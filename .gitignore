@@ -1,0 +1,10 @@
+# Локальная конфигурация и секреты Supabase
+.env
+.env.*
+!.env.example
+
+# Временные файлы Supabase CLI
+supabase/.temp/
+
+# Зависимости Node.js
+node_modules/
