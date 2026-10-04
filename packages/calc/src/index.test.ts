@@ -74,7 +74,7 @@ describe("calculate", () => {
     expect(result.costTotal).toBe(703_990);
     expect(result.margin).toBe(146_010);
     expect(result.marginPct).toBeCloseTo(0.171776, 5);
-    expect(result.warnings).toEqual(["договор ниже минимальной цены 861000"]);
+    expect(result.warnings).toEqual(["договор ниже минимальной цены 861 000"]);
   });
 
   it("calculates example C: adds per-meter assembly to fixed cost", () => {

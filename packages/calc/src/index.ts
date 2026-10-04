@@ -107,6 +107,10 @@ export function roundHalfUp(value: number, increment: number): number {
   );
 }
 
+function formatKzt(value: number): string {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
 function calculateLine(line: CalculationLine): LineCalculation {
   const qtyWithWaste = line.qty * (1 + line.wastePct);
   const billableQty =
@@ -222,7 +226,7 @@ export function calculate(input: CalculationInput): CalculationOutcome {
   const warnings: string[] = [];
 
   if (input.mode === "check_contract" && priceTotal < minPriceForTargetMargin) {
-    warnings.push(`договор ниже минимальной цены ${minPriceForTargetMargin}`);
+    warnings.push(`договор ниже минимальной цены ${formatKzt(minPriceForTargetMargin)}`);
   }
 
   return {
