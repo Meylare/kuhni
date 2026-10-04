@@ -23,7 +23,8 @@ begin
     price,
     waste_applicable,
     waste_kind,
-    billable_qty_rounding
+    billable_qty_rounding,
+    counts_for_technolog
   )
   values (
     'materials',
@@ -32,7 +33,8 @@ begin
     123,
     true,
     'edge',
-    'ceil_to_unit'
+    'ceil_to_unit',
+    true
   )
   returning id into test_price_item_id;
 
@@ -53,6 +55,7 @@ begin
       and unit_price = 123
       and waste_pct = edge_waste_pct
       and billable_qty_rounding = 'ceil_to_unit'
+      and counts_for_technolog = true
       and is_manual = false
   ) then
     raise exception 'An order line must copy the selected price-item snapshots';
@@ -79,7 +82,8 @@ begin
         'id', test_line_id,
         'unitPrice', 123,
         'wastePct', edge_waste_pct,
-        'billableQtyRounding', 'ceil_to_unit'
+        'billableQtyRounding', 'ceil_to_unit',
+        'countsForTechnolog', true
       )),
       'adjustments', jsonb_build_array(),
       'contractPrice', null
@@ -98,13 +102,15 @@ begin
       and version = 1
       and input_snapshot -> 'lines' -> 0 ->> 'unitPrice' = '123'
       and (input_snapshot -> 'lines' -> 0 ->> 'wastePct')::numeric = edge_waste_pct
+      and (input_snapshot -> 'lines' -> 0 ->> 'countsForTechnolog')::boolean = true
   ) then
     raise exception 'The first fixed calculation must retain its complete input snapshot';
   end if;
 
   update public.price_items
   set price = 456,
-      billable_qty_rounding = 'none'
+      billable_qty_rounding = 'none',
+      counts_for_technolog = false
   where id = test_price_item_id;
 
   update public.order_lines
@@ -117,12 +123,14 @@ begin
     where id = test_line_id
       and unit_price = 123
       and billable_qty_rounding = 'ceil_to_unit'
+      and counts_for_technolog = true
   ) or not exists (
     select 1
     from public.calculations
     where id = first_calculation_id
       and input_snapshot -> 'lines' -> 0 ->> 'unitPrice' = '123'
       and (input_snapshot -> 'lines' -> 0 ->> 'wastePct')::numeric = edge_waste_pct
+      and (input_snapshot -> 'lines' -> 0 ->> 'countsForTechnolog')::boolean = true
   ) then
     raise exception 'Price-list or order edits must not change a fixed calculation';
   end if;

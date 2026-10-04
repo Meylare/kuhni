@@ -174,6 +174,7 @@ describe("createCalculationVersion", () => {
           unitPrice: 1_000,
           wastePct: 0,
           billableQtyRounding: "none",
+          countsForTechnolog: false,
         },
       ],
       orderItems: [{ id: "item-1", title: "Изделие", kind: "kitchen", linearMeters: 1 }],
@@ -197,5 +198,44 @@ describe("createCalculationVersion", () => {
     expect(outcome.version.inputSnapshot.contractPrice).toBe(2_000);
     expect(outcome.version.costTotal).toBe(outcome.version.result.costTotal);
     expect(outcome.version.priceTotal).toBe(outcome.version.result.priceTotal);
+  });
+
+  it("uses the order-line technolog snapshot after the price list changes", () => {
+    const priceItem = { countsForTechnolog: true };
+    const orderLine = {
+      id: "line-1",
+      priceItemId: "price-item-1",
+      isManual: false,
+      name: "ЛДСП",
+      unit: "лист",
+      category: "materials" as const,
+      qty: 2,
+      unitPrice: 1_000,
+      wastePct: 0,
+      billableQtyRounding: "none" as const,
+      countsForTechnolog: priceItem.countsForTechnolog,
+    };
+    const parameters = { ...defaultParameters, technologMode: "per_sheet" as const };
+
+    const beforePriceListChange = createCalculationVersion({
+      mode: "quote",
+      parameters,
+      lines: [orderLine],
+    });
+    expect(beforePriceListChange.ok).toBe(true);
+    if (!beforePriceListChange.ok) throw new Error(beforePriceListChange.error);
+
+    priceItem.countsForTechnolog = false;
+    const afterPriceListChange = createCalculationVersion({
+      mode: "quote",
+      parameters,
+      lines: [orderLine],
+    });
+    expect(afterPriceListChange.ok).toBe(true);
+    if (!afterPriceListChange.ok) throw new Error(afterPriceListChange.error);
+
+    expect(orderLine.countsForTechnolog).toBe(true);
+    expect(afterPriceListChange.version.result.fixedTechnolog).toBe(8_000);
+    expect(afterPriceListChange.version.result).toEqual(beforePriceListChange.version.result);
   });
 });

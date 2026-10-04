@@ -87,6 +87,7 @@ export interface CalculationSnapshotLine extends CalculationLine {
   unit: string;
   priceItemId: string | null;
   isManual: boolean;
+  countsForTechnolog: boolean;
   comment?: string | null;
 }
 
