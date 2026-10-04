@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { calculate, type CalculationInput, type CalculationParameters } from "./index";
+import {
+  calculate,
+  createCalculationVersion,
+  type CalculationInput,
+  type CalculationParameters,
+  type CalculationVersionInput,
+} from "./index";
 
 const defaultParameters: CalculationParameters = {
   targetMarginPct: 0.18,
@@ -148,5 +154,48 @@ describe("calculate", () => {
 
     expect(result.assembly).toBe(2);
     expect(result.riskReserve).toBe(2);
+  });
+});
+
+describe("createCalculationVersion", () => {
+  it("stores a deep snapshot and result produced by the pure calculation", () => {
+    const input: CalculationVersionInput = {
+      mode: "quote",
+      parameters: { ...defaultParameters },
+      lines: [
+        {
+          id: "line-1",
+          priceItemId: "price-item-1",
+          isManual: false,
+          name: "Тестовая позиция",
+          unit: "шт",
+          category: "materials",
+          qty: 2,
+          unitPrice: 1_000,
+          wastePct: 0,
+          billableQtyRounding: "none",
+        },
+      ],
+      orderItems: [{ id: "item-1", title: "Изделие", kind: "kitchen", linearMeters: 1 }],
+      adjustments: [{ id: "adjustment-1", kind: "price", category: "adjustments", label: "Скидка", amount: -100 }],
+      contractPrice: 2_000,
+    };
+
+    const outcome = createCalculationVersion(input);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error(outcome.error);
+
+    input.parameters.targetMarginPct = 0.5;
+    input.lines[0].unitPrice = 9_999;
+    input.orderItems![0].linearMeters = 9;
+    input.adjustments![0].amount = -999;
+
+    expect(outcome.version.paramsSnapshot.targetMarginPct).toBe(0.18);
+    expect(outcome.version.inputSnapshot.lines[0].unitPrice).toBe(1_000);
+    expect(outcome.version.inputSnapshot.orderItems[0].linearMeters).toBe(1);
+    expect(outcome.version.inputSnapshot.adjustments[0].amount).toBe(-100);
+    expect(outcome.version.inputSnapshot.contractPrice).toBe(2_000);
+    expect(outcome.version.costTotal).toBe(outcome.version.result.costTotal);
+    expect(outcome.version.priceTotal).toBe(outcome.version.result.priceTotal);
   });
 });

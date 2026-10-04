@@ -81,6 +81,55 @@ export type CalculationOutcome =
   | { ok: true; result: CalculationResult }
   | { ok: false; error: "parameters_leave_no_share_for_fixed_costs" | "contract_price_required" };
 
+export interface CalculationSnapshotLine extends CalculationLine {
+  id: string;
+  name: string;
+  unit: string;
+  priceItemId: string | null;
+  isManual: boolean;
+  comment?: string | null;
+}
+
+export interface CalculationSnapshotOrderItem extends CalculationOrderItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  dims?: Record<string, unknown>;
+}
+
+export interface CalculationSnapshotAdjustment extends CalculationAdjustment {
+  id: string;
+  label: string;
+  category: "adjustments";
+  comment?: string | null;
+}
+
+export interface CalculationVersionInput
+  extends Omit<CalculationInput, "lines" | "orderItems" | "adjustments"> {
+  lines: readonly CalculationSnapshotLine[];
+  orderItems?: readonly CalculationSnapshotOrderItem[];
+  adjustments?: readonly CalculationSnapshotAdjustment[];
+}
+
+export interface CalculationVersion {
+  mode: CalculationMode;
+  paramsSnapshot: CalculationParameters;
+  inputSnapshot: {
+    lines: CalculationSnapshotLine[];
+    orderItems: CalculationSnapshotOrderItem[];
+    adjustments: CalculationSnapshotAdjustment[];
+    contractPrice: number | null;
+  };
+  result: CalculationResult;
+  costTotal: number;
+  priceTotal: number;
+  marginPct: number | null;
+}
+
+export type CalculationVersionOutcome =
+  | { ok: true; version: CalculationVersion }
+  | { ok: false; error: CalculationOutcome["error"] };
+
 const categories: readonly CostCategory[] = [
   "materials",
   "workshop",
@@ -246,6 +295,35 @@ export function calculate(input: CalculationInput): CalculationOutcome {
       marginPct: priceTotal === 0 ? null : margin / priceTotal,
       minPriceForTargetMargin,
       warnings,
+    },
+  };
+}
+
+/**
+ * Builds the immutable payload for public.calculations from the same pure
+ * calculation used by the app and future agent API. No database or clock is
+ * consulted, and every object is deep-copied before it can be persisted.
+ */
+export function createCalculationVersion(input: CalculationVersionInput): CalculationVersionOutcome {
+  const outcome = calculate(input);
+  if (!outcome.ok) return outcome;
+
+  const result = structuredClone(outcome.result);
+  return {
+    ok: true,
+    version: {
+      mode: input.mode,
+      paramsSnapshot: structuredClone(input.parameters),
+      inputSnapshot: {
+        lines: structuredClone(input.lines),
+        orderItems: structuredClone(input.orderItems ?? []),
+        adjustments: structuredClone(input.adjustments ?? []),
+        contractPrice: input.contractPrice ?? null,
+      },
+      result,
+      costTotal: result.costTotal,
+      priceTotal: result.priceTotal,
+      marginPct: result.marginPct,
     },
   };
 }
