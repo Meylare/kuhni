@@ -240,3 +240,23 @@ export interface OrderCalculation {
   is_contract_baseline: boolean;
   created_at: string;
 }
+
+export interface ActualExpense {
+  id: string;
+  order_id: string;
+  expense_date: string;
+  category: PriceCategory;
+  name: string;
+  amount: number;
+  is_rework: boolean;
+  rework_reason: string | null;
+  note: string | null;
+}
+
+export interface Payment {
+  id: string;
+  order_id: string;
+  paid_at: string;
+  amount: number;
+  note: string | null;
+}

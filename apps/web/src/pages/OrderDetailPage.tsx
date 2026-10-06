@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { FactTab } from "../components/FactTab";
+
 import { formatKzt } from "../lib/money";
 import {
   calculateOrderLive,
@@ -30,6 +32,7 @@ import {
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
   PRICE_UNITS,
+  type ActualExpense,
   type BillableQtyRounding,
   type Order,
   type OrderAdjustment,
@@ -39,6 +42,7 @@ import {
   type OrderLine,
   type OrderStatus,
   type ParameterItem,
+  type Payment,
   type PriceCategory,
   type PriceItem,
   type PriceUnit,
@@ -56,6 +60,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   const [adjustments, setAdjustments] = useState<OrderAdjustment[]>([]);
   const [priceItems, setPriceItems] = useState<PriceItem[]>([]);
   const [globalParams, setGlobalParams] = useState<ParametersMap>(DEFAULT_PARAMETERS);
+  const [expenses, setExpenses] = useState<ActualExpense[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -174,13 +180,15 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       setOrder(ordData as Order);
 
       // Загрузка связанных таблиц параллельно
-      const [itemsRes, linesRes, adjRes, pricesRes, paramsRes, calcsRes] = await Promise.all([
+      const [itemsRes, linesRes, adjRes, pricesRes, paramsRes, calcsRes, expensesRes, paymentsRes] = await Promise.all([
         supabase.from("order_items").select("*").eq("order_id", orderId).order("title"),
         supabase.from("order_lines").select("*").eq("order_id", orderId),
         supabase.from("adjustments").select("*").eq("order_id", orderId),
         supabase.from("price_items").select("*").order("name"),
         supabase.from("parameters").select("*"),
         supabase.from("calculations").select("*").eq("order_id", orderId).order("version", { ascending: false }),
+        supabase.from("actual_expenses").select("*").eq("order_id", orderId).order("expense_date", { ascending: false }),
+        supabase.from("payments").select("*").eq("order_id", orderId).order("paid_at", { ascending: false }),
       ]);
 
       if (itemsRes.error) console.error("items error", itemsRes.error);
@@ -188,12 +196,16 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       if (adjRes.error) console.error("adjustments error", adjRes.error);
       if (pricesRes.error) console.error("prices error", pricesRes.error);
       if (calcsRes.error) console.error("calculations error", calcsRes.error);
+      if (expensesRes.error) console.error("expenses error", expensesRes.error);
+      if (paymentsRes.error) console.error("payments error", paymentsRes.error);
 
       setItems((itemsRes.data as OrderItem[]) || []);
       setLines((linesRes.data as OrderLine[]) || []);
       setAdjustments((adjRes.data as OrderAdjustment[]) || []);
       setPriceItems((pricesRes.data as PriceItem[]) || []);
       setCalculations((calcsRes.data as OrderCalculation[]) || []);
+      setExpenses((expensesRes.data as ActualExpense[]) || []);
+      setPayments((paymentsRes.data as Payment[]) || []);
 
       if (paramsRes.data) {
         const map = parametersArrayToMap(paramsRes.data as ParameterItem[]);
@@ -1191,7 +1203,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                 : "bg-stone-100 text-stone-600 hover:bg-stone-200"
             }`}
           >
-            3. Факт и план (U6)
+            3. Факт ({expenses.length + payments.length})
           </button>
         </div>
       </div>
@@ -1469,14 +1481,15 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         </div>
       )}
 
-      {orderTab === "fact" && (
-        <div className="mt-6 rounded-2xl border border-dashed border-stone-300 bg-white/70 p-8 text-center text-sm text-stone-600">
-          <span className="text-2xl">📊</span>
-          <h3 className="mt-2 font-bold text-stone-800">Фактические расходы и поступления</h3>
-          <p className="mt-1 text-xs text-stone-500">
-            Внесение фактических оплат, переделок и план/факт отчётность реализуются в шаге U6.
-          </p>
-        </div>
+      {orderTab === "fact" && order && (
+        <FactTab
+          order={order}
+          expenses={expenses}
+          payments={payments}
+          calculations={calculations}
+          onExpensesChange={setExpenses}
+          onPaymentsChange={setPayments}
+        />
       )}
 
       {orderTab === "calc" && (
