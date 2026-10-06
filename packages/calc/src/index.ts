@@ -129,7 +129,7 @@ export interface CalculationVersion {
 
 export type CalculationVersionOutcome =
   | { ok: true; version: CalculationVersion }
-  | { ok: false; error: CalculationOutcome["error"] };
+  | { ok: false; error: Extract<CalculationOutcome, { ok: false }>["error"] };
 
 const categories: readonly CostCategory[] = [
   "materials",
@@ -316,9 +316,9 @@ export function createCalculationVersion(input: CalculationVersionInput): Calcul
       mode: input.mode,
       paramsSnapshot: structuredClone(input.parameters),
       inputSnapshot: {
-        lines: structuredClone(input.lines),
-        orderItems: structuredClone(input.orderItems ?? []),
-        adjustments: structuredClone(input.adjustments ?? []),
+        lines: [...structuredClone(input.lines)],
+        orderItems: [...structuredClone(input.orderItems ?? [])],
+        adjustments: [...structuredClone(input.adjustments ?? [])],
         contractPrice: input.contractPrice ?? null,
       },
       result,

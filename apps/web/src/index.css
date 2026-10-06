@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+html {
+  background: #f6f1ea;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: #f6f1ea;
+  color: #1c1917;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}

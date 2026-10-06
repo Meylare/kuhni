@@ -8,3 +8,7 @@ supabase/.temp/
 
 # Зависимости Node.js
 node_modules/
+
+# Сборка интерфейса
+apps/web/dist/
+**/node_modules/.tmp/

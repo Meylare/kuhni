@@ -1,0 +1,25 @@
+{
+  "name": "Калькулятор заказов",
+  "short_name": "Кухни",
+  "description": "Расчёт и учёт заказов мебели",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f1ea",
+  "theme_color": "#1f4d3a",
+  "icons": [
+    {
+      "src": "pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
