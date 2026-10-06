@@ -1,0 +1,2372 @@
+import { useEffect, useMemo, useState } from "react";
+
+import { formatKzt } from "../lib/money";
+import {
+  calculateOrderLive,
+  isOrderLocked,
+  validateAdjustmentInput,
+  validateManualLineInput,
+  validateOrderInput,
+  validateOrderItemInput,
+} from "../lib/orders";
+import {
+  DEFAULT_PARAMETERS,
+  formatPercent,
+  parametersArrayToMap,
+  parsePercent,
+  type ParametersMap,
+} from "../lib/parameters";
+import { getSupabase } from "../lib/supabase";
+import {
+  ALL_CATEGORIES,
+  CATEGORY_LABELS,
+  ORDER_ITEM_KIND_LABELS,
+  ORDER_ITEM_KINDS,
+  ORDER_STATUS_COLORS,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUSES,
+  PRICE_UNITS,
+  type BillableQtyRounding,
+  type Order,
+  type OrderAdjustment,
+  type OrderItem,
+  type OrderItemKind,
+  type OrderLine,
+  type OrderStatus,
+  type ParameterItem,
+  type PriceCategory,
+  type PriceItem,
+  type PriceUnit,
+} from "../types/database";
+
+interface OrderDetailPageProps {
+  orderId: string;
+  onBack: () => void;
+}
+
+export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
+  const [order, setOrder] = useState<Order | null>(null);
+  const [items, setItems] = useState<OrderItem[]>([]);
+  const [lines, setLines] = useState<OrderLine[]>([]);
+  const [adjustments, setAdjustments] = useState<OrderAdjustment[]>([]);
+  const [priceItems, setPriceItems] = useState<PriceItem[]>([]);
+  const [globalParams, setGlobalParams] = useState<ParametersMap>(DEFAULT_PARAMETERS);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Режим расчёта: "quote" (рассчитать цену) | "check_contract" (проверить договор)
+  const [calcMode, setCalcMode] = useState<"quote" | "check_contract">("quote");
+
+  // Активная вкладка заказа: "calc" (расчёт) | "history" (история) | "fact" (факт)
+  const [orderTab, setOrderTab] = useState<"calc" | "history" | "fact">("calc");
+
+  // Раскрытие подробной сводки затрат
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // Редактирование шапки заказа
+  const [isEditingHeader, setIsEditingHeader] = useState(false);
+  const [headerName, setHeaderName] = useState("");
+  const [headerClient, setHeaderClient] = useState("");
+  const [headerStatus, setHeaderStatus] = useState<OrderStatus>("draft");
+  const [headerContractPrice, setHeaderContractPrice] = useState("");
+  const [headerNote, setHeaderNote] = useState("");
+  const [headerSaving, setHeaderSaving] = useState(false);
+  const [headerError, setHeaderError] = useState<string | null>(null);
+
+  // Добавление / редактирование изделия
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<OrderItem | null>(null);
+  const [itemTitle, setItemTitle] = useState("");
+  const [itemKind, setItemKind] = useState<OrderItemKind>("kitchen");
+  const [itemMeters, setItemMeters] = useState("");
+  const [itemDesc, setItemDesc] = useState("");
+  const [itemSaving, setItemSaving] = useState(false);
+  const [itemError, setItemError] = useState<string | null>(null);
+
+  // Добавление позиции из справочника цен
+  const [isPricePickerOpen, setIsPricePickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [pickerCategory, setPickerCategory] = useState<PriceCategory | "all">("all");
+  const [selectedPriceItem, setSelectedPriceItem] = useState<PriceItem | null>(null);
+  const [pickerQty, setPickerQty] = useState("1");
+  const [pickerWaste, setPickerWaste] = useState("");
+  const [pickerItemId, setPickerItemId] = useState<string>("");
+  const [pickerComment, setPickerComment] = useState("");
+  const [pickerSaving, setPickerSaving] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+
+  // Добавление / редактирование ручной позиции
+  const [isManualLineModalOpen, setIsManualLineModalOpen] = useState(false);
+  const [editingLine, setEditingLine] = useState<OrderLine | null>(null);
+  const [manualCategory, setManualCategory] = useState<PriceCategory>("other");
+  const [manualName, setManualName] = useState("");
+  const [manualUnit, setManualUnit] = useState<PriceUnit>("шт");
+  const [manualQty, setManualQty] = useState("1");
+  const [manualUnitPrice, setManualUnitPrice] = useState("");
+  const [manualWaste, setManualWaste] = useState("0");
+  const [manualRounding, setManualRounding] = useState<BillableQtyRounding>("none");
+  const [manualTechnolog, setManualTechnolog] = useState(false);
+  const [manualItemId, setManualItemId] = useState<string>("");
+  const [manualComment, setManualComment] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+
+  // Добавление корректировки
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
+  const [adjKind, setAdjKind] = useState<"cost" | "price">("price");
+  const [adjLabel, setAdjLabel] = useState("");
+  const [adjAmount, setAdjAmount] = useState("");
+  const [adjComment, setAdjComment] = useState("");
+  const [adjSaving, setAdjSaving] = useState(false);
+  const [adjError, setAdjError] = useState<string | null>(null);
+
+  // Переопределение параметров заказа (аккордеон)
+  const [isParamsAccordionOpen, setIsParamsAccordionOpen] = useState(false);
+  const [customMargin, setCustomMargin] = useState("");
+  const [customAssemblyMode, setCustomAssemblyMode] = useState<"default" | "percent" | "per_meter">("default");
+  const [customAssemblyPct, setCustomAssemblyPct] = useState("");
+  const [customTechnologMode, setCustomTechnologMode] = useState<"default" | "percent" | "per_sheet">("default");
+  const [customTechnologPct, setCustomTechnologPct] = useState("");
+  const [customRiskReservePct, setCustomRiskReservePct] = useState("");
+  const [customWasteEdgePct, setCustomWasteEdgePct] = useState("");
+  const [paramsSaving, setParamsSaving] = useState(false);
+
+  // Копирование сводки в буфер
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  // Обновление цен в заказе из актуального прайса
+  const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
+
+  async function loadOrderData() {
+    try {
+      setLoading(true);
+      setError(null);
+      const supabase = getSupabase();
+
+      // Загрузка заказа
+      const { data: ordData, error: ordErr } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", orderId)
+        .single();
+
+      if (ordErr || !ordData) {
+        throw new Error(ordErr?.message ?? "Заказ не найден");
+      }
+
+      setOrder(ordData as Order);
+
+      // Загрузка связанных таблиц параллельно
+      const [itemsRes, linesRes, adjRes, pricesRes, paramsRes] = await Promise.all([
+        supabase.from("order_items").select("*").eq("order_id", orderId).order("title"),
+        supabase.from("order_lines").select("*").eq("order_id", orderId),
+        supabase.from("adjustments").select("*").eq("order_id", orderId),
+        supabase.from("price_items").select("*").order("name"),
+        supabase.from("parameters").select("*"),
+      ]);
+
+      if (itemsRes.error) console.error("items error", itemsRes.error);
+      if (linesRes.error) console.error("lines error", linesRes.error);
+      if (adjRes.error) console.error("adjustments error", adjRes.error);
+      if (pricesRes.error) console.error("prices error", pricesRes.error);
+
+      setItems((itemsRes.data as OrderItem[]) || []);
+      setLines((linesRes.data as OrderLine[]) || []);
+      setAdjustments((adjRes.data as OrderAdjustment[]) || []);
+      setPriceItems((pricesRes.data as PriceItem[]) || []);
+
+      if (paramsRes.data) {
+        const map = parametersArrayToMap(paramsRes.data as ParameterItem[]);
+        setGlobalParams(map);
+      }
+
+      // Инициализируем локальные поля настроек заказа
+      const s = (ordData.settings || {}) as Record<string, unknown>;
+      setCustomMargin(
+        typeof s.target_margin_pct === "number" ? formatPercent(s.target_margin_pct) : ""
+      );
+      setCustomAssemblyMode(
+        s.assembly_mode === "percent" || s.assembly_mode === "per_meter"
+          ? s.assembly_mode
+          : "default"
+      );
+      setCustomAssemblyPct(
+        typeof s.assembly_pct === "number" ? formatPercent(s.assembly_pct) : ""
+      );
+      setCustomTechnologMode(
+        s.technolog_mode === "percent" || s.technolog_mode === "per_sheet"
+          ? s.technolog_mode
+          : "default"
+      );
+      setCustomTechnologPct(
+        typeof s.technolog_pct === "number" ? formatPercent(s.technolog_pct) : ""
+      );
+      setCustomRiskReservePct(
+        typeof s.risk_reserve_pct === "number" ? formatPercent(s.risk_reserve_pct) : ""
+      );
+      setCustomWasteEdgePct(
+        typeof s.waste_edge_pct === "number" ? formatPercent(s.waste_edge_pct) : ""
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Не удалось загрузить данные заказа.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadOrderData();
+  }, [orderId]);
+
+  // Заказ заблокирован?
+  const locked = order ? isOrderLocked(order.status) : false;
+
+  // Карта справочника цен для проверки изменений снимков
+  const priceItemsById = useMemo(() => {
+    return new Map(priceItems.map((p) => [p.id, p]));
+  }, [priceItems]);
+
+  // Вычисление живого расчёта
+  const calcOutcome = useMemo(() => {
+    if (!order) return null;
+    return calculateOrderLive({
+      order,
+      items,
+      lines,
+      adjustments,
+      globalParams,
+      mode: calcMode,
+    });
+  }, [order, items, lines, adjustments, globalParams, calcMode]);
+
+  // Проверка: есть ли позиции с изменившейся ценой в справочнике?
+  const changedPriceLines = useMemo(() => {
+    return lines.filter((line) => {
+      if (!line.price_item_id) return false;
+      const current = priceItemsById.get(line.price_item_id);
+      return current && current.price !== Number(line.unit_price);
+    });
+  }, [lines, priceItemsById]);
+
+  // Открытие редактирования шапки
+  function handleOpenEditHeader() {
+    if (!order) return;
+    setHeaderName(order.name);
+    setHeaderClient(order.client_label || "");
+    setHeaderStatus(order.status);
+    setHeaderContractPrice(
+      order.contract_price !== null ? String(order.contract_price) : ""
+    );
+    setHeaderNote(order.note || "");
+    setHeaderError(null);
+    setIsEditingHeader(true);
+  }
+
+  // Сохранение шапки заказа
+  async function handleSaveHeader(e: React.FormEvent) {
+    e.preventDefault();
+    if (!order) return;
+
+    const contractPriceNum = headerContractPrice.trim()
+      ? Number(headerContractPrice.replace(/\s+/g, ""))
+      : null;
+
+    const validation = validateOrderInput({
+      name: headerName,
+      contract_price: contractPriceNum,
+    });
+
+    if (!validation.valid) {
+      setHeaderError(validation.error ?? "Проверьте введённые данные.");
+      return;
+    }
+
+    try {
+      setHeaderSaving(true);
+      setHeaderError(null);
+      const supabase = getSupabase();
+
+      const { data, error: updateErr } = await supabase
+        .from("orders")
+        .update({
+          name: headerName.trim(),
+          client_label: headerClient.trim() || null,
+          status: headerStatus,
+          contract_price: contractPriceNum,
+          note: headerNote.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id)
+        .select()
+        .single();
+
+      if (updateErr) {
+        setHeaderError(updateErr.message);
+      } else if (data) {
+        setOrder(data as Order);
+        setIsEditingHeader(false);
+      }
+    } catch (err: unknown) {
+      setHeaderError(err instanceof Error ? err.message : "Ошибка при сохранении.");
+    } finally {
+      setHeaderSaving(false);
+    }
+  }
+
+  // Сохранение переопределённых параметров заказа
+  async function handleSaveOrderSettings() {
+    if (!order || locked) return;
+
+    try {
+      setParamsSaving(true);
+      const newSettings: Record<string, unknown> = {};
+
+      const marginParsed = parsePercent(customMargin);
+      if (marginParsed !== null) newSettings.target_margin_pct = marginParsed;
+
+      if (customAssemblyMode !== "default") {
+        newSettings.assembly_mode = customAssemblyMode;
+      }
+      const assemblyParsed = parsePercent(customAssemblyPct);
+      if (assemblyParsed !== null) newSettings.assembly_pct = assemblyParsed;
+
+      if (customTechnologMode !== "default") {
+        newSettings.technolog_mode = customTechnologMode;
+      }
+      const techParsed = parsePercent(customTechnologPct);
+      if (techParsed !== null) newSettings.technolog_pct = techParsed;
+
+      const riskParsed = parsePercent(customRiskReservePct);
+      if (riskParsed !== null) newSettings.risk_reserve_pct = riskParsed;
+
+      const wasteParsed = parsePercent(customWasteEdgePct);
+      if (wasteParsed !== null) newSettings.waste_edge_pct = wasteParsed;
+
+      const supabase = getSupabase();
+      const { data, error: updateErr } = await supabase
+        .from("orders")
+        .update({
+          settings: newSettings,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id)
+        .select()
+        .single();
+
+      if (updateErr) {
+        alert("Ошибка сохранения параметров: " + updateErr.message);
+      } else if (data) {
+        setOrder(data as Order);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setParamsSaving(false);
+    }
+  }
+
+  // Добавление / редактирование изделия
+  function handleOpenAddItem() {
+    setEditingItem(null);
+    setItemTitle("");
+    setItemKind("kitchen");
+    setItemMeters("3");
+    setItemDesc("");
+    setItemError(null);
+    setIsItemModalOpen(true);
+  }
+
+  function handleOpenEditItem(item: OrderItem) {
+    setEditingItem(item);
+    setItemTitle(item.title);
+    setItemKind(item.kind);
+    setItemMeters(item.linear_meters !== null ? String(item.linear_meters) : "");
+    setItemDesc(item.description || "");
+    setItemError(null);
+    setIsItemModalOpen(true);
+  }
+
+  async function handleSaveItem(e: React.FormEvent) {
+    e.preventDefault();
+    if (!order || locked) return;
+
+    const metersNum =
+      itemKind !== "other" && itemMeters.trim()
+        ? Number(itemMeters.replace(/,/g, ".").trim())
+        : null;
+
+    const validation = validateOrderItemInput({
+      title: itemTitle,
+      kind: itemKind,
+      linear_meters: metersNum,
+    });
+
+    if (!validation.valid) {
+      setItemError(validation.error ?? "Проверьте данные изделия.");
+      return;
+    }
+
+    try {
+      setItemSaving(true);
+      setItemError(null);
+      const supabase = getSupabase();
+
+      if (editingItem) {
+        const { data, error: updateErr } = await supabase
+          .from("order_items")
+          .update({
+            title: itemTitle.trim(),
+            kind: itemKind,
+            linear_meters: metersNum,
+            description: itemDesc.trim() || null,
+          })
+          .eq("id", editingItem.id)
+          .select()
+          .single();
+
+        if (updateErr) {
+          setItemError(updateErr.message);
+        } else if (data) {
+          setItems((prev) =>
+            prev.map((i) => (i.id === editingItem.id ? (data as OrderItem) : i))
+          );
+          setIsItemModalOpen(false);
+        }
+      } else {
+        const { data, error: insertErr } = await supabase
+          .from("order_items")
+          .insert({
+            order_id: order.id,
+            title: itemTitle.trim(),
+            kind: itemKind,
+            linear_meters: metersNum,
+            description: itemDesc.trim() || null,
+            dims: {},
+          })
+          .select()
+          .single();
+
+        if (insertErr) {
+          setItemError(insertErr.message);
+        } else if (data) {
+          setItems((prev) => [...prev, data as OrderItem]);
+          setIsItemModalOpen(false);
+        }
+      }
+    } catch (err: unknown) {
+      setItemError(err instanceof Error ? err.message : "Ошибка при сохранении изделия.");
+    } finally {
+      setItemSaving(false);
+    }
+  }
+
+  async function handleDeleteItem(itemId: string) {
+    if (locked || !confirm("Удалить это изделие и все привязанные к нему позиции?")) return;
+    try {
+      const supabase = getSupabase();
+      const { error: delErr } = await supabase
+        .from("order_items")
+        .delete()
+        .eq("id", itemId);
+      if (delErr) {
+        alert("Ошибка удаления изделия: " + delErr.message);
+      } else {
+        setItems((prev) => prev.filter((i) => i.id !== itemId));
+        setLines((prev) => prev.filter((l) => l.order_item_id !== itemId));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Добавление позиции из справочника цен
+  function handleOpenPricePicker() {
+    setSelectedPriceItem(null);
+    setPickerQty("1");
+    setPickerWaste("");
+    setPickerItemId(items.length > 0 ? items[0].id : "");
+    setPickerComment("");
+    setPickerError(null);
+    setPickerSearch("");
+    setPickerCategory("all");
+    setIsPricePickerOpen(true);
+  }
+
+  function handleSelectPriceItem(pi: PriceItem) {
+    setSelectedPriceItem(pi);
+    // Предзаполняем отход: если кромка - берём waste_edge_pct из параметров, иначе 0
+    if (pi.waste_applicable) {
+      const edgeWaste = globalParams.waste_edge_pct * 100;
+      setPickerWaste(String(edgeWaste));
+    } else {
+      setPickerWaste("0");
+    }
+  }
+
+  async function handleAddPriceItemToOrder(e: React.FormEvent) {
+    e.preventDefault();
+    if (!order || !selectedPriceItem || locked) return;
+
+    const qtyNum = Number(pickerQty.replace(/,/g, ".").trim());
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      setPickerError("Количество должно быть больше 0.");
+      return;
+    }
+
+    const wasteNum = pickerWaste.trim()
+      ? Number(pickerWaste.replace(/,/g, ".").trim()) / 100
+      : 0;
+
+    try {
+      setPickerSaving(true);
+      setPickerError(null);
+      const supabase = getSupabase();
+
+      // Вставка позиции
+      const { data, error: insertErr } = await supabase
+        .from("order_lines")
+        .insert({
+          order_id: order.id,
+          order_item_id: pickerItemId || null,
+          price_item_id: selectedPriceItem.id,
+          category: selectedPriceItem.category,
+          name: selectedPriceItem.name,
+          unit: selectedPriceItem.unit,
+          qty: qtyNum,
+          unit_price: selectedPriceItem.price,
+          waste_pct: wasteNum,
+          billable_qty_rounding: selectedPriceItem.billable_qty_rounding,
+          counts_for_technolog: selectedPriceItem.counts_for_technolog,
+          is_manual: false,
+          comment: pickerComment.trim() || null,
+        })
+        .select()
+        .single();
+
+      if (insertErr) {
+        setPickerError(insertErr.message);
+      } else if (data) {
+        // Если триггер перезаписал waste_pct, а пользователь указал своё значение
+        const insertedLine = data as OrderLine;
+        if (Math.abs(Number(insertedLine.waste_pct) - wasteNum) > 0.0001) {
+          await supabase
+            .from("order_lines")
+            .update({ waste_pct: wasteNum })
+            .eq("id", insertedLine.id);
+          insertedLine.waste_pct = wasteNum;
+        }
+
+        setLines((prev) => [...prev, insertedLine]);
+        setIsPricePickerOpen(false);
+      }
+    } catch (err: unknown) {
+      setPickerError(err instanceof Error ? err.message : "Ошибка добавления позиции.");
+    } finally {
+      setPickerSaving(false);
+    }
+  }
+
+  // Добавление / редактирование ручной позиции
+  function handleOpenAddManualLine() {
+    setEditingLine(null);
+    setManualCategory("transport");
+    setManualName("");
+    setManualUnit("проект");
+    setManualQty("1");
+    setManualUnitPrice("");
+    setManualWaste("0");
+    setManualRounding("none");
+    setManualTechnolog(false);
+    setManualItemId(items.length > 0 ? items[0].id : "");
+    setManualComment("");
+    setManualError(null);
+    setIsManualLineModalOpen(true);
+  }
+
+  function handleOpenEditLine(line: OrderLine) {
+    setEditingLine(line);
+    setManualCategory(line.category);
+    setManualName(line.name);
+    setManualUnit(line.unit as PriceUnit);
+    setManualQty(String(line.qty));
+    setManualUnitPrice(String(line.unit_price));
+    setManualWaste(String(Number(line.waste_pct) * 100));
+    setManualRounding(line.billable_qty_rounding);
+    setManualTechnolog(line.counts_for_technolog);
+    setManualItemId(line.order_item_id || "");
+    setManualComment(line.comment || "");
+    setManualError(null);
+    setIsManualLineModalOpen(true);
+  }
+
+  async function handleSaveManualLine(e: React.FormEvent) {
+    e.preventDefault();
+    if (!order || locked) return;
+
+    const qtyNum = Number(manualQty.replace(/,/g, ".").trim());
+    const priceNum = Number(manualUnitPrice.replace(/\s+/g, "").trim());
+    const wasteNum = manualWaste.trim()
+      ? Number(manualWaste.replace(/,/g, ".").trim()) / 100
+      : 0;
+
+    const validation = validateManualLineInput({
+      name: manualName,
+      category: manualCategory,
+      qty: qtyNum,
+      unit_price: priceNum,
+      waste_pct: wasteNum,
+    });
+
+    if (!validation.valid) {
+      setManualError(validation.error ?? "Проверьте данные позиции.");
+      return;
+    }
+
+    try {
+      setManualSaving(true);
+      setManualError(null);
+      const supabase = getSupabase();
+
+      if (editingLine) {
+        const updatePayload: Partial<OrderLine> = {
+          qty: qtyNum,
+          waste_pct: wasteNum,
+          comment: manualComment.trim() || null,
+          order_item_id: manualItemId || null,
+        };
+
+        if (editingLine.is_manual) {
+          updatePayload.name = manualName.trim();
+          updatePayload.category = manualCategory;
+          updatePayload.unit = manualUnit;
+          updatePayload.unit_price = priceNum;
+          updatePayload.billable_qty_rounding = manualRounding;
+          updatePayload.counts_for_technolog = manualTechnolog;
+        }
+
+        const { data, error: updateErr } = await supabase
+          .from("order_lines")
+          .update(updatePayload)
+          .eq("id", editingLine.id)
+          .select()
+          .single();
+
+        if (updateErr) {
+          setManualError(updateErr.message);
+        } else if (data) {
+          setLines((prev) =>
+            prev.map((l) => (l.id === editingLine.id ? (data as OrderLine) : l))
+          );
+          setIsManualLineModalOpen(false);
+        }
+      } else {
+        const { data, error: insertErr } = await supabase
+          .from("order_lines")
+          .insert({
+            order_id: order.id,
+            order_item_id: manualItemId || null,
+            price_item_id: null,
+            category: manualCategory,
+            name: manualName.trim(),
+            unit: manualUnit,
+            qty: qtyNum,
+            unit_price: priceNum,
+            waste_pct: wasteNum,
+            billable_qty_rounding: manualRounding,
+            counts_for_technolog: manualTechnolog,
+            is_manual: true,
+            comment: manualComment.trim() || null,
+          })
+          .select()
+          .single();
+
+        if (insertErr) {
+          setManualError(insertErr.message);
+        } else if (data) {
+          setLines((prev) => [...prev, data as OrderLine]);
+          setIsManualLineModalOpen(false);
+        }
+      }
+    } catch (err: unknown) {
+      setManualError(err instanceof Error ? err.message : "Ошибка сохранения позиции.");
+    } finally {
+      setManualSaving(false);
+    }
+  }
+
+  async function handleDeleteLine(lineId: string) {
+    if (locked || !confirm("Удалить эту позицию из заказа?")) return;
+    try {
+      const supabase = getSupabase();
+      const { error: delErr } = await supabase
+        .from("order_lines")
+        .delete()
+        .eq("id", lineId);
+      if (delErr) {
+        alert("Ошибка удаления: " + delErr.message);
+      } else {
+        setLines((prev) => prev.filter((l) => l.id !== lineId));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Обновление цен в заказе из текущего справочника цен
+  async function handleUpdatePricesFromCatalog() {
+    if (locked || changedPriceLines.length === 0) return;
+    if (
+      !confirm(
+        `Обновить цены для ${changedPriceLines.length} позиций по актуальному прайсу?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setIsUpdatingPrices(true);
+      const supabase = getSupabase();
+
+      for (const line of changedPriceLines) {
+        const itemInCatalog = priceItemsById.get(line.price_item_id!);
+        if (itemInCatalog) {
+          await supabase
+            .from("order_lines")
+            .update({ unit_price: itemInCatalog.price })
+            .eq("id", line.id);
+        }
+      }
+
+      // Перезагрузка строк
+      const { data: updatedLines } = await supabase
+        .from("order_lines")
+        .select("*")
+        .eq("order_id", order!.id);
+      if (updatedLines) {
+        setLines(updatedLines as OrderLine[]);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUpdatingPrices(false);
+    }
+  }
+
+  // Добавление корректировки
+  function handleOpenAddAdjustment() {
+    setAdjKind("price");
+    setAdjLabel("");
+    setAdjAmount("");
+    setAdjComment("");
+    setAdjError(null);
+    setIsAdjustmentModalOpen(true);
+  }
+
+  async function handleSaveAdjustment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!order || locked) return;
+
+    const amountNum = Number(adjAmount.replace(/\s+/g, "").trim());
+    const validation = validateAdjustmentInput({
+      label: adjLabel,
+      amount: amountNum,
+    });
+
+    if (!validation.valid) {
+      setAdjError(validation.error ?? "Проверьте данные корректировки.");
+      return;
+    }
+
+    try {
+      setAdjSaving(true);
+      setAdjError(null);
+      const supabase = getSupabase();
+
+      const { data, error: insertErr } = await supabase
+        .from("adjustments")
+        .insert({
+          order_id: order.id,
+          kind: adjKind,
+          category: "adjustments",
+          label: adjLabel.trim(),
+          amount: amountNum,
+          comment: adjComment.trim() || null,
+        })
+        .select()
+        .single();
+
+      if (insertErr) {
+        setAdjError(insertErr.message);
+      } else if (data) {
+        setAdjustments((prev) => [...prev, data as OrderAdjustment]);
+        setIsAdjustmentModalOpen(false);
+      }
+    } catch (err: unknown) {
+      setAdjError(err instanceof Error ? err.message : "Ошибка добавления корректировки.");
+    } finally {
+      setAdjSaving(false);
+    }
+  }
+
+  async function handleDeleteAdjustment(adjId: string) {
+    if (locked || !confirm("Удалить эту корректировку?")) return;
+    try {
+      const supabase = getSupabase();
+      const { error: delErr } = await supabase
+        .from("adjustments")
+        .delete()
+        .eq("id", adjId);
+      if (delErr) {
+        alert("Ошибка удаления: " + delErr.message);
+      } else {
+        setAdjustments((prev) => prev.filter((a) => a.id !== adjId));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Копирование сводки расчёта в буфер обмена
+  function handleCopySummary() {
+    if (!order || !calcOutcome || !calcOutcome.ok) return;
+    const res = calcOutcome.result;
+    const text = [
+      `Расчёт заказа: ${order.name}`,
+      order.client_label ? `Клиент: ${order.client_label}` : "",
+      `Режим: ${calcMode === "quote" ? "Рассчитать цену" : "Проверить договор"}`,
+      `Итоговая цена: ${formatKzt(res.priceTotal)} ₸`,
+      `Себестоимость: ${formatKzt(res.costTotal)} ₸`,
+      `Маржа: ${formatKzt(res.margin)} ₸ (${formatPercent(res.marginPct)})`,
+      `Мин. цена для маржи: ${formatKzt(res.minPriceForTargetMargin)} ₸`,
+      "",
+      "Затраты по категориям:",
+      `• Материалы: ${formatKzt(res.categoryTotals.materials)} ₸`,
+      `• Фасады: ${formatKzt(res.categoryTotals.facades)} ₸`,
+      `• Цех: ${formatKzt(res.categoryTotals.workshop)} ₸`,
+      `• Фурнитура: ${formatKzt(res.categoryTotals.hardware)} ₸`,
+      `• Транспорт: ${formatKzt(res.categoryTotals.transport)} ₸`,
+      `• Работа: ${formatKzt(res.categoryTotals.labor)} ₸`,
+      `• Остальное: ${formatKzt(res.categoryTotals.other)} ₸`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    navigator.clipboard.writeText(text);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center py-20 text-stone-500">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-900 border-t-transparent" />
+        <span className="mt-3 text-sm">Загрузка данных заказа…</span>
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-8">
+        <button
+          type="button"
+          onClick={onBack}
+          className="self-start min-h-11 rounded-xl border border-stone-300 bg-white/70 px-4 text-sm font-medium text-stone-700 hover:bg-white"
+        >
+          ← К списку заказов
+        </button>
+        <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-800">
+          <h2 className="text-base font-bold">Не удалось открыть заказ</h2>
+          <p className="mt-1 text-sm">{error || "Заказ не найден"}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const statusConfig = ORDER_STATUS_COLORS[order.status] ?? ORDER_STATUS_COLORS.draft;
+  const statusLabel = ORDER_STATUS_LABELS[order.status] ?? order.status;
+
+  // Фильтрация позиций прайса в модалке выбора
+  const filteredCatalogItems = priceItems.filter((p) => {
+    if (!p.active) return false;
+    if (pickerCategory !== "all" && p.category !== pickerCategory) return false;
+    if (pickerSearch.trim()) {
+      return p.name.toLowerCase().includes(pickerSearch.trim().toLowerCase());
+    }
+    return true;
+  });
+
+  return (
+    <div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-4 pb-48 md:pb-32">
+      {/* Верхняя навигация и статус */}
+      <div className="flex items-center justify-between gap-2 border-b border-stone-200 pb-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white/80 px-3.5 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-white active:scale-98"
+        >
+          <span>←</span>
+          <span>Заказы</span>
+        </button>
+
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot}`} />
+            {statusLabel}
+          </span>
+          <button
+            type="button"
+            onClick={handleOpenEditHeader}
+            className="min-h-10 rounded-xl border border-stone-300 bg-white px-3 text-xs font-medium text-stone-700 hover:bg-stone-50"
+          >
+            Изменить заказ
+          </button>
+        </div>
+      </div>
+
+      {/* Предупреждение о блокировке */}
+      {locked && (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          🔒 <strong>Заказ заблокирован от случайных правок</strong>, так как находится в статусе «{statusLabel}».
+        </div>
+      )}
+
+      {/* Карточка заказа: название, клиент, сумма */}
+      <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-stone-900 md:text-2xl">
+              {order.name}
+            </h1>
+            {order.client_label && (
+              <p className="mt-0.5 text-xs text-stone-500">
+                Клиент: <span className="font-semibold text-stone-800">{order.client_label}</span>
+              </p>
+            )}
+            {order.note && (
+              <p className="mt-1 text-xs text-stone-600 bg-stone-50 p-2 rounded-lg italic">
+                {order.note}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {order.contract_price !== null && (
+              <div className="rounded-xl bg-stone-100 px-3 py-1.5 text-right">
+                <span className="block text-[10px] text-stone-500 uppercase tracking-wide">
+                  Договор
+                </span>
+                <span className="text-sm font-bold text-stone-900">
+                  {formatKzt(order.contract_price)} ₸
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleCopySummary}
+              className="min-h-10 rounded-xl border border-stone-200 bg-stone-50 px-3 text-xs font-medium text-stone-700 hover:bg-stone-100"
+              title="Копировать сводку расчёта"
+            >
+              {copySuccess ? "✓ Скопировано" : "📋 Скопировать"}
+            </button>
+          </div>
+        </div>
+
+        {/* Вкладки: Расчёт / История / Факт */}
+        <div className="mt-4 flex items-center gap-1 border-t border-stone-100 pt-3">
+          <button
+            type="button"
+            onClick={() => setOrderTab("calc")}
+            className={`min-h-10 flex-1 rounded-xl text-xs font-bold transition-all ${
+              orderTab === "calc"
+                ? "bg-emerald-900 text-white shadow-xs"
+                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+            }`}
+          >
+            1. Расчёт ({lines.length} поз.)
+          </button>
+          <button
+            type="button"
+            onClick={() => setOrderTab("history")}
+            className={`min-h-10 flex-1 rounded-xl text-xs font-bold transition-all ${
+              orderTab === "history"
+                ? "bg-emerald-900 text-white shadow-xs"
+                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+            }`}
+          >
+            2. История версий (U5)
+          </button>
+          <button
+            type="button"
+            onClick={() => setOrderTab("fact")}
+            className={`min-h-10 flex-1 rounded-xl text-xs font-bold transition-all ${
+              orderTab === "fact"
+                ? "bg-emerald-900 text-white shadow-xs"
+                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+            }`}
+          >
+            3. Факт и план (U6)
+          </button>
+        </div>
+      </div>
+
+      {orderTab === "history" && (
+        <div className="mt-6 rounded-2xl border border-dashed border-stone-300 bg-white/70 p-8 text-center text-sm text-stone-600">
+          <span className="text-2xl">📜</span>
+          <h3 className="mt-2 font-bold text-stone-800">История расчётов</h3>
+          <p className="mt-1 text-xs text-stone-500">
+            Сохранение неизменяемых версий расчёта в таблицу `calculations` реализуется в шаге U5.
+          </p>
+        </div>
+      )}
+
+      {orderTab === "fact" && (
+        <div className="mt-6 rounded-2xl border border-dashed border-stone-300 bg-white/70 p-8 text-center text-sm text-stone-600">
+          <span className="text-2xl">📊</span>
+          <h3 className="mt-2 font-bold text-stone-800">Фактические расходы и поступления</h3>
+          <p className="mt-1 text-xs text-stone-500">
+            Внесение фактических оплат, переделок и план/факт отчётность реализуются в шаге U6.
+          </p>
+        </div>
+      )}
+
+      {orderTab === "calc" && (
+        <>
+          {/* Переключатель режима расчёта */}
+          <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-stone-200 bg-white p-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-xs font-semibold text-stone-700">
+              Режим расчёта:
+            </span>
+            <div className="flex items-center gap-1 rounded-xl bg-stone-100 p-1">
+              <button
+                type="button"
+                onClick={() => setCalcMode("quote")}
+                className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-all ${
+                  calcMode === "quote"
+                    ? "bg-white text-stone-900 shadow-xs"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                Рассчитать цену (quote)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCalcMode("check_contract")}
+                className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-all ${
+                  calcMode === "check_contract"
+                    ? "bg-white text-stone-900 shadow-xs"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                Проверить договор (check_contract)
+              </button>
+            </div>
+          </div>
+
+          {/* Предупреждение о не указанной цене договора в режиме check_contract */}
+          {calcMode === "check_contract" && order.contract_price === null && (
+            <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              ⚠️ В режиме проверки договора требуется указать цену по договору. Нажмите «Изменить заказ» вверху и введите сумму.
+            </div>
+          )}
+
+          {/* Баннер изменившихся цен в справочнике */}
+          {changedPriceLines.length > 0 && (
+            <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50/80 p-3 sm:flex-row sm:items-center sm:justify-between text-xs text-amber-900">
+              <div>
+                <strong>Внимание:</strong> в справочнике цен изменились цены для {changedPriceLines.length} поз. из этого заказа.
+              </div>
+              {!locked && (
+                <button
+                  type="button"
+                  disabled={isUpdatingPrices}
+                  onClick={handleUpdatePricesFromCatalog}
+                  className="self-start whitespace-nowrap rounded-lg bg-amber-800 px-3 py-1.5 font-semibold text-white shadow-xs hover:bg-amber-900 disabled:opacity-50"
+                >
+                  {isUpdatingPrices ? "Обновление…" : "Обновить цены в заказе"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* СЕКЦИЯ 1: ИЗДЕЛИЯ */}
+          <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-stone-900">
+                  Изделия заказа
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Кухни, шкафы и другие модули проекта
+                </p>
+              </div>
+
+              {!locked && (
+                <button
+                  type="button"
+                  onClick={handleOpenAddItem}
+                  className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98"
+                >
+                  <span>+</span>
+                  <span>Добавить изделие</span>
+                </button>
+              )}
+            </div>
+
+            {items.length === 0 ? (
+              <div className="mt-3 rounded-xl border border-dashed border-stone-200 bg-stone-50/50 p-4 text-center text-xs text-stone-500">
+                В заказе пока нет изделий (например: Кухня 3м). Изделия нужны для расчёта сборки по погонным метрам.
+              </div>
+            ) : (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {items.map((item) => {
+                  const kindLabel = ORDER_ITEM_KIND_LABELS[item.kind];
+                  const linkedLinesCount = lines.filter((l) => l.order_item_id === item.id).length;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50/60 p-3"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-stone-900 text-sm">
+                            {item.title}
+                          </span>
+                          <span className="rounded-md bg-stone-200 px-2 py-0.5 text-[11px] font-medium text-stone-700">
+                            {kindLabel}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-3 text-xs text-stone-500">
+                          {item.linear_meters !== null && (
+                            <span>{item.linear_meters} пог. м</span>
+                          )}
+                          <span>Позиций: {linkedLinesCount}</span>
+                        </div>
+                      </div>
+
+                      {!locked && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditItem(item)}
+                            className="p-1.5 text-xs text-stone-500 hover:text-stone-800"
+                            title="Редактировать"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteItem(item.id)}
+                            className="p-1.5 text-xs text-rose-500 hover:text-rose-800"
+                            title="Удалить"
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* СЕКЦИЯ 2: ПОЗИЦИИ И СМЕТА */}
+          <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-base font-bold text-stone-900">
+                  Позиции и затраты ({lines.length})
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Материалы, фасады, цех, фурнитура, транспорт и монтаж
+                </p>
+              </div>
+
+              {!locked && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleOpenPricePicker}
+                    className="flex min-h-11 flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-xl bg-emerald-900 px-4 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 active:scale-98"
+                  >
+                    <span>+</span>
+                    <span>Из справочника</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddManualLine}
+                    className="flex min-h-11 flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3.5 text-xs font-semibold text-stone-800 hover:bg-stone-50 active:scale-98"
+                  >
+                    <span>+</span>
+                    <span>Ручная позиция</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {lines.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-dashed border-stone-300 bg-stone-50/50 p-8 text-center text-xs text-stone-500">
+                Позиций пока нет. Добавьте материалы и услуги из прайс-листа или создайте ручную позицию (например, доставку).
+              </div>
+            ) : (
+              <div className="mt-4 flex flex-col divide-y divide-stone-100">
+                {ALL_CATEGORIES.map((cat) => {
+                  const catLines = lines.filter((l) => l.category === cat);
+                  if (catLines.length === 0) return null;
+
+                  const catTotal = catLines.reduce((sum, l) => {
+                    const qtyWithWaste = l.qty * (1 + Number(l.waste_pct));
+                    const billable =
+                      l.billable_qty_rounding === "ceil_to_unit"
+                        ? Math.ceil(qtyWithWaste)
+                        : qtyWithWaste;
+                    return sum + Math.ceil(billable * Number(l.unit_price));
+                  }, 0);
+
+                  return (
+                    <div key={cat} className="py-3 first:pt-0 last:pb-0">
+                      {/* Заголовок категории */}
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
+                          {CATEGORY_LABELS[cat]} ({catLines.length})
+                        </span>
+                        <span className="text-xs font-bold text-stone-900">
+                          {formatKzt(catTotal)} ₸
+                        </span>
+                      </div>
+
+                      {/* Список строк категории */}
+                      <div className="mt-1 flex flex-col gap-1.5">
+                        {catLines.map((line) => {
+                          const qtyWithWaste = line.qty * (1 + Number(line.waste_pct));
+                          const billableQty =
+                            line.billable_qty_rounding === "ceil_to_unit"
+                              ? Math.ceil(qtyWithWaste)
+                              : qtyWithWaste;
+                          const lineTotal = Math.ceil(billableQty * Number(line.unit_price));
+
+                          // Проверка изменения цены в каталоге
+                          const currentCatItem = line.price_item_id
+                            ? priceItemsById.get(line.price_item_id)
+                            : null;
+                          const hasPriceChange =
+                            currentCatItem && currentCatItem.price !== Number(line.unit_price);
+
+                          return (
+                            <div
+                              key={line.id}
+                              className="group flex flex-col justify-between rounded-xl border border-stone-100 bg-stone-50/50 p-2.5 text-xs transition-colors hover:bg-stone-100/60 sm:flex-row sm:items-center"
+                            >
+                              <div className="flex-1 min-w-0 pr-2">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="font-semibold text-stone-900">
+                                    {line.name}
+                                  </span>
+                                  {line.is_manual && (
+                                    <span className="rounded-md bg-stone-200/80 px-1.5 py-0.2 text-[10px] font-medium text-stone-600">
+                                      ручная
+                                    </span>
+                                  )}
+                                  {line.counts_for_technolog && (
+                                    <span className="rounded-md bg-blue-100 px-1.5 py-0.2 text-[10px] font-medium text-blue-700">
+                                      технолог
+                                    </span>
+                                  )}
+                                  {line.waste_pct > 0 && (
+                                    <span className="rounded-md bg-amber-100 px-1.5 py-0.2 text-[10px] font-medium text-amber-800">
+                                      +{(Number(line.waste_pct) * 100).toFixed(0)}% отход
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
+                                  <span>
+                                    {line.qty} {line.unit} × {formatKzt(line.unit_price)} ₸
+                                  </span>
+                                  {line.billable_qty_rounding === "ceil_to_unit" && (
+                                    <span>(округление до целого: {billableQty} {line.unit})</span>
+                                  )}
+                                  {line.comment && (
+                                    <span className="italic text-stone-400 truncate max-w-[200px]">
+                                      «{line.comment}»
+                                    </span>
+                                  )}
+                                </div>
+
+                                {hasPriceChange && (
+                                  <div className="mt-1 text-[11px] font-semibold text-amber-700">
+                                    ⚠️ В прайсе сейчас {formatKzt(currentCatItem.price)} ₸
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="mt-2 flex items-center justify-between gap-3 border-t border-stone-200/40 pt-1.5 sm:mt-0 sm:border-0 sm:pt-0">
+                                <span className="font-bold text-stone-900 text-sm">
+                                  {formatKzt(lineTotal)} ₸
+                                </span>
+
+                                {!locked && (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditLine(line)}
+                                      className="p-1 text-stone-400 hover:text-stone-700"
+                                      title="Редактировать"
+                                    >
+                                      ✎
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleDeleteLine(line.id)}
+                                      className="p-1 text-rose-400 hover:text-rose-700"
+                                      title="Удалить"
+                                    >
+                                      🗑
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* СЕКЦИЯ 3: КОРРЕКТИРОВКИ (СКИДКИ, СРОЧНОСТЬ, РИСК) */}
+          <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-stone-900">
+                  Корректировки ({adjustments.length})
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Скидки клиенту, наценка за срочность, непредвиденные расходы
+                </p>
+              </div>
+
+              {!locked && (
+                <button
+                  type="button"
+                  onClick={handleOpenAddAdjustment}
+                  className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98"
+                >
+                  <span>+</span>
+                  <span>Корректировка</span>
+                </button>
+              )}
+            </div>
+
+            {adjustments.length === 0 ? (
+              <div className="mt-3 rounded-xl border border-dashed border-stone-200 bg-stone-50/50 p-3 text-center text-xs text-stone-400">
+                Корректировок нет
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-col gap-1.5">
+                {adjustments.map((adj) => (
+                  <div
+                    key={adj.id}
+                    className="flex items-center justify-between rounded-xl border border-stone-100 bg-stone-50 p-2.5 text-xs"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-stone-900">{adj.label}</span>
+                        <span className="rounded-md bg-stone-200 px-1.5 py-0.5 text-[10px] text-stone-700">
+                          {adj.kind === "price" ? "к цене" : "к затратам"}
+                        </span>
+                      </div>
+                      {adj.comment && (
+                        <p className="text-[11px] text-stone-500 italic">{adj.comment}</p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`font-bold text-sm ${
+                          adj.amount < 0 ? "text-emerald-700" : "text-stone-900"
+                        }`}
+                      >
+                        {adj.amount > 0 ? `+${formatKzt(adj.amount)}` : formatKzt(adj.amount)} ₸
+                      </span>
+                      {!locked && (
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteAdjustment(adj.id)}
+                          className="p-1 text-rose-400 hover:text-rose-700"
+                        >
+                          🗑
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* СЕКЦИЯ 4: ПЕРЕОПРЕДЕЛЕНИЕ ПАРАМЕТРОВ ДЛЯ ЭТОГО ЗАКАЗА */}
+          <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setIsParamsAccordionOpen((prev) => !prev)}
+              className="flex w-full items-center justify-between text-left text-xs font-bold text-stone-800"
+            >
+              <span>⚙️ Индивидуальные параметры расчёта заказа</span>
+              <span>{isParamsAccordionOpen ? "▲ Скрыть" : "▼ Настроить"}</span>
+            </button>
+
+            {isParamsAccordionOpen && (
+              <div className="mt-4 flex flex-col gap-3 border-t border-stone-100 pt-3">
+                <div className="grid gap-3 sm:grid-cols-2 text-xs">
+                  <div>
+                    <label className="block font-semibold text-stone-700 mb-1">
+                      Целевая маржа (по умолч. {formatPercent(globalParams.target_margin_pct)})
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="18%"
+                      value={customMargin}
+                      onChange={(e) => setCustomMargin(e.target.value)}
+                      disabled={locked}
+                      className="min-h-10 w-full rounded-xl border border-stone-300 px-3 py-1.5 focus:border-emerald-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-stone-700 mb-1">
+                      Режим сборки
+                    </label>
+                    <select
+                      value={customAssemblyMode}
+                      onChange={(e) =>
+                        setCustomAssemblyMode(
+                          e.target.value as "default" | "percent" | "per_meter"
+                        )
+                      }
+                      disabled={locked}
+                      className="min-h-10 w-full rounded-xl border border-stone-300 bg-white px-3 py-1.5 focus:border-emerald-800"
+                    >
+                      <option value="default">
+                        По умолчанию ({globalParams.assembly_mode === "percent" ? "Процент" : "За метр"})
+                      </option>
+                      <option value="percent">Процент от цены</option>
+                      <option value="per_meter">За погонный метр</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-stone-700 mb-1">
+                      Сборка, % (по умолч. {formatPercent(globalParams.assembly_pct)})
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="14,5%"
+                      value={customAssemblyPct}
+                      onChange={(e) => setCustomAssemblyPct(e.target.value)}
+                      disabled={locked}
+                      className="min-h-10 w-full rounded-xl border border-stone-300 px-3 py-1.5 focus:border-emerald-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-stone-700 mb-1">
+                      Технолог, % (по умолч. {formatPercent(globalParams.technolog_pct)})
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="4%"
+                      value={customTechnologPct}
+                      onChange={(e) => setCustomTechnologPct(e.target.value)}
+                      disabled={locked}
+                      className="min-h-10 w-full rounded-xl border border-stone-300 px-3 py-1.5 focus:border-emerald-800"
+                    />
+                  </div>
+                </div>
+
+                {!locked && (
+                  <button
+                    type="button"
+                    disabled={paramsSaving}
+                    onClick={handleSaveOrderSettings}
+                    className="self-end min-h-10 rounded-xl bg-emerald-900 px-4 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+                  >
+                    {paramsSaving ? "Сохранение…" : "Применить параметры к заказу"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ЗАКРЕПЛЁННАЯ СВОДКА РАСЧЁТА (STICKY BOTTOM BAR) */}
+      {orderTab === "calc" && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stone-300/80 bg-white/95 backdrop-blur-md shadow-2xl safe-bottom">
+          <div className="mx-auto max-w-4xl px-4 py-3">
+            {/* Результаты или Ошибка расчёта */}
+            {!calcOutcome ? null : !calcOutcome.ok ? (
+              <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-800">
+                <strong>Ошибка расчёта:</strong>{" "}
+                {calcOutcome.error === "parameters_leave_no_share_for_fixed_costs"
+                  ? "Сумма процентных ставок превышает 100%. Измените параметры расчёта."
+                  : "Необходимо указать цену по договору в шапке заказа."}
+              </div>
+            ) : (
+              <div>
+                {/* Предупреждения расчёта */}
+                {calcOutcome.result.warnings.length > 0 && (
+                  <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-medium text-amber-900">
+                    ⚠️ {calcOutcome.result.warnings.join("; ")}
+                  </div>
+                )}
+
+                {/* Основные цифры (крупно) */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-1 items-baseline gap-2 sm:gap-4">
+                    <div>
+                      <span className="block text-[10px] text-stone-500 uppercase tracking-wide">
+                        Цена ({calcMode === "quote" ? "расчёт" : "договор"})
+                      </span>
+                      <span className="text-lg sm:text-2xl font-extrabold text-stone-900">
+                        {formatKzt(calcOutcome.result.priceTotal)} ₸
+                      </span>
+                    </div>
+
+                    <div className="border-l border-stone-200 pl-2 sm:pl-4">
+                      <span className="block text-[10px] text-stone-500 uppercase tracking-wide">
+                        Себестоимость
+                      </span>
+                      <span className="text-sm sm:text-base font-bold text-stone-700">
+                        {formatKzt(calcOutcome.result.costTotal)} ₸
+                      </span>
+                    </div>
+
+                    <div className="border-l border-stone-200 pl-2 sm:pl-4">
+                      <span className="block text-[10px] text-stone-500 uppercase tracking-wide">
+                        Маржа
+                      </span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-sm sm:text-base font-bold text-emerald-900">
+                          {formatKzt(calcOutcome.result.margin)} ₸
+                        </span>
+                        {calcOutcome.result.marginPct !== null && (
+                          <span className="text-xs font-semibold text-emerald-700">
+                            ({formatPercent(calcOutcome.result.marginPct)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Кнопка раскрытия подробной разбивки */}
+                  <button
+                    type="button"
+                    onClick={() => setShowBreakdown((prev) => !prev)}
+                    className="min-h-11 rounded-xl border border-stone-300 bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-95"
+                  >
+                    {showBreakdown ? "Скрыть ▲" : "Сводка ▼"}
+                  </button>
+                </div>
+
+                {/* Раскрывающаяся подробная сводка */}
+                {showBreakdown && (
+                  <div className="mt-3 max-h-60 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs divide-y divide-stone-200">
+                    <div className="pb-2">
+                      <span className="font-bold text-stone-800">
+                        Фиксированные расходы: {formatKzt(calcOutcome.result.fixedCost)} ₸
+                      </span>
+                      <div className="mt-1 grid grid-cols-2 sm:grid-cols-4 gap-1 text-[11px] text-stone-600">
+                        <span>Материалы: {formatKzt(calcOutcome.result.categoryTotals.materials)} ₸</span>
+                        <span>Фасады: {formatKzt(calcOutcome.result.categoryTotals.facades)} ₸</span>
+                        <span>Цех: {formatKzt(calcOutcome.result.categoryTotals.workshop)} ₸</span>
+                        <span>Фурнитура: {formatKzt(calcOutcome.result.categoryTotals.hardware)} ₸</span>
+                        <span>Транспорт: {formatKzt(calcOutcome.result.categoryTotals.transport)} ₸</span>
+                        <span>Работа: {formatKzt(calcOutcome.result.categoryTotals.labor)} ₸</span>
+                        <span>Остальное: {formatKzt(calcOutcome.result.categoryTotals.other)} ₸</span>
+                        <span>Корректировки: {formatKzt(calcOutcome.result.categoryTotals.adjustments)} ₸</span>
+                      </div>
+                    </div>
+
+                    <div className="py-2 text-[11px] text-stone-700 flex flex-wrap gap-x-4 gap-y-1">
+                      <span>Сборка: {formatKzt(calcOutcome.result.assembly || calcOutcome.result.fixedAssembly)} ₸</span>
+                      <span>Технолог: {formatKzt(calcOutcome.result.technolog || calcOutcome.result.fixedTechnolog)} ₸</span>
+                      <span>Резерв на риск: {formatKzt(calcOutcome.result.riskReserve)} ₸</span>
+                      <span className="font-semibold">
+                        Мин. цена для целевой маржи: {formatKzt(calcOutcome.result.minPriceForTargetMargin)} ₸
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* МОДАЛКА 1: РЕДАКТИРОВАНИЕ ШАПКИ ЗАКАЗА */}
+      {isEditingHeader && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
+          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <h3 className="text-base font-bold text-stone-900">Изменение заказа</h3>
+              <button
+                type="button"
+                onClick={() => setIsEditingHeader(false)}
+                className="text-stone-400 hover:text-stone-600 text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {headerError && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                {headerError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveHeader} className="mt-4 flex flex-col gap-3 text-xs">
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Название заказа <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={headerName}
+                  onChange={(e) => setHeaderName(e.target.value)}
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Клиент / метка
+                </label>
+                <input
+                  type="text"
+                  value={headerClient}
+                  onChange={(e) => setHeaderClient(e.target.value)}
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Статус заказа
+                </label>
+                <select
+                  value={headerStatus}
+                  onChange={(e) => setHeaderStatus(e.target.value as OrderStatus)}
+                  className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                >
+                  {ORDER_STATUSES.map((st) => (
+                    <option key={st} value={st}>
+                      {ORDER_STATUS_LABELS[st]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Цена по договору (₸)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={headerContractPrice}
+                  onChange={(e) => setHeaderContractPrice(e.target.value)}
+                  placeholder="850 000"
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Заметка
+                </label>
+                <textarea
+                  rows={2}
+                  value={headerNote}
+                  onChange={(e) => setHeaderNote(e.target.value)}
+                  className="w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              <div className="mt-2 flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingHeader(false)}
+                  disabled={headerSaving}
+                  className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={headerSaving}
+                  className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+                >
+                  {headerSaving ? "Сохранение…" : "Сохранить"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* МОДАЛКА 2: ИЗДЕЛИЕ (КУХНЯ, ШКАФ) */}
+      {isItemModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
+          <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <h3 className="text-base font-bold text-stone-900">
+                {editingItem ? "Редактировать изделие" : "Новое изделие"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsItemModalOpen(false)}
+                className="text-stone-400 hover:text-stone-600 text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {itemError && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+                {itemError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveItem} className="mt-3 flex flex-col gap-3 text-xs">
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Тип изделия
+                </label>
+                <select
+                  value={itemKind}
+                  onChange={(e) => setItemKind(e.target.value as OrderItemKind)}
+                  className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                >
+                  {ORDER_ITEM_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {ORDER_ITEM_KIND_LABELS[k]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Название изделия <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={itemTitle}
+                  onChange={(e) => setItemTitle(e.target.value)}
+                  placeholder="Например: Кухня угловая"
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              {itemKind !== "other" && (
+                <div>
+                  <label className="block font-semibold text-stone-700 mb-1">
+                    Погонные метры (м)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={itemMeters}
+                    onChange={(e) => setItemMeters(e.target.value)}
+                    placeholder="3.0"
+                    className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Описание / габариты
+                </label>
+                <input
+                  type="text"
+                  value={itemDesc}
+                  onChange={(e) => setItemDesc(e.target.value)}
+                  placeholder="2400 × 600 × 850"
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              <div className="mt-2 flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsItemModalOpen(false)}
+                  disabled={itemSaving}
+                  className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={itemSaving}
+                  className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+                >
+                  {itemSaving ? "Сохранение…" : "Сохранить"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* МОДАЛКА 3: ВЫБОР ПОЗИЦИИ ИЗ СПРАВОЧНИКА ЦЕН (ПОЛНОЭКРАННАЯ НА МОБИЛЬНЫХ) */}
+      {isPricePickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-xs p-0 sm:p-4">
+          <div className="flex h-full w-full sm:h-auto sm:max-h-[85vh] sm:max-w-2xl flex-col rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-4 sm:p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <div>
+                <h3 className="text-base font-bold text-stone-900">
+                  Выбор из справочника цен
+                </h3>
+                <p className="text-xs text-stone-500">
+                  {selectedPriceItem
+                    ? `Выбрано: ${selectedPriceItem.name}`
+                    : "Выберите позицию для добавления в заказ"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPricePickerOpen(false)}
+                className="text-stone-400 hover:text-stone-600 text-lg p-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            {pickerError && (
+              <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+                {pickerError}
+              </div>
+            )}
+
+            {!selectedPriceItem ? (
+              // Шаг 1: Поиск и выбор позиции из прайса
+              <div className="mt-3 flex flex-1 flex-col overflow-hidden">
+                <input
+                  type="text"
+                  value={pickerSearch}
+                  onChange={(e) => setPickerSearch(e.target.value)}
+                  placeholder="Поиск позиции по названию…"
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+
+                {/* Категории */}
+                <div className="mt-2 flex items-center gap-1 overflow-x-auto pb-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPickerCategory("all")}
+                    className={`min-h-8 whitespace-nowrap rounded-lg px-2.5 py-1 ${
+                      pickerCategory === "all"
+                        ? "bg-stone-900 text-white"
+                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    }`}
+                  >
+                    Все
+                  </button>
+                  {ALL_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setPickerCategory(cat)}
+                      className={`min-h-8 whitespace-nowrap rounded-lg px-2.5 py-1 ${
+                        pickerCategory === cat
+                          ? "bg-stone-900 text-white"
+                          : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                      }`}
+                    >
+                      {CATEGORY_LABELS[cat]}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Список активных позиций */}
+                <div className="mt-2 flex-1 overflow-y-auto divide-y divide-stone-100">
+                  {filteredCatalogItems.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-stone-500">
+                      Позиций не найдено
+                    </div>
+                  ) : (
+                    filteredCatalogItems.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleSelectPriceItem(p)}
+                        className="flex w-full items-center justify-between p-2.5 text-left text-xs hover:bg-stone-50 rounded-xl transition-colors active:bg-emerald-50"
+                      >
+                        <div>
+                          <div className="font-semibold text-stone-900">{p.name}</div>
+                          <div className="text-[11px] text-stone-500">
+                            {CATEGORY_LABELS[p.category]} • {p.unit}
+                          </div>
+                        </div>
+                        <div className="font-bold text-emerald-900 text-sm">
+                          {formatKzt(p.price)} ₸
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Шаг 2: Ввод количества и параметров для выбранной позиции
+              <form onSubmit={handleAddPriceItemToOrder} className="mt-4 flex flex-col gap-3 text-xs">
+                <div className="rounded-xl bg-stone-50 p-3 border border-stone-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-stone-900 text-sm">
+                        {selectedPriceItem.name}
+                      </span>
+                      <span className="block text-stone-500 text-[11px]">
+                        {CATEGORY_LABELS[selectedPriceItem.category]} • {selectedPriceItem.unit}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPriceItem(null)}
+                      className="text-xs text-emerald-900 font-semibold underline"
+                    >
+                      Сменить
+                    </button>
+                  </div>
+                  <div className="mt-2 font-bold text-base text-stone-900">
+                    {formatKzt(selectedPriceItem.price)} ₸ / {selectedPriceItem.unit}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block font-semibold text-stone-700 mb-1">
+                      Количество ({selectedPriceItem.unit}) <span className="text-rose-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      required
+                      value={pickerQty}
+                      onChange={(e) => setPickerQty(e.target.value)}
+                      className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-stone-700 mb-1">
+                      Отход (%)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={pickerWaste}
+                      onChange={(e) => setPickerWaste(e.target.value)}
+                      placeholder="0"
+                      className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                    />
+                  </div>
+                </div>
+
+                {items.length > 0 && (
+                  <div>
+                    <label className="block font-semibold text-stone-700 mb-1">
+                      Привязать к изделию
+                    </label>
+                    <select
+                      value={pickerItemId}
+                      onChange={(e) => setPickerItemId(e.target.value)}
+                      className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                    >
+                      <option value="">Без привязки (общий заказ)</option>
+                      {items.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.title} ({ORDER_ITEM_KIND_LABELS[i.kind]})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block font-semibold text-stone-700 mb-1">
+                    Комментарий (необязательно)
+                  </label>
+                  <input
+                    type="text"
+                    value={pickerComment}
+                    onChange={(e) => setPickerComment(e.target.value)}
+                    placeholder="Например: на верхние шкафы"
+                    className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                  />
+                </div>
+
+                <div className="mt-2 flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPriceItem(null)}
+                    className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                  >
+                    Назад к списку
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={pickerSaving}
+                    className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+                  >
+                    {pickerSaving ? "Добавление…" : "Добавить в заказ"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* МОДАЛКА 4: РУЧНАЯ ПОЗИЦИЯ / РЕДАКТИРОВАНИЕ ПОЗИЦИИ */}
+      {isManualLineModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
+          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <h3 className="text-base font-bold text-stone-900">
+                {editingLine
+                  ? editingLine.is_manual
+                    ? "Редактировать ручную позицию"
+                    : "Редактировать позицию из прайса"
+                  : "Добавить ручную позицию"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsManualLineModalOpen(false)}
+                className="text-stone-400 hover:text-stone-600 text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {manualError && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+                {manualError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveManualLine} className="mt-3 flex flex-col gap-3 text-xs">
+              {/* Поля названия и категории (редактируются для ручной позиции) */}
+              {(!editingLine || editingLine.is_manual) && (
+                <>
+                  <div>
+                    <label className="block font-semibold text-stone-700 mb-1">
+                      Категория <span className="text-rose-600">*</span>
+                    </label>
+                    <select
+                      value={manualCategory}
+                      onChange={(e) => setManualCategory(e.target.value as PriceCategory)}
+                      className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                    >
+                      {ALL_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {CATEGORY_LABELS[c]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-stone-700 mb-1">
+                      Название <span className="text-rose-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder="Например: Транспорт (ГАЗель)"
+                      className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-stone-700 mb-1">
+                        Единица измерения
+                      </label>
+                      <select
+                        value={manualUnit}
+                        onChange={(e) => setManualUnit(e.target.value as PriceUnit)}
+                        className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                      >
+                        {PRICE_UNITS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-stone-700 mb-1">
+                        Цена за ед. (₸) <span className="text-rose-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        required
+                        value={manualUnitPrice}
+                        onChange={(e) => setManualUnitPrice(e.target.value)}
+                        placeholder="20 000"
+                        className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Количество и отход */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-stone-700 mb-1">
+                    Количество <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    required
+                    value={manualQty}
+                    onChange={(e) => setManualQty(e.target.value)}
+                    className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-stone-700 mb-1">
+                    Отход (%)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={manualWaste}
+                    onChange={(e) => setManualWaste(e.target.value)}
+                    placeholder="0"
+                    className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                  />
+                </div>
+              </div>
+
+              {/* Чекбоксы: технолог и округление */}
+              {(!editingLine || editingLine.is_manual) && (
+                <div className="flex flex-col gap-2 pt-1">
+                  <label className="flex items-center gap-2 text-stone-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={manualTechnolog}
+                      onChange={(e) => setManualTechnolog(e.target.checked)}
+                      className="h-4 w-4 rounded-sm border-stone-300 text-emerald-900 focus:ring-emerald-800"
+                    />
+                    <span>Учитывать для технолога (как лист ЛДСП)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-stone-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={manualRounding === "ceil_to_unit"}
+                      onChange={(e) =>
+                        setManualRounding(e.target.checked ? "ceil_to_unit" : "none")
+                      }
+                      className="h-4 w-4 rounded-sm border-stone-300 text-emerald-900 focus:ring-emerald-800"
+                    />
+                    <span>Округлять оплачиваемое количество вверх до целого</span>
+                  </label>
+                </div>
+              )}
+
+              {items.length > 0 && (
+                <div>
+                  <label className="block font-semibold text-stone-700 mb-1">
+                    Привязать к изделию
+                  </label>
+                  <select
+                    value={manualItemId}
+                    onChange={(e) => setManualItemId(e.target.value)}
+                    className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                  >
+                    <option value="">Без привязки (общий заказ)</option>
+                    {items.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.title} ({ORDER_ITEM_KIND_LABELS[i.kind]})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Комментарий
+                </label>
+                <input
+                  type="text"
+                  value={manualComment}
+                  onChange={(e) => setManualComment(e.target.value)}
+                  placeholder="Примечание к позиции…"
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              <div className="mt-2 flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsManualLineModalOpen(false)}
+                  disabled={manualSaving}
+                  className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={manualSaving}
+                  className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+                >
+                  {manualSaving ? "Сохранение…" : "Сохранить"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* МОДАЛКА 5: ДОБАВЛЕНИЕ КОРРЕКТИРОВКИ */}
+      {isAdjustmentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
+          <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <h3 className="text-base font-bold text-stone-900">
+                Новая корректировка
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAdjustmentModalOpen(false)}
+                className="text-stone-400 hover:text-stone-600 text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {adjError && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+                {adjError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAdjustment} className="mt-3 flex flex-col gap-3 text-xs">
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Тип корректировки
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdjKind("price")}
+                    className={`min-h-10 rounded-xl font-semibold border ${
+                      adjKind === "price"
+                        ? "bg-emerald-900 text-white border-emerald-900"
+                        : "bg-white text-stone-700 border-stone-300"
+                    }`}
+                  >
+                    К цене (скидка/наценка)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjKind("cost")}
+                    className={`min-h-10 rounded-xl font-semibold border ${
+                      adjKind === "cost"
+                        ? "bg-emerald-900 text-white border-emerald-900"
+                        : "bg-white text-stone-700 border-stone-300"
+                    }`}
+                  >
+                    К затратам (себестоимость)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Название корректировки <span className="text-rose-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={adjLabel}
+                  onChange={(e) => setAdjLabel(e.target.value)}
+                  placeholder="Например: Скидка постоянному клиенту"
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Сумма (₸) <span className="text-rose-600">*</span>
+                  <span className="text-stone-400 font-normal"> (для скидки введите минус: -11000)</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={adjAmount}
+                  onChange={(e) => setAdjAmount(e.target.value)}
+                  placeholder="-10 000 или 25 000"
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Комментарий
+                </label>
+                <input
+                  type="text"
+                  value={adjComment}
+                  onChange={(e) => setAdjComment(e.target.value)}
+                  placeholder="Причина применения…"
+                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                />
+              </div>
+
+              <div className="mt-2 flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAdjustmentModalOpen(false)}
+                  disabled={adjSaving}
+                  className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={adjSaving}
+                  className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+                >
+                  {adjSaving ? "Добавление…" : "Добавить"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

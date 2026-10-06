@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { LoginPage } from "./auth/LoginPage";
 import { Navigation, type ActiveTab } from "./components/Navigation";
+import { OrderDetailPage } from "./pages/OrderDetailPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { ParametersPage } from "./pages/ParametersPage";
 import { PriceListPage } from "./pages/PriceListPage";
@@ -62,18 +63,10 @@ function MainApp() {
           <OrdersPage onSelectOrder={handleSelectOrder} />
         )}
         {activeTab === "orders" && selectedOrderId && (
-          <div className="mx-auto max-w-4xl px-4 py-6">
-            <button
-              type="button"
-              onClick={handleBackToOrders}
-              className="min-h-11 rounded-xl border border-stone-300 bg-white/70 px-4 text-sm font-medium text-stone-700 hover:bg-white"
-            >
-              ← К списку заказов
-            </button>
-            <p className="mt-4 text-sm text-stone-600">
-              Заказ #{selectedOrderId} загружается…
-            </p>
-          </div>
+          <OrderDetailPage
+            orderId={selectedOrderId}
+            onBack={handleBackToOrders}
+          />
         )}
         {activeTab === "prices" && <PriceListPage />}
         {activeTab === "parameters" && <ParametersPage />}
