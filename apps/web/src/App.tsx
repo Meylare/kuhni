@@ -4,12 +4,13 @@ import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { LoginPage } from "./auth/LoginPage";
 import { Navigation, type ActiveTab } from "./components/Navigation";
 import { OrdersPlaceholderPage } from "./pages/OrdersPlaceholderPage";
+import { ParametersPage } from "./pages/ParametersPage";
 import { PriceListPage } from "./pages/PriceListPage";
 
 function getTabFromHash(): ActiveTab {
   if (typeof window === "undefined") return "orders";
   const hash = window.location.hash.replace("#", "");
-  if (hash === "prices") {
+  if (hash === "prices" || hash === "parameters") {
     return hash;
   }
   return "orders";
@@ -39,6 +40,7 @@ function MainApp() {
       <div className="flex-1">
         {activeTab === "orders" && <OrdersPlaceholderPage />}
         {activeTab === "prices" && <PriceListPage />}
+        {activeTab === "parameters" && <ParametersPage />}
       </div>
     </div>
   );

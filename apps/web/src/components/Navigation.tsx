@@ -1,6 +1,6 @@
 import { useAuth } from "../auth/AuthProvider";
 
-export type ActiveTab = "orders" | "prices";
+export type ActiveTab = "orders" | "prices" | "parameters";
 
 interface NavigationProps {
   activeTab: ActiveTab;
@@ -52,6 +52,17 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             >
               Справочник цен
             </button>
+            <button
+              type="button"
+              onClick={() => onTabChange("parameters")}
+              className={`min-h-9 rounded-lg px-3 py-1.5 transition-all ${
+                activeTab === "parameters"
+                  ? "bg-white text-stone-900 shadow-xs"
+                  : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              Параметры
+            </button>
           </nav>
 
           <div className="flex items-center gap-2">
@@ -71,7 +82,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </div>
       </header>
 
-      {/* Нижняя панель навигации для мобильных устройств */}
+      {/* Нижняя панель навигации для мобильных устройств (mobile-first, min-h 44px) */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-stone-200 bg-[#f6f1ea]/95 backdrop-blur-md safe-bottom">
         <button
           type="button"
@@ -96,6 +107,18 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         >
           <span className="text-lg">🏷️</span>
           <span>Прайс</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onTabChange("parameters")}
+          className={`flex-1 min-h-14 flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${
+            activeTab === "parameters"
+              ? "text-emerald-900 font-semibold bg-emerald-50/50"
+              : "text-stone-500 hover:text-stone-800"
+          }`}
+        >
+          <span className="text-lg">⚙️</span>
+          <span>Параметры</span>
         </button>
       </nav>
     </>
