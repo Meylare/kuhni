@@ -1,3 +1,5 @@
+import { calculatePriceDenominator } from "@kuhni/calc";
+
 import type { ParameterItem } from "../types/database";
 
 export type ParameterType = "percent" | "currency" | "select" | "number";
@@ -239,22 +241,22 @@ export function parametersArrayToMap(rows: ParameterItem[]): ParametersMap {
 }
 
 /**
- * Вычисляет знаменатель формулы расчёта цены:
+ * Вычисляет знаменатель формулы расчёта цены через чистый модуль packages/calc:
  * 1 - target_margin_pct - assembly_pct - technolog_pct - risk_reserve_pct
  */
 export function calculateDenominator(params: ParametersMap): number {
-  const assemblyFraction =
-    params.assembly_mode === "percent" ? params.assembly_pct : 0;
-  const technologFraction =
-    params.technolog_mode === "percent" ? params.technolog_pct : 0;
-
-  return (
-    1 -
-    params.target_margin_pct -
-    assemblyFraction -
-    technologFraction -
-    params.risk_reserve_pct
-  );
+  return calculatePriceDenominator({
+    targetMarginPct: params.target_margin_pct,
+    assemblyMode: params.assembly_mode,
+    assemblyPct: params.assembly_pct,
+    assemblyPerMeterKitchen: params.assembly_per_meter_kitchen,
+    assemblyPerMeterWardrobe: params.assembly_per_meter_wardrobe,
+    technologMode: params.technolog_mode,
+    technologPct: params.technolog_pct,
+    technologPerSheet: params.technolog_per_sheet,
+    riskReservePct: params.risk_reserve_pct,
+    priceRounding: params.price_rounding,
+  });
 }
 
 // Вспомогательная функция для чистой доли
@@ -277,7 +279,7 @@ export function evaluateDenominator(params: ParametersMap): {
   const riskShare = safeFraction(params.risk_reserve_pct);
 
   const sumPercentShares = marginShare + assemblyShare + technologShare + riskShare;
-  const denominator = 1 - sumPercentShares;
+  const denominator = calculateDenominator(params);
 
   if (denominator <= 0) {
     return {

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculate,
+  calculateLine,
+  calculatePriceDenominator,
   createCalculationVersion,
   type CalculationInput,
   type CalculationParameters,
@@ -237,5 +239,55 @@ describe("createCalculationVersion", () => {
     expect(orderLine.countsForTechnolog).toBe(true);
     expect(afterPriceListChange.version.result.fixedTechnolog).toBe(8_000);
     expect(afterPriceListChange.version.result).toEqual(beforePriceListChange.version.result);
+  });
+});
+
+describe("calculateLine", () => {
+  it("calculates billable quantity and rounds total upward to KZT", () => {
+    const line = calculateLine({
+      id: "test-line",
+      category: "materials",
+      qty: 1.001,
+      unitPrice: 100,
+      wastePct: 0.1,
+      billableQtyRounding: "none",
+    });
+
+    expect(line).toEqual({
+      id: "test-line",
+      billableQty: 1.1011,
+      total: 111,
+    });
+  });
+
+  it("applies ceil_to_unit rounding to billable quantity", () => {
+    const line = calculateLine({
+      category: "facades",
+      qty: 6.2,
+      unitPrice: 10_000,
+      wastePct: 0,
+      billableQtyRounding: "ceil_to_unit",
+    });
+
+    expect(line).toEqual({
+      billableQty: 7,
+      total: 70_000,
+    });
+  });
+});
+
+describe("calculatePriceDenominator", () => {
+  it("calculates denominator from default parameters", () => {
+    // 1 - 0.18 - 0.145 - 0.04 - 0 = 0.635
+    const denom = calculatePriceDenominator(defaultParameters);
+    expect(denom).toBeCloseTo(0.635, 4);
+  });
+
+  it("returns <= 0 when percentage shares sum to >= 100%", () => {
+    const denom = calculatePriceDenominator({
+      ...defaultParameters,
+      targetMarginPct: 0.85,
+    });
+    expect(denom).toBeLessThanOrEqual(0);
   });
 });

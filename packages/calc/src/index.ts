@@ -161,7 +161,7 @@ function formatKzt(value: number): string {
   return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
-function calculateLine(line: CalculationLine): LineCalculation {
+export function calculateLine(line: CalculationLine): LineCalculation {
   const qtyWithWaste = line.qty * (1 + line.wastePct);
   const billableQty =
     line.billableQtyRounding === "ceil_to_unit" ? Math.ceil(qtyWithWaste) : qtyWithWaste;
@@ -206,14 +206,19 @@ function fixedTechnologCost(
   );
 }
 
+export function calculatePriceDenominator(parameters: CalculationParameters): number {
+  const assemblyPct = parameters.assemblyMode === "percent" ? parameters.assemblyPct : 0;
+  const technologPct = parameters.technologMode === "percent" ? parameters.technologPct : 0;
+  return (
+    1 - parameters.targetMarginPct - assemblyPct - technologPct - parameters.riskReservePct
+  );
+}
+
 function minimumPrice(
   fixedCost: number,
   parameters: CalculationParameters,
 ): number | "parameters_leave_no_share_for_fixed_costs" {
-  const assemblyPct = parameters.assemblyMode === "percent" ? parameters.assemblyPct : 0;
-  const technologPct = parameters.technologMode === "percent" ? parameters.technologPct : 0;
-  const denominator =
-    1 - parameters.targetMarginPct - assemblyPct - technologPct - parameters.riskReservePct;
+  const denominator = calculatePriceDenominator(parameters);
 
   if (denominator <= 0) return "parameters_leave_no_share_for_fixed_costs";
   return roundHalfUp(fixedCost / denominator, parameters.priceRounding);
