@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { formatErrorMessage } from "../lib/errors";
 import { formatKzt } from "../lib/money";
 import { formatPercent } from "../lib/parameters";
 import {
@@ -72,7 +73,6 @@ export function FactTab({
   }, [latestCalc]);
 
   const planCostTotal = latestCalc ? Number(latestCalc.cost_total) : 0;
-  const planPriceTotal = latestCalc ? Number(latestCalc.price_total) : 0;
 
   // --- Факт: сводные данные ---
   const factExpensesTotal = sumAllExpenses(expenses);
@@ -137,14 +137,14 @@ export function FactTab({
         .single();
 
       if (insertErr) {
-        setExpError(insertErr.message);
+        setExpError(formatErrorMessage(insertErr, "Ошибка сохранения расхода."));
       } else if (data) {
         onExpensesChange([...expenses, data as ActualExpense]);
         resetExpenseForm();
         setIsExpenseFormOpen(false);
       }
     } catch (err: unknown) {
-      setExpError(err instanceof Error ? err.message : "Ошибка сохранения расхода.");
+      setExpError(formatErrorMessage(err, "Ошибка сохранения расхода."));
     } finally {
       setExpSaving(false);
     }
@@ -159,12 +159,12 @@ export function FactTab({
         .delete()
         .eq("id", expId);
       if (delErr) {
-        alert("Ошибка удаления: " + delErr.message);
+        alert("Ошибка удаления: " + formatErrorMessage(delErr));
       } else {
         onExpensesChange(expenses.filter((e) => e.id !== expId));
       }
     } catch (err) {
-      console.error(err);
+      alert("Ошибка удаления: " + formatErrorMessage(err));
     }
   }
 
@@ -193,14 +193,14 @@ export function FactTab({
         .single();
 
       if (insertErr) {
-        setPayError(insertErr.message);
+        setPayError(formatErrorMessage(insertErr, "Ошибка сохранения поступления."));
       } else if (data) {
         onPaymentsChange([...payments, data as Payment]);
         resetPaymentForm();
         setIsPaymentFormOpen(false);
       }
     } catch (err: unknown) {
-      setPayError(err instanceof Error ? err.message : "Ошибка сохранения поступления.");
+      setPayError(formatErrorMessage(err, "Ошибка сохранения поступления."));
     } finally {
       setPaySaving(false);
     }
@@ -215,12 +215,12 @@ export function FactTab({
         .delete()
         .eq("id", payId);
       if (delErr) {
-        alert("Ошибка удаления: " + delErr.message);
+        alert("Ошибка удаления: " + formatErrorMessage(delErr));
       } else {
         onPaymentsChange(payments.filter((p) => p.id !== payId));
       }
     } catch (err) {
-      console.error(err);
+      alert("Ошибка удаления: " + formatErrorMessage(err));
     }
   }
 

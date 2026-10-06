@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { formatErrorMessage } from "../lib/errors";
 import { formatKzt } from "../lib/money";
 import {
   filterPriceItems,
@@ -55,12 +56,12 @@ export function PriceListPage() {
         .order("name");
 
       if (fetchErr) {
-        setError(fetchErr.message);
+        setError(formatErrorMessage(fetchErr, "Не удалось загрузить справочник цен."));
       } else {
         setItems((data as PriceItem[]) || []);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить справочник цен.");
+      setError(formatErrorMessage(err, "Не удалось загрузить справочник цен."));
     } finally {
       setLoading(false);
     }
@@ -123,7 +124,7 @@ export function PriceListPage() {
         .eq("id", item.id);
 
       if (updateErr) {
-        setInlineError(updateErr.message);
+        setInlineError(formatErrorMessage(updateErr, "Не удалось обновить цену."));
       } else {
         setItems((prev) =>
           prev.map((it) => (it.id === item.id ? { ...it, price: parsed } : it)),
@@ -131,7 +132,7 @@ export function PriceListPage() {
         setInlineEditingId(null);
       }
     } catch (err: unknown) {
-      setInlineError(err instanceof Error ? err.message : "Не удалось обновить цену.");
+      setInlineError(formatErrorMessage(err, "Не удалось обновить цену."));
     } finally {
       setInlineSaving(false);
     }
@@ -187,7 +188,7 @@ export function PriceListPage() {
         .single();
 
       if (updateErr) {
-        setModalError(updateErr.message);
+        setModalError(formatErrorMessage(updateErr, "Не удалось сохранить изменения."));
       } else if (data) {
         const updatedItem = data as PriceItem;
         setSelectedItem(updatedItem);
@@ -195,7 +196,7 @@ export function PriceListPage() {
         void loadItemHistory(updatedItem.id);
       }
     } catch (err: unknown) {
-      setModalError(err instanceof Error ? err.message : "Не удалось сохранить изменения.");
+      setModalError(formatErrorMessage(err, "Не удалось сохранить изменения."));
     } finally {
       setModalSaving(false);
     }
@@ -212,7 +213,7 @@ export function PriceListPage() {
         .eq("id", item.id);
 
       if (updateErr) {
-        alert("Ошибка архивации: " + updateErr.message);
+        alert("Ошибка: " + formatErrorMessage(updateErr));
       } else {
         const updated = { ...item, active: nextActive };
         setItems((prev) => prev.map((it) => (it.id === item.id ? updated : it)));
@@ -221,7 +222,7 @@ export function PriceListPage() {
         }
       }
     } catch (err: unknown) {
-      alert("Ошибка: " + (err instanceof Error ? err.message : "Не удалось изменить статус."));
+      alert("Ошибка: " + formatErrorMessage(err));
     }
   }
 
@@ -253,7 +254,7 @@ export function PriceListPage() {
         .single();
 
       if (insertErr) {
-        return { ok: false, error: insertErr.message };
+        return { ok: false, error: formatErrorMessage(insertErr, "Не удалось добавить позицию.") };
       }
 
       if (data) {
@@ -264,7 +265,7 @@ export function PriceListPage() {
     } catch (err: unknown) {
       return {
         ok: false,
-        error: err instanceof Error ? err.message : "Не удалось добавить позицию.",
+        error: formatErrorMessage(err, "Не удалось добавить позицию."),
       };
     }
   }

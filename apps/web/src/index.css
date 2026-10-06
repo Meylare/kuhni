@@ -16,3 +16,17 @@ button,
 input {
   font: inherit;
 }
+
+/* Безопасная область для мобильных экранов с вырезом / домашней полоской */
+.safe-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+/* Скрытие скроллбара для горизонтальных списков табов/фильтров */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

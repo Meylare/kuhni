@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { formatErrorMessage } from "../lib/errors";
 import { formatKzt } from "../lib/money";
 import {
   filterOrders,
@@ -51,12 +52,12 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
         .order("created_at", { ascending: false });
 
       if (fetchErr) {
-        setError(fetchErr.message);
+        setError(formatErrorMessage(fetchErr, "Не удалось загрузить заказы."));
       } else {
         setOrders((data as OrderWithCalculations[]) || []);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить заказы.");
+      setError(formatErrorMessage(err, "Не удалось загрузить заказы."));
     } finally {
       setLoading(false);
     }
@@ -110,14 +111,14 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
         .single();
 
       if (insertErr) {
-        setCreateError(insertErr.message);
+        setCreateError(formatErrorMessage(insertErr, "Ошибка при создании заказа."));
       } else if (data) {
         setIsCreating(false);
         // Сразу открываем созданный заказ
         onSelectOrder(data.id);
       }
     } catch (err: unknown) {
-      setCreateError(err instanceof Error ? err.message : "Ошибка при создании заказа.");
+      setCreateError(formatErrorMessage(err, "Ошибка при создании заказа."));
     } finally {
       setCreateSaving(false);
     }

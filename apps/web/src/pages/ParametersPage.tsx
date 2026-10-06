@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { formatErrorMessage } from "../lib/errors";
 import {
   DEFAULT_PARAMETERS,
   evaluateDenominator,
@@ -55,7 +56,7 @@ export function ParametersPage() {
       const { data, error: fetchErr } = await supabase.from("parameters").select("*");
 
       if (fetchErr) {
-        setError(fetchErr.message);
+        setError(formatErrorMessage(fetchErr, "Не удалось загрузить параметры."));
       } else if (data) {
         const rows = data as ParameterItem[];
         const map = parametersArrayToMap(rows);
@@ -74,7 +75,7 @@ export function ParametersPage() {
         });
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить параметры.");
+      setError(formatErrorMessage(err, "Не удалось загрузить параметры."));
     } finally {
       setLoading(false);
     }
@@ -190,14 +191,14 @@ export function ParametersPage() {
           .eq("key", row.key);
 
         if (upsertErr) {
-          throw new Error(`Ошибка сохранения параметра ${row.key}: ${upsertErr.message}`);
+          throw new Error(`Ошибка сохранения параметра ${row.key}: ${formatErrorMessage(upsertErr)}`);
         }
       }
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить параметры.");
+      setError(formatErrorMessage(err, "Не удалось сохранить параметры."));
     } finally {
       setSaving(false);
     }

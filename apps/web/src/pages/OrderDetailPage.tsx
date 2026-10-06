@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { FactTab } from "../components/FactTab";
 
+import { formatErrorMessage } from "../lib/errors";
 import { formatKzt } from "../lib/money";
 import {
   calculateOrderLive,
@@ -240,7 +241,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         typeof s.waste_edge_pct === "number" ? formatPercent(s.waste_edge_pct) : ""
       );
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить данные заказа.");
+      setError(formatErrorMessage(err, "Не удалось загрузить данные заказа."));
     } finally {
       setLoading(false);
     }
@@ -359,13 +360,13 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .single();
 
       if (updateErr) {
-        setHeaderError(updateErr.message);
+        setHeaderError(formatErrorMessage(updateErr, "Ошибка при сохранении."));
       } else if (data) {
         setOrder(data as Order);
         setIsEditingHeader(false);
       }
     } catch (err: unknown) {
-      setHeaderError(err instanceof Error ? err.message : "Ошибка при сохранении.");
+      setHeaderError(formatErrorMessage(err, "Ошибка при сохранении."));
     } finally {
       setHeaderSaving(false);
     }
@@ -412,12 +413,12 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .single();
 
       if (updateErr) {
-        alert("Ошибка сохранения параметров: " + updateErr.message);
+        alert("Ошибка сохранения параметров: " + formatErrorMessage(updateErr));
       } else if (data) {
         setOrder(data as Order);
       }
     } catch (err) {
-      console.error(err);
+      alert("Ошибка сохранения параметров: " + formatErrorMessage(err));
     } finally {
       setParamsSaving(false);
     }
@@ -483,7 +484,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           .single();
 
         if (updateErr) {
-          setItemError(updateErr.message);
+          setItemError(formatErrorMessage(updateErr, "Ошибка при сохранении изделия."));
         } else if (data) {
           setItems((prev) =>
             prev.map((i) => (i.id === editingItem.id ? (data as OrderItem) : i))
@@ -505,14 +506,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           .single();
 
         if (insertErr) {
-          setItemError(insertErr.message);
+          setItemError(formatErrorMessage(insertErr, "Ошибка при сохранении изделия."));
         } else if (data) {
           setItems((prev) => [...prev, data as OrderItem]);
           setIsItemModalOpen(false);
         }
       }
     } catch (err: unknown) {
-      setItemError(err instanceof Error ? err.message : "Ошибка при сохранении изделия.");
+      setItemError(formatErrorMessage(err, "Ошибка при сохранении изделия."));
     } finally {
       setItemSaving(false);
     }
@@ -527,13 +528,13 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .delete()
         .eq("id", itemId);
       if (delErr) {
-        alert("Ошибка удаления изделия: " + delErr.message);
+        alert("Ошибка удаления изделия: " + formatErrorMessage(delErr));
       } else {
         setItems((prev) => prev.filter((i) => i.id !== itemId));
         setLines((prev) => prev.filter((l) => l.order_item_id !== itemId));
       }
     } catch (err) {
-      console.error(err);
+      alert("Ошибка удаления изделия: " + formatErrorMessage(err));
     }
   }
 
@@ -602,7 +603,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .single();
 
       if (insertErr) {
-        setPickerError(insertErr.message);
+        setPickerError(formatErrorMessage(insertErr, "Ошибка добавления позиции."));
       } else if (data) {
         // Если триггер перезаписал waste_pct, а пользователь указал своё значение
         const insertedLine = data as OrderLine;
@@ -618,7 +619,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         setIsPricePickerOpen(false);
       }
     } catch (err: unknown) {
-      setPickerError(err instanceof Error ? err.message : "Ошибка добавления позиции.");
+      setPickerError(formatErrorMessage(err, "Ошибка добавления позиции."));
     } finally {
       setPickerSaving(false);
     }
@@ -710,7 +711,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           .single();
 
         if (updateErr) {
-          setManualError(updateErr.message);
+          setManualError(formatErrorMessage(updateErr, "Ошибка сохранения позиции."));
         } else if (data) {
           setLines((prev) =>
             prev.map((l) => (l.id === editingLine.id ? (data as OrderLine) : l))
@@ -739,14 +740,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           .single();
 
         if (insertErr) {
-          setManualError(insertErr.message);
+          setManualError(formatErrorMessage(insertErr, "Ошибка сохранения позиции."));
         } else if (data) {
           setLines((prev) => [...prev, data as OrderLine]);
           setIsManualLineModalOpen(false);
         }
       }
     } catch (err: unknown) {
-      setManualError(err instanceof Error ? err.message : "Ошибка сохранения позиции.");
+      setManualError(formatErrorMessage(err, "Ошибка сохранения позиции."));
     } finally {
       setManualSaving(false);
     }
@@ -761,12 +762,12 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .delete()
         .eq("id", lineId);
       if (delErr) {
-        alert("Ошибка удаления: " + delErr.message);
+        alert("Ошибка удаления: " + formatErrorMessage(delErr));
       } else {
         setLines((prev) => prev.filter((l) => l.id !== lineId));
       }
     } catch (err) {
-      console.error(err);
+      alert("Ошибка удаления: " + formatErrorMessage(err));
     }
   }
 
@@ -828,7 +829,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .single();
 
       if (insertErr) {
-        alert("Ошибка сохранения расчёта: " + insertErr.message);
+        alert("Ошибка сохранения расчёта: " + formatErrorMessage(insertErr));
       } else if (data) {
         const saved = data as OrderCalculation;
         setCalculations((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
@@ -836,7 +837,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         setTimeout(() => setCalcSaveSuccess(null), 4000);
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Ошибка при сохранении расчёта.");
+      alert("Ошибка при сохранении расчёта: " + formatErrorMessage(err));
     } finally {
       setCalcSaving(false);
     }
@@ -863,7 +864,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .single();
 
       if (updateErr) {
-        alert("Ошибка назначения базового расчёта: " + updateErr.message);
+        alert("Ошибка назначения базового расчёта: " + formatErrorMessage(updateErr));
       } else if (data) {
         setCalculations((prev) =>
           prev.map((c) => ({
@@ -873,7 +874,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         );
       }
     } catch (err) {
-      console.error(err);
+      alert("Ошибка назначения базового расчёта: " + formatErrorMessage(err));
     }
   }
 
@@ -921,13 +922,13 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .single();
 
       if (updateErr) {
-        alert("Ошибка смены статуса: " + updateErr.message);
+        alert("Ошибка смены статуса: " + formatErrorMessage(updateErr));
       } else if (updatedOrder) {
         setOrder(updatedOrder as Order);
         setIsUnlockModalOpen(false);
       }
     } catch (err) {
-      console.error(err);
+      alert("Ошибка смены статуса: " + formatErrorMessage(err));
     } finally {
       setUnlockSaving(false);
     }
@@ -977,13 +978,13 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .single();
 
       if (insertErr) {
-        setAdjError(insertErr.message);
+        setAdjError(formatErrorMessage(insertErr, "Ошибка добавления корректировки."));
       } else if (data) {
         setAdjustments((prev) => [...prev, data as OrderAdjustment]);
         setIsAdjustmentModalOpen(false);
       }
     } catch (err: unknown) {
-      setAdjError(err instanceof Error ? err.message : "Ошибка добавления корректировки.");
+      setAdjError(formatErrorMessage(err, "Ошибка добавления корректировки."));
     } finally {
       setAdjSaving(false);
     }
@@ -998,12 +999,12 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .delete()
         .eq("id", adjId);
       if (delErr) {
-        alert("Ошибка удаления: " + delErr.message);
+        alert("Ошибка удаления: " + formatErrorMessage(delErr));
       } else {
         setAdjustments((prev) => prev.filter((a) => a.id !== adjId));
       }
     } catch (err) {
-      console.error(err);
+      alert("Ошибка удаления: " + formatErrorMessage(err));
     }
   }
 
