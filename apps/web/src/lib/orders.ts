@@ -1,11 +1,13 @@
 import {
   calculate,
+  calculateLine,
   type CalculationInput,
   type CalculationLine,
   type CalculationOrderItem,
   type CalculationAdjustment,
   type CalculationOutcome,
   type CalculationParameters,
+  type LineCalculation,
 } from "@kuhni/calc";
 
 import type {
@@ -228,6 +230,38 @@ export function calculateOrderLive(params: {
   const input = buildCalculationInput(params);
   return calculate(input);
 }
+
+/**
+ * Преобразует массив расчётов строк в карту по id позиции.
+ */
+export function getLineCalculationsMap(
+  lineCalculations: readonly LineCalculation[],
+): Map<string, LineCalculation> {
+  const map = new Map<string, LineCalculation>();
+  for (const calc of lineCalculations) {
+    if (calc.id) {
+      map.set(calc.id, calc);
+    }
+  }
+  return map;
+}
+
+/**
+ * Вычисляет отдельную позицию заказа через чистую функцию calculateLine из packages/calc.
+ */
+export function getOrderLineCalculation(line: OrderLine): LineCalculation {
+  return calculateLine({
+    id: line.id,
+    category: line.category,
+    qty: Number(line.qty),
+    unitPrice: Number(line.unit_price),
+    wastePct: Number(line.waste_pct),
+    billableQtyRounding: line.billable_qty_rounding,
+    countsForTechnolog: line.counts_for_technolog,
+  });
+}
+
+export type { LineCalculation };
 
 /**
  * Валидация создания / редактирования заказа.

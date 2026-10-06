@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { formatKzt } from "../lib/money";
 import {
   calculateOrderLive,
+  getLineCalculationsMap,
+  getOrderLineCalculation,
   isOrderLocked,
   validateAdjustmentInput,
   validateManualLineInput,
@@ -227,8 +229,9 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     return new Map(priceItems.map((p) => [p.id, p]));
   }, [priceItems]);
 
-  // Вычисление живого расчёта
-  const calcOutcome = useMemo(() => {
+  // Базовый расчёт сметы позиций (в режиме quote), чтобы подытоги и строки
+  // всегда брались из пакета packages/calc, даже если в check_contract не введена сумма договора
+  const baseCalcOutcome = useMemo(() => {
     if (!order) return null;
     return calculateOrderLive({
       order,
@@ -236,9 +239,36 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       lines,
       adjustments,
       globalParams,
-      mode: calcMode,
+      mode: "quote",
     });
-  }, [order, items, lines, adjustments, globalParams, calcMode]);
+  }, [order, items, lines, adjustments, globalParams]);
+
+  // Вычисление живого расчёта для активного режима
+  const calcOutcome = useMemo(() => {
+    if (!order) return null;
+    if (calcMode === "quote") return baseCalcOutcome;
+    return calculateOrderLive({
+      order,
+      items,
+      lines,
+      adjustments,
+      globalParams,
+      mode: "check_contract",
+    });
+  }, [order, items, lines, adjustments, globalParams, calcMode, baseCalcOutcome]);
+
+  // Карта расчётов строк из чистого модуля packages/calc
+  const lineCalculationsById = useMemo(() => {
+    const outcome = calcOutcome?.ok ? calcOutcome : baseCalcOutcome;
+    if (!outcome || !outcome.ok) return new Map();
+    return getLineCalculationsMap(outcome.result.lineCalculations);
+  }, [calcOutcome, baseCalcOutcome]);
+
+  // Карта подытогов категорий из чистого модуля packages/calc
+  const categoryTotals = useMemo(() => {
+    const outcome = calcOutcome?.ok ? calcOutcome : baseCalcOutcome;
+    return outcome?.ok ? outcome.result.categoryTotals : null;
+  }, [calcOutcome, baseCalcOutcome]);
 
   // Проверка: есть ли позиции с изменившейся ценой в справочнике?
   const changedPriceLines = useMemo(() => {
@@ -1219,14 +1249,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                   const catLines = lines.filter((l) => l.category === cat);
                   if (catLines.length === 0) return null;
 
-                  const catTotal = catLines.reduce((sum, l) => {
-                    const qtyWithWaste = l.qty * (1 + Number(l.waste_pct));
-                    const billable =
-                      l.billable_qty_rounding === "ceil_to_unit"
-                        ? Math.ceil(qtyWithWaste)
-                        : qtyWithWaste;
-                    return sum + Math.ceil(billable * Number(l.unit_price));
-                  }, 0);
+                  const catTotal = categoryTotals ? (categoryTotals[cat] ?? 0) : 0;
 
                   return (
                     <div key={cat} className="py-3 first:pt-0 last:pb-0">
@@ -1243,12 +1266,10 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                       {/* Список строк категории */}
                       <div className="mt-1 flex flex-col gap-1.5">
                         {catLines.map((line) => {
-                          const qtyWithWaste = line.qty * (1 + Number(line.waste_pct));
-                          const billableQty =
-                            line.billable_qty_rounding === "ceil_to_unit"
-                              ? Math.ceil(qtyWithWaste)
-                              : qtyWithWaste;
-                          const lineTotal = Math.ceil(billableQty * Number(line.unit_price));
+                          const lineCalc =
+                            lineCalculationsById.get(line.id) ?? getOrderLineCalculation(line);
+                          const billableQty = lineCalc.billableQty;
+                          const lineTotal = lineCalc.total;
 
                           // Проверка изменения цены в каталоге
                           const currentCatItem = line.price_item_id

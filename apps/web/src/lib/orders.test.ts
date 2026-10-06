@@ -13,6 +13,8 @@ import {
   calculateOrderLive,
   filterOrders,
   getLatestCalculation,
+  getLineCalculationsMap,
+  getOrderLineCalculation,
   isOrderLocked,
   mergeOrderParameters,
   sortOrders,
@@ -756,5 +758,34 @@ describe("orders helpers", () => {
     expect(contractOutcome.result.warnings).toEqual([
       "договор ниже минимальной цены 886 000",
     ]);
+  });
+
+  it("calculates individual order line and maps line calculations by id using packages/calc", () => {
+    const line: OrderLine = {
+      id: "line-test-1",
+      order_id: "ord-test",
+      order_item_id: null,
+      price_item_id: null,
+      category: "facades",
+      name: "Фасад МДФ",
+      unit: "м2",
+      qty: 6.2,
+      unit_price: 26_000,
+      waste_pct: 0,
+      billable_qty_rounding: "ceil_to_unit",
+      counts_for_technolog: false,
+      is_manual: true,
+      comment: null,
+    };
+
+    const calc = getOrderLineCalculation(line);
+    expect(calc).toEqual({
+      id: "line-test-1",
+      billableQty: 7,
+      total: 182_000,
+    });
+
+    const map = getLineCalculationsMap([calc]);
+    expect(map.get("line-test-1")).toEqual(calc);
   });
 });
