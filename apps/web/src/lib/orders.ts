@@ -20,6 +20,7 @@ import type {
   OrderStatus,
   OrderWithCalculations,
   PriceCategory,
+  PriceItem,
 } from "../types/database";
 import type { ParametersMap } from "./parameters";
 
@@ -347,3 +348,171 @@ export function validateAdjustmentInput(input: {
   }
   return { valid: true };
 }
+
+/**
+ * Структура данных для сохранения версии расчёта в таблицу calculations.
+ */
+export interface SaveCalculationPayload {
+  order_id: string;
+  version: number;
+  mode: "quote" | "check_contract";
+  params_snapshot: Record<string, unknown>;
+  input_snapshot: Record<string, unknown>;
+  result: Record<string, unknown>;
+  cost_total: number;
+  price_total: number;
+  margin_pct: number | null;
+  is_contract_baseline?: boolean;
+}
+
+/**
+ * Формирует неизменяемый снимок расчёта для сохранения в базу данных.
+ */
+export function prepareCalculationSnapshot(params: {
+  order: Order;
+  items: OrderItem[];
+  lines: OrderLine[];
+  adjustments: OrderAdjustment[];
+  globalParams: ParametersMap;
+  mode: "quote" | "check_contract";
+  outcome: CalculationOutcome;
+  isContractBaseline?: boolean;
+}): SaveCalculationPayload {
+  if (!params.outcome.ok) {
+    throw new Error(`Невозможно сохранить расчёт с ошибкой: ${params.outcome.error}`);
+  }
+
+  const calcParams = mergeOrderParameters(params.globalParams, params.order.settings);
+
+  return {
+    order_id: params.order.id,
+    version: 0, // Базовый триггер БД назначит atomic следующий номер версии
+    mode: params.mode,
+    params_snapshot: {
+      target_margin_pct: calcParams.targetMarginPct,
+      assembly_mode: calcParams.assemblyMode,
+      assembly_pct: calcParams.assemblyPct,
+      assembly_per_meter_kitchen: calcParams.assemblyPerMeterKitchen,
+      assembly_per_meter_wardrobe: calcParams.assemblyPerMeterWardrobe,
+      technolog_mode: calcParams.technologMode,
+      technolog_pct: calcParams.technologPct,
+      technolog_per_sheet: calcParams.technologPerSheet,
+      risk_reserve_pct: calcParams.riskReservePct,
+      price_rounding: calcParams.priceRounding,
+    },
+    input_snapshot: {
+      contract_price: params.order.contract_price,
+      items: params.items.map((it) => ({
+        id: it.id,
+        kind: it.kind,
+        title: it.title,
+        linear_meters: it.linear_meters,
+        description: it.description,
+      })),
+      lines: params.lines.map((l) => ({
+        id: l.id,
+        price_item_id: l.price_item_id,
+        order_item_id: l.order_item_id,
+        category: l.category,
+        name: l.name,
+        unit: l.unit,
+        qty: Number(l.qty),
+        unit_price: Number(l.unit_price),
+        waste_pct: Number(l.waste_pct),
+        billable_qty_rounding: l.billable_qty_rounding,
+        counts_for_technolog: l.counts_for_technolog,
+        is_manual: l.is_manual,
+        comment: l.comment,
+      })),
+      adjustments: params.adjustments.map((a) => ({
+        id: a.id,
+        kind: a.kind,
+        category: a.category,
+        label: a.label,
+        amount: Number(a.amount),
+        comment: a.comment,
+      })),
+    },
+    result: params.outcome.result as unknown as Record<string, unknown>,
+    cost_total: params.outcome.result.costTotal,
+    price_total: params.outcome.result.priceTotal,
+    margin_pct: params.outcome.result.marginPct,
+    is_contract_baseline: params.isContractBaseline ?? false,
+  };
+}
+
+export interface PriceDiffLine {
+  lineId: string;
+  name: string;
+  category: PriceCategory;
+  oldUnitPrice: number;
+  newUnitPrice: number;
+  qty: number;
+  oldLineTotal: number;
+  newLineTotal: number;
+  diff: number;
+}
+
+export interface PriceUpdatesDiff {
+  lines: PriceDiffLine[];
+  totalOldLinesCost: number;
+  totalNewLinesCost: number;
+  totalDiff: number;
+}
+
+/**
+ * Сравнивает цены позиций заказа с актуальными ценами в справочнике
+ * и подсчитывает разницу итоговой стоимости позиций.
+ */
+export function computePriceUpdatesDiff(
+  lines: OrderLine[],
+  catalogMap: Map<string, PriceItem>,
+): PriceUpdatesDiff {
+  const diffLines: PriceDiffLine[] = [];
+  let totalOld = 0;
+  let totalNew = 0;
+
+  for (const line of lines) {
+    if (!line.price_item_id) continue;
+    const catItem = catalogMap.get(line.price_item_id);
+    if (!catItem) continue;
+
+    const oldUnitPrice = Number(line.unit_price);
+    const newUnitPrice = Number(catItem.price);
+
+    if (oldUnitPrice !== newUnitPrice) {
+      const oldCalc = getOrderLineCalculation(line);
+      const newCalc = getOrderLineCalculation({
+        ...line,
+        unit_price: newUnitPrice,
+      });
+
+      const oldTotal = oldCalc.total;
+      const newTotal = newCalc.total;
+      const diff = newTotal - oldTotal;
+
+      diffLines.push({
+        lineId: line.id,
+        name: line.name,
+        category: line.category,
+        oldUnitPrice,
+        newUnitPrice,
+        qty: Number(line.qty),
+        oldLineTotal: oldTotal,
+        newLineTotal: newTotal,
+        diff,
+      });
+
+      totalOld += oldTotal;
+      totalNew += newTotal;
+    }
+  }
+
+  return {
+    lines: diffLines,
+    totalOldLinesCost: totalOld,
+    totalNewLinesCost: totalNew,
+    totalDiff: totalNew - totalOld,
+  };
+}
+

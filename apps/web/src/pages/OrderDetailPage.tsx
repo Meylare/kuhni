@@ -3,9 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { formatKzt } from "../lib/money";
 import {
   calculateOrderLive,
+  computePriceUpdatesDiff,
   getLineCalculationsMap,
   getOrderLineCalculation,
   isOrderLocked,
+  prepareCalculationSnapshot,
   validateAdjustmentInput,
   validateManualLineInput,
   validateOrderInput,
@@ -31,6 +33,7 @@ import {
   type BillableQtyRounding,
   type Order,
   type OrderAdjustment,
+  type OrderCalculation,
   type OrderItem,
   type OrderItemKind,
   type OrderLine,
@@ -65,6 +68,17 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
   // Раскрытие подробной сводки затрат
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // Версии расчёта заказа (U5)
+  const [calculations, setCalculations] = useState<OrderCalculation[]>([]);
+  const [calcSaving, setCalcSaving] = useState(false);
+  const [calcSaveSuccess, setCalcSaveSuccess] = useState<string | null>(null);
+  const [expandedVersionId, setExpandedVersionId] = useState<string | null>(null);
+
+  // Модальные окна U5: обновление цен и разблокировка заказа
+  const [isPriceDiffModalOpen, setIsPriceDiffModalOpen] = useState(false);
+  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
+  const [unlockSaving, setUnlockSaving] = useState(false);
 
   // Редактирование шапки заказа
   const [isEditingHeader, setIsEditingHeader] = useState(false);
@@ -160,23 +174,26 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       setOrder(ordData as Order);
 
       // Загрузка связанных таблиц параллельно
-      const [itemsRes, linesRes, adjRes, pricesRes, paramsRes] = await Promise.all([
+      const [itemsRes, linesRes, adjRes, pricesRes, paramsRes, calcsRes] = await Promise.all([
         supabase.from("order_items").select("*").eq("order_id", orderId).order("title"),
         supabase.from("order_lines").select("*").eq("order_id", orderId),
         supabase.from("adjustments").select("*").eq("order_id", orderId),
         supabase.from("price_items").select("*").order("name"),
         supabase.from("parameters").select("*"),
+        supabase.from("calculations").select("*").eq("order_id", orderId).order("version", { ascending: false }),
       ]);
 
       if (itemsRes.error) console.error("items error", itemsRes.error);
       if (linesRes.error) console.error("lines error", linesRes.error);
       if (adjRes.error) console.error("adjustments error", adjRes.error);
       if (pricesRes.error) console.error("prices error", pricesRes.error);
+      if (calcsRes.error) console.error("calculations error", calcsRes.error);
 
       setItems((itemsRes.data as OrderItem[]) || []);
       setLines((linesRes.data as OrderLine[]) || []);
       setAdjustments((adjRes.data as OrderAdjustment[]) || []);
       setPriceItems((pricesRes.data as PriceItem[]) || []);
+      setCalculations((calcsRes.data as OrderCalculation[]) || []);
 
       if (paramsRes.data) {
         const map = parametersArrayToMap(paramsRes.data as ParameterItem[]);
@@ -270,14 +287,12 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     return outcome?.ok ? outcome.result.categoryTotals : null;
   }, [calcOutcome, baseCalcOutcome]);
 
-  // Проверка: есть ли позиции с изменившейся ценой в справочнике?
-  const changedPriceLines = useMemo(() => {
-    return lines.filter((line) => {
-      if (!line.price_item_id) return false;
-      const current = priceItemsById.get(line.price_item_id);
-      return current && current.price !== Number(line.unit_price);
-    });
+  // Проверка и расчёт разницы цен с актуальным справочником (U5)
+  const priceDiff = useMemo(() => {
+    return computePriceUpdatesDiff(lines, priceItemsById);
   }, [lines, priceItemsById]);
+
+  const changedPriceLines = priceDiff.lines;
 
   // Открытие редактирования шапки
   function handleOpenEditHeader() {
@@ -743,29 +758,19 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     }
   }
 
-  // Обновление цен в заказе из текущего справочника цен
-  async function handleUpdatePricesFromCatalog() {
-    if (locked || changedPriceLines.length === 0) return;
-    if (
-      !confirm(
-        `Обновить цены для ${changedPriceLines.length} позиций по актуальному прайсу?`
-      )
-    ) {
-      return;
-    }
+  // Подтверждение и применение обновлений цен из справочника
+  async function handleConfirmPriceUpdates() {
+    if (locked || priceDiff.lines.length === 0) return;
 
     try {
       setIsUpdatingPrices(true);
       const supabase = getSupabase();
 
-      for (const line of changedPriceLines) {
-        const itemInCatalog = priceItemsById.get(line.price_item_id!);
-        if (itemInCatalog) {
-          await supabase
-            .from("order_lines")
-            .update({ unit_price: itemInCatalog.price })
-            .eq("id", line.id);
-        }
+      for (const item of priceDiff.lines) {
+        await supabase
+          .from("order_lines")
+          .update({ unit_price: item.newUnitPrice })
+          .eq("id", item.lineId);
       }
 
       // Перезагрузка строк
@@ -776,10 +781,143 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       if (updatedLines) {
         setLines(updatedLines as OrderLine[]);
       }
+      setIsPriceDiffModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert("Ошибка при обновлении цен: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsUpdatingPrices(false);
+    }
+  }
+
+  // Сохранение новой неизменяемой версии расчёта (U5)
+  async function handleSaveCalculation() {
+    if (!order || !calcOutcome || !calcOutcome.ok) return;
+
+    try {
+      setCalcSaving(true);
+      setCalcSaveSuccess(null);
+      const payload = prepareCalculationSnapshot({
+        order,
+        items,
+        lines,
+        adjustments,
+        globalParams,
+        mode: calcMode,
+        outcome: calcOutcome,
+        isContractBaseline: false,
+      });
+
+      const supabase = getSupabase();
+      const { data, error: insertErr } = await supabase
+        .from("calculations")
+        .insert(payload)
+        .select()
+        .single();
+
+      if (insertErr) {
+        alert("Ошибка сохранения расчёта: " + insertErr.message);
+      } else if (data) {
+        const saved = data as OrderCalculation;
+        setCalculations((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
+        setCalcSaveSuccess(`Версия №${saved.version} успешно сохранена в истории`);
+        setTimeout(() => setCalcSaveSuccess(null), 4000);
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Ошибка при сохранении расчёта.");
+    } finally {
+      setCalcSaving(false);
+    }
+  }
+
+  // Назначение версии расчёта как базовой для договора (is_contract_baseline)
+  async function handleSetBaseline(calcId: string) {
+    if (!order) return;
+    try {
+      const supabase = getSupabase();
+      // Снимаем отметку со старого базового расчёта
+      await supabase
+        .from("calculations")
+        .update({ is_contract_baseline: false })
+        .eq("order_id", order.id)
+        .eq("is_contract_baseline", true);
+
+      // Назначаем выбранный
+      const { data, error: updateErr } = await supabase
+        .from("calculations")
+        .update({ is_contract_baseline: true })
+        .eq("id", calcId)
+        .select()
+        .single();
+
+      if (updateErr) {
+        alert("Ошибка назначения базового расчёта: " + updateErr.message);
+      } else if (data) {
+        setCalculations((prev) =>
+          prev.map((c) => ({
+            ...c,
+            is_contract_baseline: c.id === calcId,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Разблокировка заблокированного заказа для создания новой версии (U5)
+  async function handleConfirmCreateNewVersion() {
+    if (!order) return;
+    try {
+      setUnlockSaving(true);
+      const supabase = getSupabase();
+
+      // Если расчёт валиден и ещё не сохранён, зафиксируем текущий
+      if (calcOutcome && calcOutcome.ok) {
+        try {
+          const payload = prepareCalculationSnapshot({
+            order,
+            items,
+            lines,
+            adjustments,
+            globalParams,
+            mode: calcMode,
+            outcome: calcOutcome,
+          });
+          const { data: savedCalc } = await supabase
+            .from("calculations")
+            .insert(payload)
+            .select()
+            .single();
+          if (savedCalc) {
+            setCalculations((prev) => [savedCalc as OrderCalculation, ...prev]);
+          }
+        } catch {
+          // Игнорируем дублирование фиксации
+        }
+      }
+
+      // Переводим заказ в статус 'quoted' для возможности редактирования
+      const { data: updatedOrder, error: updateErr } = await supabase
+        .from("orders")
+        .update({
+          status: "quoted",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id)
+        .select()
+        .single();
+
+      if (updateErr) {
+        alert("Ошибка смены статуса: " + updateErr.message);
+      } else if (updatedOrder) {
+        setOrder(updatedOrder as Order);
+        setIsUnlockModalOpen(false);
+      }
     } catch (err) {
       console.error(err);
     } finally {
-      setIsUpdatingPrices(false);
+      setUnlockSaving(false);
     }
   }
 
@@ -957,10 +1095,25 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         </div>
       </div>
 
-      {/* Предупреждение о блокировке */}
+      {/* Предупреждение о блокировке (U5) */}
       {locked && (
-        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          🔒 <strong>Заказ заблокирован от случайных правок</strong>, так как находится в статусе «{statusLabel}».
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-xs">
+          <div className="flex items-start gap-2.5">
+            <span className="text-xl leading-none">🔒</span>
+            <div>
+              <strong className="text-sm font-bold text-amber-950">Заказ заблокирован от случайных правок</strong>
+              <p className="mt-0.5 text-amber-800">
+                Заказ находится в статусе «{statusLabel}». Позиции и параметры защищены от изменений.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsUnlockModalOpen(true)}
+            className="self-start sm:self-auto min-h-10 whitespace-nowrap rounded-xl bg-amber-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-950 active:scale-98"
+          >
+            Создать новую версию расчёта
+          </button>
         </div>
       )}
 
@@ -1027,7 +1180,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                 : "bg-stone-100 text-stone-600 hover:bg-stone-200"
             }`}
           >
-            2. История версий (U5)
+            2. История версий ({calculations.length})
           </button>
           <button
             type="button"
@@ -1044,12 +1197,275 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       </div>
 
       {orderTab === "history" && (
-        <div className="mt-6 rounded-2xl border border-dashed border-stone-300 bg-white/70 p-8 text-center text-sm text-stone-600">
-          <span className="text-2xl">📜</span>
-          <h3 className="mt-2 font-bold text-stone-800">История расчётов</h3>
-          <p className="mt-1 text-xs text-stone-500">
-            Сохранение неизменяемых версий расчёта в таблицу `calculations` реализуется в шаге U5.
-          </p>
+        <div className="mt-4 flex flex-col gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-bold text-stone-900">История расчётов</h2>
+              <p className="text-xs text-stone-500">
+                Зафиксированные неизменяемые версии расчёта с исходными параметрами и снимками
+              </p>
+            </div>
+            {!locked && calcOutcome && calcOutcome.ok && (
+              <button
+                type="button"
+                disabled={calcSaving}
+                onClick={handleSaveCalculation}
+                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-900 px-4 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 active:scale-98 disabled:opacity-50"
+              >
+                <span>💾</span>
+                <span>{calcSaving ? "Сохранение…" : "Сохранить текущий расчёт"}</span>
+              </button>
+            )}
+          </div>
+
+          {calcSaveSuccess && (
+            <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-medium text-emerald-900">
+              ✓ {calcSaveSuccess}
+            </div>
+          )}
+
+          {calculations.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-stone-300 bg-white/70 p-10 text-center text-sm text-stone-600">
+              <span className="text-3xl">📜</span>
+              <h3 className="mt-2 font-bold text-stone-800">Нет сохранённых расчётов</h3>
+              <p className="mt-1 text-xs text-stone-500 max-w-sm mx-auto">
+                В этом заказе пока нет зафиксированных версий. Нажмите «Сохранить расчёт», чтобы зафиксировать версию 1.
+              </p>
+              {!locked && calcOutcome && calcOutcome.ok && (
+                <button
+                  type="button"
+                  disabled={calcSaving}
+                  onClick={handleSaveCalculation}
+                  className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-900 px-5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950"
+                >
+                  <span>💾 Сохранить версию 1</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {calculations.map((calc) => {
+                const isExpanded = expandedVersionId === calc.id;
+                const formattedDate = new Date(calc.created_at).toLocaleString("ru-RU", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+                const paramsSnap = (calc.params_snapshot || {}) as Record<string, unknown>;
+                const resSnap = (calc.result || {}) as Record<string, unknown>;
+                const inputSnap = (calc.input_snapshot || {}) as Record<string, unknown>;
+                const inputLines = (inputSnap?.lines as Array<Record<string, unknown>>) || [];
+                const catTotals = (resSnap?.categoryTotals as Record<string, number>) || {};
+                const warnings = (resSnap?.warnings as string[]) || [];
+
+                return (
+                  <div
+                    key={calc.id}
+                    className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs transition-shadow hover:shadow-sm"
+                  >
+                    {/* Заголовок версии */}
+                    <div className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between border-b border-stone-100 bg-stone-50/60">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-extrabold text-stone-900">
+                          Версия #{calc.version}
+                        </span>
+                        <span className="text-xs text-stone-500">{formattedDate}</span>
+                        <span className="rounded-md bg-stone-200 px-2 py-0.5 text-[10px] font-semibold text-stone-700">
+                          {calc.mode === "quote" ? "Рассчитать цену" : "Проверить договор"}
+                        </span>
+                        {calc.is_contract_baseline && (
+                          <span className="rounded-full bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                            ⭐ Подписанный договор
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        {!calc.is_contract_baseline && (
+                          <button
+                            type="button"
+                            onClick={() => void handleSetBaseline(calc.id)}
+                            className="min-h-8 rounded-lg border border-stone-200 bg-white px-2.5 text-[11px] font-medium text-stone-600 hover:bg-stone-50 hover:text-stone-900"
+                            title="Сделать этот расчёт базовым для договора"
+                          >
+                            Сделать договорным
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setExpandedVersionId(isExpanded ? null : calc.id)}
+                          className="min-h-8 rounded-lg bg-stone-100 px-3 text-[11px] font-semibold text-stone-700 hover:bg-stone-200"
+                        >
+                          {isExpanded ? "Свернуть ▲" : "Подробнее ▼"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Ключевые показатели */}
+                    <div className="grid grid-cols-3 divide-x divide-stone-100 p-4 text-center">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wide text-stone-400">
+                          Итоговая цена
+                        </span>
+                        <span className="mt-0.5 block text-base font-extrabold text-stone-900 sm:text-lg">
+                          {formatKzt(calc.price_total)} ₸
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wide text-stone-400">
+                          Себестоимость
+                        </span>
+                        <span className="mt-0.5 block text-sm font-bold text-stone-700 sm:text-base">
+                          {formatKzt(calc.cost_total)} ₸
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wide text-stone-400">
+                          Маржа
+                        </span>
+                        <div className="mt-0.5 flex flex-wrap items-baseline justify-center gap-1">
+                          <span className="text-sm font-bold text-emerald-900 sm:text-base">
+                            {formatKzt(calc.price_total - calc.cost_total)} ₸
+                          </span>
+                          {calc.margin_pct !== null && (
+                            <span className="text-xs font-semibold text-emerald-700">
+                              ({formatPercent(calc.margin_pct)})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Раскрывающийся подробный снимок */}
+                    {isExpanded && (
+                      <div className="border-t border-stone-100 bg-stone-50/40 p-4 text-xs flex flex-col gap-4">
+                        {warnings.length > 0 && (
+                          <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            ⚠️ {warnings.join("; ")}
+                          </div>
+                        )}
+
+                        {/* Параметры */}
+                        <div>
+                          <h4 className="font-bold text-stone-800 mb-1.5">
+                            ⚙️ Параметры на момент фиксации:
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-stone-200 bg-white p-3 text-[11px] text-stone-700">
+                            <div>
+                              <span className="text-stone-400 block">Целевая маржа:</span>
+                              <span className="font-semibold">
+                                {typeof paramsSnap.target_margin_pct === "number"
+                                  ? formatPercent(paramsSnap.target_margin_pct as number)
+                                  : "—"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-stone-400 block">Сборка:</span>
+                              <span className="font-semibold">
+                                {paramsSnap.assembly_mode === "per_meter"
+                                  ? "за пог. метр"
+                                  : typeof paramsSnap.assembly_pct === "number"
+                                  ? formatPercent(paramsSnap.assembly_pct as number)
+                                  : "—"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-stone-400 block">Технолог:</span>
+                              <span className="font-semibold">
+                                {paramsSnap.technolog_mode === "per_sheet"
+                                  ? "за лист"
+                                  : typeof paramsSnap.technolog_pct === "number"
+                                  ? formatPercent(paramsSnap.technolog_pct as number)
+                                  : "—"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-stone-400 block">Резерв на риск:</span>
+                              <span className="font-semibold">
+                                {typeof paramsSnap.risk_reserve_pct === "number"
+                                  ? formatPercent(paramsSnap.risk_reserve_pct as number)
+                                  : "—"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Разделение затрат по статьям */}
+                        <div>
+                          <h4 className="font-bold text-stone-800 mb-1.5">
+                            📊 Затраты по категориям:
+                          </h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-stone-200 bg-white p-3 text-[11px]">
+                            {ALL_CATEGORIES.map((cat) => (
+                              <div key={cat}>
+                                <span className="text-stone-400 block">{CATEGORY_LABELS[cat]}:</span>
+                                <span className="font-semibold text-stone-800">
+                                  {formatKzt(catTotals[cat] || 0)} ₸
+                                </span>
+                              </div>
+                            ))}
+                            <div>
+                              <span className="text-stone-400 block">Сборка:</span>
+                              <span className="font-semibold text-stone-800">
+                                {formatKzt(Number(resSnap.assembly || resSnap.fixedAssembly || 0))} ₸
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-stone-400 block">Технолог:</span>
+                              <span className="font-semibold text-stone-800">
+                                {formatKzt(Number(resSnap.technolog || resSnap.fixedTechnolog || 0))} ₸
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-stone-400 block">Резерв на риск:</span>
+                              <span className="font-semibold text-stone-800">
+                                {formatKzt(Number(resSnap.riskReserve || 0))} ₸
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-stone-400 block">Мин. цена для маржи:</span>
+                              <span className="font-semibold text-stone-800">
+                                {formatKzt(Number(resSnap.minPriceForTargetMargin || 0))} ₸
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Зафиксированные позиции */}
+                        {inputLines.length > 0 && (
+                          <div>
+                            <h4 className="font-bold text-stone-800 mb-1.5">
+                              📋 Позиции расчёта ({inputLines.length}):
+                            </h4>
+                            <div className="max-h-60 overflow-y-auto rounded-xl border border-stone-200 bg-white divide-y divide-stone-100">
+                              {inputLines.map((l, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-2.5 text-[11px]">
+                                  <div>
+                                    <div className="font-semibold text-stone-900">
+                                      {String(l.name)}
+                                    </div>
+                                    <div className="text-stone-500">
+                                      {String(l.qty)} {String(l.unit)} × {formatKzt(Number(l.unit_price))} ₸
+                                      {Number(l.waste_pct) > 0 && ` (+${(Number(l.waste_pct) * 100).toFixed(0)}% отход)`}
+                                    </div>
+                                  </div>
+                                  <div className="font-bold text-stone-900">
+                                    {formatKzt(Number(l.qty) * Number(l.unit_price) * (1 + Number(l.waste_pct || 0)))} ₸
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1113,10 +1529,10 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                 <button
                   type="button"
                   disabled={isUpdatingPrices}
-                  onClick={handleUpdatePricesFromCatalog}
+                  onClick={() => setIsPriceDiffModalOpen(true)}
                   className="self-start whitespace-nowrap rounded-lg bg-amber-800 px-3 py-1.5 font-semibold text-white shadow-xs hover:bg-amber-900 disabled:opacity-50"
                 >
-                  {isUpdatingPrices ? "Обновление…" : "Обновить цены в заказе"}
+                  {isUpdatingPrices ? "Обновление…" : `Обновить цены (${priceDiff.totalDiff > 0 ? "+" : ""}${formatKzt(priceDiff.totalDiff)} ₸)`}
                 </button>
               )}
             </div>
@@ -1550,6 +1966,13 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                   </div>
                 )}
 
+                {/* Сообщение об успешном сохранении (U5) */}
+                {calcSaveSuccess && (
+                  <div className="mb-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-900">
+                    ✓ {calcSaveSuccess}
+                  </div>
+                )}
+
                 {/* Основные цифры (крупно) */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex flex-1 items-baseline gap-2 sm:gap-4">
@@ -1588,14 +2011,37 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                     </div>
                   </div>
 
-                  {/* Кнопка раскрытия подробной разбивки */}
-                  <button
-                    type="button"
-                    onClick={() => setShowBreakdown((prev) => !prev)}
-                    className="min-h-11 rounded-xl border border-stone-300 bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-95"
-                  >
-                    {showBreakdown ? "Скрыть ▲" : "Сводка ▼"}
-                  </button>
+                  {/* Кнопки действий: Сохранить расчёт и Сводка */}
+                  <div className="flex items-center gap-1.5">
+                    {!locked ? (
+                      <button
+                        type="button"
+                        disabled={calcSaving}
+                        onClick={handleSaveCalculation}
+                        className="min-h-11 rounded-xl bg-emerald-900 px-3.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-950 active:scale-95 disabled:opacity-50"
+                        title="Зафиксировать версию расчёта в базе"
+                      >
+                        {calcSaving ? "Сохранение…" : "💾 Сохранить"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsUnlockModalOpen(true)}
+                        className="min-h-11 rounded-xl bg-amber-900 px-3 text-xs font-bold text-white shadow-xs hover:bg-amber-950 active:scale-95"
+                        title="Создать новую версию расчёта"
+                      >
+                        🔒 Новая версия
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setShowBreakdown((prev) => !prev)}
+                      className="min-h-11 rounded-xl border border-stone-300 bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-95"
+                    >
+                      {showBreakdown ? "Скрыть ▲" : "Сводка ▼"}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Раскрывающаяся подробная сводка */}
@@ -2385,6 +2831,118 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* МОДАЛКА 5: ОБНОВЛЕНИЕ ЦЕН ИЗ СПРАВОЧНИКА С РАСЧЁТОМ РАЗНИЦЫ (U5) */}
+      {isPriceDiffModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
+          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <h3 className="text-base font-bold text-stone-900">Обновление цен из справочника</h3>
+              <button
+                type="button"
+                onClick={() => setIsPriceDiffModalOpen(false)}
+                className="text-stone-400 hover:text-stone-600 text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="mt-2 text-xs text-stone-600 leading-relaxed">
+              В актуальном справочнике цен изменились цены для {priceDiff.lines.length} поз. из этого заказа.
+              Ознакомьтесь с изменениями перед подтверждением:
+            </p>
+
+            <div className="mt-3 max-h-56 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 divide-y divide-stone-200 text-xs">
+              {priceDiff.lines.map((item) => (
+                <div key={item.lineId} className="p-3">
+                  <div className="font-bold text-stone-900">{item.name}</div>
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[11px] text-stone-600">
+                    <span>
+                      {item.qty} шт: {formatKzt(item.oldUnitPrice)} ₸ ➔ <strong className="text-emerald-900">{formatKzt(item.newUnitPrice)} ₸</strong>
+                    </span>
+                    <span className={item.diff > 0 ? "text-rose-700 font-bold" : "text-emerald-700 font-bold"}>
+                      {item.diff > 0 ? "+" : ""}{formatKzt(item.diff)} ₸
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Сводка разницы */}
+            <div className="mt-3 rounded-xl border border-stone-200 bg-stone-100 p-3 text-xs flex justify-between items-center">
+              <span className="font-medium text-stone-700">Разница общей стоимости:</span>
+              <span className={`text-sm font-extrabold ${priceDiff.totalDiff > 0 ? "text-rose-800" : "text-emerald-800"}`}>
+                {priceDiff.totalDiff > 0 ? "+" : ""}{formatKzt(priceDiff.totalDiff)} ₸
+              </span>
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsPriceDiffModalOpen(false)}
+                disabled={isUpdatingPrices}
+                className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingPrices}
+                onClick={() => void handleConfirmPriceUpdates()}
+                className="min-h-11 rounded-xl bg-amber-800 px-5 text-sm font-semibold text-white shadow-xs hover:bg-amber-900 disabled:opacity-50"
+              >
+                {isUpdatingPrices ? "Обновление…" : "Подтвердить обновление цен"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* МОДАЛКА 6: СОЗДАНИЕ НОВОЙ ВЕРСИИ ДЛЯ ЗАБЛОКИРОВАННОГО ЗАКАЗА (U5) */}
+      {isUnlockModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
+          <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xl">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <h3 className="text-base font-bold text-stone-900">Создать новую версию расчёта</h3>
+              <button
+                type="button"
+                onClick={() => setIsUnlockModalOpen(false)}
+                className="text-stone-400 hover:text-stone-600 text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-3 text-xs text-stone-600 leading-relaxed">
+              <p>
+                Заказ сейчас находится в статусе «<strong>{statusLabel}</strong>».
+              </p>
+              <p className="mt-2">
+                Чтобы внести изменения в позиции или параметры, текущий расчёт будет зафиксирован в истории версий, а статус заказа переведён в «<strong>Оценён</strong>» (quoted) для редактирования.
+              </p>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsUnlockModalOpen(false)}
+                disabled={unlockSaving}
+                className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={unlockSaving}
+                onClick={() => void handleConfirmCreateNewVersion()}
+                className="min-h-11 rounded-xl bg-amber-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-amber-950 disabled:opacity-50"
+              >
+                {unlockSaving ? "Обработка…" : "Разблокировать для правок"}
+              </button>
+            </div>
           </div>
         </div>
       )}
