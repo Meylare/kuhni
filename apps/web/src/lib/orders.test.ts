@@ -17,6 +17,7 @@ import {
   filterOrders,
   getLatestCalculation,
   getPlanCalculation,
+  resolveOrderDisplayCalculation,
   getLineCalculationsMap,
   getOrderLineCalculation,
   isOrderLocked,
@@ -1344,6 +1345,121 @@ describe("orders helpers", () => {
       const planUpdated = getPlanCalculation(calcsUpdatedBaseline);
       expect(planUpdated?.version).toBe(3);
       expect(planUpdated?.cost_total).toBe(700_000);
+    });
+
+    it("orders with a saved calculation version preserve their displayed totals when global parameters change (Step A6, Q2)", () => {
+      const order: Order = {
+        id: "ord-saved-1",
+        name: "Кухня МДФ",
+        client_label: "Иван",
+        status: "quoted",
+        contract_price: null,
+        settings: {},
+        note: null,
+        created_at: "2026-10-01T10:00:00Z",
+        updated_at: "2026-10-01T10:00:00Z",
+      };
+
+      const savedCalc: OrderCalculation = {
+        id: "calc-fixed-1",
+        order_id: "ord-saved-1",
+        version: 1,
+        mode: "quote",
+        params_snapshot: { target_margin_pct: 0.18 },
+        input_snapshot: {},
+        result: {
+          priceTotal: 861_000,
+          costTotal: 706_025,
+          margin: 154_975,
+          marginPct: 0.18,
+          fixedCost: 200_000,
+          minPriceForTargetMargin: 861_000,
+          categoryTotals: {
+            materials: 100_000,
+            workshop: 50_000,
+            facades: 150_000,
+            hardware: 40_000,
+            transport: 25_000,
+            labor: 80_000,
+            assembly: 124_845,
+            technolog: 34_440,
+            other: 0,
+            adjustments: 0,
+          },
+          assembly: 124_845,
+          technolog: 34_440,
+          riskReserve: 14_000,
+          warnings: [],
+          lineCalculations: [],
+        },
+        cost_total: 706_025,
+        price_total: 861_000,
+        margin_pct: 0.18,
+        is_contract_baseline: false,
+        created_at: "2026-10-01T10:30:00Z",
+      };
+
+      // Предположим, текущие глобальные параметры изменились: маржа стала 25%
+      // В результате liveOutcome пересчитает цену на существенно большую сумму
+      const liveOutcomeAfterGlobalParamChange: any = {
+        ok: true,
+        mode: "quote",
+        result: {
+          priceTotal: 980_000,
+          costTotal: 706_025,
+          margin: 273_975,
+          marginPct: 0.25,
+          fixedCost: 200_000,
+          minPriceForTargetMargin: 980_000,
+          categoryTotals: { ...savedCalc.result.categoryTotals },
+          assembly: 124_845,
+          technolog: 34_440,
+          riskReserve: 14_000,
+          warnings: [],
+          lineCalculations: [],
+        },
+      };
+
+      // 1. По умолчанию для заказа с сохранённой версией:
+      // Отображаются данные сохранённой версии (861 000 ₸, 18%), а не результат живого пересчёта (980 000 ₸)
+      const displayDefault = resolveOrderDisplayCalculation({
+        order,
+        calculations: [savedCalc],
+        liveOutcome: liveOutcomeAfterGlobalParamChange,
+        showLivePreview: false,
+      });
+
+      expect(displayDefault).not.toBeNull();
+      expect(displayDefault?.source).toBe("saved");
+      expect(displayDefault?.version).toBe(1);
+      expect(displayDefault?.priceTotal).toBe(861_000);
+      expect(displayDefault?.costTotal).toBe(706_025);
+      expect(displayDefault?.marginPct).toBe(0.18);
+
+      // 2. Пользователь явно нажимает кнопку «Пересчитать по актуальным параметрам» (showLivePreview = true)
+      // Отображается превью живого расчёта
+      const displayPreview = resolveOrderDisplayCalculation({
+        order,
+        calculations: [savedCalc],
+        liveOutcome: liveOutcomeAfterGlobalParamChange,
+        showLivePreview: true,
+      });
+
+      expect(displayPreview).not.toBeNull();
+      expect(displayPreview?.source).toBe("live");
+      expect(displayPreview?.priceTotal).toBe(980_000);
+      expect(displayPreview?.marginPct).toBe(0.25);
+
+      // 3. Для нового заказа без сохранённых версий (calculations: []) отображается живой расчёт
+      const displayNewOrder = resolveOrderDisplayCalculation({
+        order,
+        calculations: [],
+        liveOutcome: liveOutcomeAfterGlobalParamChange,
+        showLivePreview: false,
+      });
+
+      expect(displayNewOrder?.source).toBe("live");
+      expect(displayNewOrder?.priceTotal).toBe(980_000);
     });
   });
 });

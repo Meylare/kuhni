@@ -9,8 +9,10 @@ import {
   computePriceUpdatesDiff,
   getLineCalculationsMap,
   getOrderLineCalculation,
+  getPlanCalculation,
   isOrderLocked,
   prepareCalculationSnapshot,
+  resolveOrderDisplayCalculation,
   validateAdjustmentInput,
   validateManualLineInput,
   validateOrderInput,
@@ -81,6 +83,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   const [calcSaving, setCalcSaving] = useState(false);
   const [calcSaveSuccess, setCalcSaveSuccess] = useState<string | null>(null);
   const [expandedVersionId, setExpandedVersionId] = useState<string | null>(null);
+  const [showLivePreview, setShowLivePreview] = useState(false);
 
   // Модальные окна U5: обновление цен и разблокировка заказа
   const [isPriceDiffModalOpen, setIsPriceDiffModalOpen] = useState(false);
@@ -283,18 +286,35 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     });
   }, [order, items, lines, adjustments, globalParams, calcMode, baseCalcOutcome]);
 
+  // Определение расчёта для отображения в сводке (Step A6, Q2)
+  const displayCalc = useMemo(() => {
+    if (!order) return null;
+    return resolveOrderDisplayCalculation({
+      order,
+      calculations,
+      liveOutcome: calcOutcome,
+      showLivePreview,
+    });
+  }, [order, calculations, calcOutcome, showLivePreview]);
+
   // Карта расчётов строк из чистого модуля packages/calc
   const lineCalculationsById = useMemo(() => {
+    if (displayCalc && displayCalc.lineCalculations.length > 0) {
+      return getLineCalculationsMap(displayCalc.lineCalculations);
+    }
     const outcome = calcOutcome?.ok ? calcOutcome : baseCalcOutcome;
     if (!outcome || !outcome.ok) return new Map();
     return getLineCalculationsMap(outcome.result.lineCalculations);
-  }, [calcOutcome, baseCalcOutcome]);
+  }, [displayCalc, calcOutcome, baseCalcOutcome]);
 
   // Карта подытогов категорий из чистого модуля packages/calc
   const categoryTotals = useMemo(() => {
+    if (displayCalc) {
+      return displayCalc.categoryTotals;
+    }
     const outcome = calcOutcome?.ok ? calcOutcome : baseCalcOutcome;
     return outcome?.ok ? outcome.result.categoryTotals : null;
-  }, [calcOutcome, baseCalcOutcome]);
+  }, [displayCalc, calcOutcome, baseCalcOutcome]);
 
   // Проверка и расчёт разницы цен с актуальным справочником (U5)
   const priceDiff = useMemo(() => {
@@ -827,6 +847,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         const saved = data as OrderCalculation;
         setCalculations((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
         setCalcSaveSuccess(`Версия №${saved.version} успешно сохранена в истории`);
+        setShowLivePreview(false);
         setTimeout(() => setCalcSaveSuccess(null), 4000);
       } else {
         alert("Не удалось сохранить расчёт: сервер не вернул созданную запись.");
@@ -1003,25 +1024,27 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
   // Копирование сводки расчёта в буфер обмена
   function handleCopySummary() {
-    if (!order || !calcOutcome || !calcOutcome.ok) return;
-    const res = calcOutcome.result;
+    if (!order || !displayCalc) return;
     const text = [
       `Расчёт заказа: ${order.name}`,
       order.client_label ? `Клиент: ${order.client_label}` : "",
       `Режим: ${calcMode === "quote" ? "Рассчитать цену" : "Проверить договор"}`,
-      `Итоговая цена: ${formatKzt(res.priceTotal)} ₸`,
-      `Себестоимость: ${formatKzt(res.costTotal)} ₸`,
-      `Маржа: ${formatKzt(res.margin)} ₸ (${formatPercent(res.marginPct)})`,
-      `Мин. цена для маржи: ${formatKzt(res.minPriceForTargetMargin)} ₸`,
+      displayCalc.version ? `Версия: №${displayCalc.version}` : "Превью по актуальным параметрам",
+      `Итоговая цена: ${formatKzt(displayCalc.priceTotal)} ₸`,
+      `Себестоимость: ${formatKzt(displayCalc.costTotal)} ₸`,
+      `Маржа: ${formatKzt(displayCalc.margin)} ₸ (${formatPercent(displayCalc.marginPct)})`,
+      `Мин. цена для маржи: ${formatKzt(displayCalc.minPriceForTargetMargin)} ₸`,
       "",
       "Затраты по категориям:",
-      `• Материалы: ${formatKzt(res.categoryTotals.materials)} ₸`,
-      `• Фасады: ${formatKzt(res.categoryTotals.facades)} ₸`,
-      `• Цех: ${formatKzt(res.categoryTotals.workshop)} ₸`,
-      `• Фурнитура: ${formatKzt(res.categoryTotals.hardware)} ₸`,
-      `• Транспорт: ${formatKzt(res.categoryTotals.transport)} ₸`,
-      `• Работа: ${formatKzt(res.categoryTotals.labor)} ₸`,
-      `• Остальное: ${formatKzt(res.categoryTotals.other)} ₸`,
+      `• Материалы: ${formatKzt(displayCalc.categoryTotals.materials)} ₸`,
+      `• Фасады: ${formatKzt(displayCalc.categoryTotals.facades)} ₸`,
+      `• Цех: ${formatKzt(displayCalc.categoryTotals.workshop)} ₸`,
+      `• Фурнитура: ${formatKzt(displayCalc.categoryTotals.hardware)} ₸`,
+      `• Транспорт: ${formatKzt(displayCalc.categoryTotals.transport)} ₸`,
+      `• Работа: ${formatKzt(displayCalc.categoryTotals.labor)} ₸`,
+      `• Сборка: ${formatKzt(displayCalc.assembly)} ₸`,
+      `• Технолог: ${formatKzt(displayCalc.technolog)} ₸`,
+      `• Остальное: ${formatKzt(displayCalc.categoryTotals.other)} ₸`,
     ]
       .filter(Boolean)
       .join("\n");
@@ -1957,19 +1980,21 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stone-300/80 bg-white/95 backdrop-blur-md shadow-2xl safe-bottom">
           <div className="mx-auto max-w-4xl px-4 py-3">
             {/* Результаты или Ошибка расчёта */}
-            {!calcOutcome ? null : !calcOutcome.ok ? (
-              <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-800">
-                <strong>Ошибка расчёта:</strong>{" "}
-                {calcOutcome.error === "parameters_leave_no_share_for_fixed_costs"
-                  ? "Сумма процентных ставок превышает 100%. Измените параметры расчёта."
-                  : "Необходимо указать цену по договору в шапке заказа."}
-              </div>
+            {!displayCalc ? (
+              calcOutcome && !calcOutcome.ok ? (
+                <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-800">
+                  <strong>Ошибка расчёта:</strong>{" "}
+                  {calcOutcome.error === "parameters_leave_no_share_for_fixed_costs"
+                    ? "Сумма процентных ставок превышает 100%. Измените параметры расчёта."
+                    : "Необходимо указать цену по договору в шапке заказа."}
+                </div>
+              ) : null
             ) : (
               <div>
                 {/* Предупреждения расчёта */}
-                {calcOutcome.result.warnings.length > 0 && (
+                {displayCalc.warnings.length > 0 && (
                   <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-medium text-amber-900">
-                    ⚠️ {calcOutcome.result.warnings.join("; ")}
+                    ⚠️ {displayCalc.warnings.join("; ")}
                   </div>
                 )}
 
@@ -1988,7 +2013,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                         Цена ({calcMode === "quote" ? "расчёт" : "договор"})
                       </span>
                       <span className="text-lg sm:text-2xl font-extrabold text-stone-900">
-                        {formatKzt(calcOutcome.result.priceTotal)} ₸
+                        {formatKzt(displayCalc.priceTotal)} ₸
                       </span>
                     </div>
 
@@ -1997,7 +2022,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                         Себестоимость
                       </span>
                       <span className="text-sm sm:text-base font-bold text-stone-700">
-                        {formatKzt(calcOutcome.result.costTotal)} ₸
+                        {formatKzt(displayCalc.costTotal)} ₸
                       </span>
                     </div>
 
@@ -2007,11 +2032,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                       </span>
                       <div className="flex items-baseline gap-1">
                         <span className="text-sm sm:text-base font-bold text-emerald-900">
-                          {formatKzt(calcOutcome.result.margin)} ₸
+                          {formatKzt(displayCalc.margin)} ₸
                         </span>
-                        {calcOutcome.result.marginPct !== null && (
+                        {displayCalc.marginPct !== null && (
                           <span className="text-xs font-semibold text-emerald-700">
-                            ({formatPercent(calcOutcome.result.marginPct)})
+                            ({formatPercent(displayCalc.marginPct)})
                           </span>
                         )}
                       </div>
@@ -2051,31 +2076,82 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                   </div>
                 </div>
 
+                {/* Плашка источника расчёта (Step A6, Q2) */}
+                {calculations.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 bg-stone-50/90 px-3 py-1.5 text-xs text-stone-700">
+                    <div className="flex items-center gap-1.5">
+                      {displayCalc.source === "saved" ? (
+                        <>
+                          <span>📌</span>
+                          <span>
+                            Отображается расчёт из версии №{displayCalc.version} от{" "}
+                            {displayCalc.createdAt
+                              ? new Date(displayCalc.createdAt).toLocaleDateString("ru-RU", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                })
+                              : "—"}
+                            {displayCalc.isContractBaseline && " (договорная)"}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span>⚡</span>
+                          <span className="font-semibold text-amber-900">
+                            Превью расчёта по актуальным параметрам (не сохранено в истории)
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    <div>
+                      {displayCalc.source === "saved" ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowLivePreview(true)}
+                          className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-900 shadow-2xs hover:bg-emerald-50 active:scale-95 transition-all"
+                        >
+                          🔄 Пересчитать по актуальным параметрам
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowLivePreview(false)}
+                          className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100 active:scale-95 transition-all"
+                        >
+                          Вернуться к версии №{getPlanCalculation(calculations)?.version}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Раскрывающаяся подробная сводка */}
                 {showBreakdown && (
                   <div className="mt-3 max-h-60 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs divide-y divide-stone-200">
                     <div className="pb-2">
                       <span className="font-bold text-stone-800">
-                        Фиксированные расходы: {formatKzt(calcOutcome.result.fixedCost)} ₸
+                        Фиксированные расходы: {formatKzt(displayCalc.fixedCost)} ₸
                       </span>
                       <div className="mt-1 grid grid-cols-2 sm:grid-cols-4 gap-1 text-[11px] text-stone-600">
-                        <span>Материалы: {formatKzt(calcOutcome.result.categoryTotals.materials)} ₸</span>
-                        <span>Фасады: {formatKzt(calcOutcome.result.categoryTotals.facades)} ₸</span>
-                        <span>Цех: {formatKzt(calcOutcome.result.categoryTotals.workshop)} ₸</span>
-                        <span>Фурнитура: {formatKzt(calcOutcome.result.categoryTotals.hardware)} ₸</span>
-                        <span>Транспорт: {formatKzt(calcOutcome.result.categoryTotals.transport)} ₸</span>
-                        <span>Работа: {formatKzt(calcOutcome.result.categoryTotals.labor)} ₸</span>
-                        <span>Остальное: {formatKzt(calcOutcome.result.categoryTotals.other)} ₸</span>
-                        <span>Корректировки: {formatKzt(calcOutcome.result.categoryTotals.adjustments)} ₸</span>
+                        <span>Материалы: {formatKzt(displayCalc.categoryTotals.materials)} ₸</span>
+                        <span>Фасады: {formatKzt(displayCalc.categoryTotals.facades)} ₸</span>
+                        <span>Цех: {formatKzt(displayCalc.categoryTotals.workshop)} ₸</span>
+                        <span>Фурнитура: {formatKzt(displayCalc.categoryTotals.hardware)} ₸</span>
+                        <span>Транспорт: {formatKzt(displayCalc.categoryTotals.transport)} ₸</span>
+                        <span>Работа: {formatKzt(displayCalc.categoryTotals.labor)} ₸</span>
+                        <span>Остальное: {formatKzt(displayCalc.categoryTotals.other)} ₸</span>
+                        <span>Корректировки: {formatKzt(displayCalc.categoryTotals.adjustments)} ₸</span>
                       </div>
                     </div>
 
                     <div className="py-2 text-[11px] text-stone-700 flex flex-wrap gap-x-4 gap-y-1">
-                      <span>Сборка: {formatKzt(calcOutcome.result.assembly || calcOutcome.result.fixedAssembly)} ₸</span>
-                      <span>Технолог: {formatKzt(calcOutcome.result.technolog || calcOutcome.result.fixedTechnolog)} ₸</span>
-                      <span>Резерв на риск: {formatKzt(calcOutcome.result.riskReserve)} ₸</span>
+                      <span>Сборка: {formatKzt(displayCalc.assembly)} ₸</span>
+                      <span>Технолог: {formatKzt(displayCalc.technolog)} ₸</span>
+                      <span>Резерв на риск: {formatKzt(displayCalc.riskReserve)} ₸</span>
                       <span className="font-semibold">
-                        Мин. цена для целевой маржи: {formatKzt(calcOutcome.result.minPriceForTargetMargin)} ₸
+                        Мин. цена для целевой маржи: {formatKzt(displayCalc.minPriceForTargetMargin)} ₸
                       </span>
                     </div>
                   </div>

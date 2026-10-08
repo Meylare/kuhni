@@ -14,6 +14,7 @@ import {
 import type {
   Order,
   OrderAdjustment,
+  OrderCalculation,
   OrderCalculationSummary,
   OrderItem,
   OrderItemKind,
@@ -55,6 +56,136 @@ export function getPlanCalculation<
   }
   return [...calculations].sort((a, b) => b.version - a.version)[0] ?? null;
 }
+
+export interface ResolveOrderDisplayOptions {
+  order: Order;
+  calculations: OrderCalculation[];
+  liveOutcome: CalculationOutcome | null;
+  showLivePreview?: boolean;
+}
+
+export interface OrderDisplayCalculation {
+  source: "saved" | "live";
+  version: number | null;
+  createdAt: string | null;
+  isContractBaseline: boolean;
+  priceTotal: number;
+  costTotal: number;
+  margin: number;
+  marginPct: number | null;
+  fixedCost: number;
+  minPriceForTargetMargin: number;
+  warnings: string[];
+  categoryTotals: Record<string, number>;
+  assembly: number;
+  technolog: number;
+  riskReserve: number;
+  lineCalculations: LineCalculation[];
+}
+
+/**
+ * Определяет расчёт для отображения в сводке заказа (Step A6, Q2):
+ * - Если у заказа есть сохранённые версии и не включён предпросмотр (showLivePreview = false),
+ *   возвращает данные опорной сохранённой версии (договорной или последней по номеру).
+ *   Это защищает старые заказы от спонтанного изменения цен при правке глобальных параметров.
+ * - Если пользователь явно нажал «Пересчитать по актуальным параметрам» (showLivePreview = true)
+ *   или у заказа нет сохранённых версий, возвращает результат живого расчёта.
+ */
+export function resolveOrderDisplayCalculation(
+  options: ResolveOrderDisplayOptions,
+): OrderDisplayCalculation | null {
+  const { calculations, liveOutcome, showLivePreview } = options;
+  const activeSaved = getPlanCalculation(calculations);
+
+  if (activeSaved && !showLivePreview) {
+    const res = (activeSaved.result || {}) as Record<string, unknown>;
+    const catTotals = (res.categoryTotals || res.category_totals || {}) as Record<string, number>;
+    const priceTotal = Number(activeSaved.price_total ?? res.priceTotal ?? 0);
+    const costTotal = Number(activeSaved.cost_total ?? res.costTotal ?? 0);
+    const margin = typeof res.margin === "number" ? res.margin : priceTotal - costTotal;
+    const marginPct =
+      activeSaved.margin_pct !== undefined && activeSaved.margin_pct !== null
+        ? Number(activeSaved.margin_pct)
+        : ((res.marginPct as number | null) ?? null);
+    const fixedCost = Number(res.fixedCost ?? res.fixed_cost ?? 0);
+    const minPriceForTargetMargin = Number(
+      res.minPriceForTargetMargin ?? res.min_price_for_target_margin ?? 0,
+    );
+    const warnings = Array.isArray(res.warnings) ? (res.warnings as string[]) : [];
+    const assembly = Number(res.assembly ?? res.fixedAssembly ?? res.fixed_assembly ?? 0);
+    const technolog = Number(res.technolog ?? res.fixedTechnolog ?? res.fixed_technolog ?? 0);
+    const riskReserve = Number(res.riskReserve ?? res.risk_reserve ?? 0);
+    const lineCalculations = Array.isArray(res.lineCalculations)
+      ? (res.lineCalculations as LineCalculation[])
+      : [];
+
+    return {
+      source: "saved",
+      version: activeSaved.version,
+      createdAt: activeSaved.created_at,
+      isContractBaseline: Boolean(activeSaved.is_contract_baseline),
+      priceTotal,
+      costTotal,
+      margin,
+      marginPct,
+      fixedCost,
+      minPriceForTargetMargin,
+      warnings,
+      categoryTotals: {
+        materials: Number(catTotals.materials ?? 0),
+        workshop: Number(catTotals.workshop ?? 0),
+        facades: Number(catTotals.facades ?? 0),
+        hardware: Number(catTotals.hardware ?? 0),
+        transport: Number(catTotals.transport ?? 0),
+        labor: Number(catTotals.labor ?? 0),
+        assembly: Number(catTotals.assembly ?? 0),
+        technolog: Number(catTotals.technolog ?? 0),
+        other: Number(catTotals.other ?? 0),
+        adjustments: Number(catTotals.adjustments ?? 0),
+      },
+      assembly,
+      technolog,
+      riskReserve,
+      lineCalculations,
+    };
+  }
+
+  if (liveOutcome && liveOutcome.ok) {
+    const res = liveOutcome.result;
+    return {
+      source: "live",
+      version: null,
+      createdAt: null,
+      isContractBaseline: false,
+      priceTotal: res.priceTotal,
+      costTotal: res.costTotal,
+      margin: res.margin,
+      marginPct: res.marginPct,
+      fixedCost: res.fixedCost,
+      minPriceForTargetMargin: res.minPriceForTargetMargin,
+      warnings: res.warnings,
+      categoryTotals: {
+        materials: res.categoryTotals.materials,
+        workshop: res.categoryTotals.workshop,
+        facades: res.categoryTotals.facades,
+        hardware: res.categoryTotals.hardware,
+        transport: res.categoryTotals.transport,
+        labor: res.categoryTotals.labor,
+        assembly: res.assembly,
+        technolog: res.technolog,
+        other: res.categoryTotals.other,
+        adjustments: res.categoryTotals.adjustments,
+      },
+      assembly: res.assembly,
+      technolog: res.technolog,
+      riskReserve: res.riskReserve,
+      lineCalculations: res.lineCalculations,
+    };
+  }
+
+  return null;
+}
+
 
 
 /**
