@@ -218,5 +218,37 @@
   - Написан SQL-тест `supabase/tests/apply_price_updates_to_order.sql`.
   - Все 91 тест пакетов `@kuhni/calc` и `@kuhni/web` проходят успешно. Проект собирается `npm run build` без ошибок.
 
+### Шаг B3. Триггер snapshot_price_item_on_order_line_insert и кастомный waste_pct (п. 2.12)
+* **Результат 2026-10-08 (коммит `1e83e14`):**
+  - Создана миграция `supabase/migrations/20261008190000_012_preserve_custom_waste_pct_trigger.sql`:
+    - Снят жесткий `DEFAULT 0.10` с колонки `order_lines.waste_pct` (теперь `DEFAULT NULL`), позволяя отличать явно переданный `waste_pct` от отсутствующего.
+    - Триггер `snapshot_price_item_on_order_line_insert` обновлён логикой `coalesce(new.waste_pct, snapshot_waste_pct, 0)`: если при вставке явно передан кастомный процент отхода (например, 15% для кромки), он гарантированно сохраняется и не перезаписывается дефолтом или значением из справочника.
+  - В `OrderDetailPage.tsx` (`handleAddPriceItemToOrder`) убран лишний второй запрос `.update({ waste_pct })`, создававший гонку данных и избыточную нагрузку на сеть.
+  - Написан SQL-тест `supabase/tests/preserve_custom_waste_pct.sql`, подтверждающий сохранение переданного процента отхода и корректный fallback на справочник при `NULL`.
+
+### Шаг B4. Защита от потери данных при сбоях сети (п. 1.2, 1.4)
+* **Результат 2026-10-08 (коммит `2d65470`):**
+  - Разработка по TDD: в `apps/web/src/lib/order-load-guard.test.ts` реализован набор unit-тестов (9 тестов) на проверку сетевых сбоев и защиту от обнуления сметы.
+  - В `apps/web/src/lib/orders.ts` добавлены функции:
+    - `checkOrderLoadCriticalErrors`: определяет критический сбой загрузки позиций, изделий или корректировок заказа при `Promise.allSettled`.
+    - `ORDER_LOAD_NETWORK_ERROR_MESSAGE`: единое понятное сообщение об ошибке сети.
+    - `shouldConfirmCalculationSave`: определяет необходимость подтверждения сохранения сметы (0 позиций или нулевая стоимость).
+  - В `apps/web/src/pages/OrderDetailPage.tsx`:
+    - При сбое параллельных запросов загрузки заказа выводится заметный красный баннер сетевой ошибки с кнопкой *«Повторить загрузку»*.
+    - Блокируются кнопки мутации данных сметы («Добавить изделие», «Из справочника», «Ручная позиция», «Корректировка», «Сохранить расчёт»), предотвращая перезапись заказа неполными данными.
+    - Реализовано предупреждение через `window.confirm` при попытке сохранить пустой расчёт или расчёт с нулевой стоимостью.
+
+### Шаг B5. Формат calculation_versions и JWT-валидация ключей (п. 1.1, 2.13)
+* **Результат 2026-10-08 (коммит `1b58a45`):**
+  - Разработка по TDD: добавлены unit-тесты в `apps/web/src/lib/config.test.ts` (5 тестов) и `apps/web/src/lib/calculation-versions.test.ts` (4 теста).
+  - В `apps/web/src/lib/config.ts`:
+    - Реализована функция `decodeJwtPayload`, безопасно извлекающая полезную нагрузку JWT без внешних зависимостей.
+    - Реализована функция `validateAnonKeyRole`, проверяющая, что ключ не содержит `role: "service_role"` или `"service"`, и выбрасывающая предупреждение/ошибку конфигурации.
+  - В `apps/web/src/lib/orders.ts`:
+    - Функция `prepareCalculationSnapshot` переведена на использование канонической функции `createCalculationVersion` из `@kuhni/calc`.
+    - Реализован слой обратной совместимости (`normalizeOrderCalculation`, `normalizeCalculationParams`, `normalizeCalculationInput`, `normalizeCalculationResult`), обеспечивающий прозрачное чтение как старых версий (snake_case), так и новых версий (camelCase из `@kuhni/calc`).
+  - В `apps/web/src/pages/OrderDetailPage.tsx` детальный просмотр снимков в истории версий переведён на `normalizeOrderCalculation`.
+  - Все 109 тестов (`@kuhni/calc` и `@kuhni/web`) проходят успешно (`npm test`), сборка проекта `npm run build` завершается чисто без ошибок.
+
 
 
