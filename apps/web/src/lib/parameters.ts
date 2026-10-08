@@ -151,9 +151,11 @@ export function formatPercent(fraction: number | null | undefined): string {
 }
 
 /**
- * Парсит пользовательский ввод процента ("14,5", "14.5%", "18") в десятичную долю (0.145, 0.18).
+ * Парсит пользовательский ввод процента ("14,5", "14.5%", "18", "0.18") в десятичную долю (0.145, 0.18).
+ * Если введено число в диапазоне (0, 1) без знака % (например, "0.18"), оно интерпретируется как доля (18%).
  */
 export function parsePercent(input: string): number | null {
+  const hasPercentSign = input.includes("%");
   const cleaned = input
     .replace(/%/g, "")
     .replace(/\s+/g, "")
@@ -169,9 +171,18 @@ export function parsePercent(input: string): number | null {
     return null;
   }
 
-  // Человеческий ввод: 14.5 -> 0.145
-  // Округляем для исключения артефактов IEEE-754
-  return Math.round(num * 10000) / 1000000;
+  if (num === 0) {
+    return 0;
+  }
+
+  // Если введено число в диапазоне (0, 1) без знака % (например, "0.18" или "0,145"),
+  // интерпретируем его как десятичную долю (18% или 14.5%)
+  if (!hasPercentSign && num > 0 && num < 1) {
+    return Math.round(num * 1000000) / 1000000;
+  }
+
+  // Человеческий ввод: 18 -> 0.18, 14.5 -> 0.145; при явном знаке %: 0.18% -> 0.0018
+  return Math.round((num / 100) * 1000000) / 1000000;
 }
 
 export interface ParametersMap {
@@ -278,8 +289,9 @@ export function evaluateDenominator(params: ParametersMap): {
   const marginShare = safeFraction(params.target_margin_pct);
   const riskShare = safeFraction(params.risk_reserve_pct);
 
-  const sumPercentShares = marginShare + assemblyShare + technologShare + riskShare;
-  const denominator = calculateDenominator(params);
+  const rawSum = marginShare + assemblyShare + technologShare + riskShare;
+  const sumPercentShares = Math.round(rawSum * 10000) / 10000;
+  const denominator = Math.round((1 - sumPercentShares) * 10000) / 10000;
 
   if (denominator <= 0) {
     return {
@@ -291,14 +303,26 @@ export function evaluateDenominator(params: ParametersMap): {
     };
   }
 
+  const warnings: string[] = [];
+  if (marginShare > 0.50) {
+    const marginPct = (marginShare * 100).toFixed(1).replace(".", ",");
+    warnings.push(`целевая маржа равна ${marginPct}% (> 50%)`);
+  }
+  if (sumPercentShares > 0.70) {
+    const sumPct = (sumPercentShares * 100).toFixed(1).replace(".", ",");
+    warnings.push(`сумма процентных ставок равна ${sumPct}% (> 70%)`);
+  }
   if (denominator <= 0.05) {
     const denomPct = (denominator * 100).toFixed(1).replace(".", ",");
-    const sumPct = (sumPercentShares * 100).toFixed(1).replace(".", ",");
+    warnings.push(`знаменатель формулы ${denomPct}% ≤ 5%`);
+  }
+
+  if (warnings.length > 0) {
     return {
       denominator,
       sumPercentShares,
       status: "warning",
-      message: `Внимание: сумма процентных ставок равна ${sumPct}% (знаменатель формулы ${denomPct}% ≤ 5%). Расчёт цены может давать экстремально высокие значения.`,
+      message: `Внимание: ${warnings.join(", ")}. Расчёт цены может давать экстремально высокие значения.`,
     };
   }
 

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 
 import { formatErrorMessage } from "../lib/errors";
 import {
-  DEFAULT_PARAMETERS,
   evaluateDenominator,
   formatPercent,
   PARAMETER_DEFINITIONS,
@@ -86,21 +85,19 @@ export function ParametersPage() {
   }, []);
 
   // Вычисляем текущую карту параметров для живого расчёта знаменателя
+  // Строго по введённым данным пользователя (Step B1)
   const currentMap: ParametersMap = {
-    target_margin_pct: parsePercent(form.target_margin_pct) ?? DEFAULT_PARAMETERS.target_margin_pct,
-    price_rounding: parsePrice(form.price_rounding) ?? DEFAULT_PARAMETERS.price_rounding,
+    target_margin_pct: parsePercent(form.target_margin_pct) ?? 0,
+    price_rounding: parsePrice(form.price_rounding) ?? 0,
     assembly_mode: form.assembly_mode,
-    assembly_pct: parsePercent(form.assembly_pct) ?? DEFAULT_PARAMETERS.assembly_pct,
-    assembly_per_meter_kitchen:
-      parsePrice(form.assembly_per_meter_kitchen) ?? DEFAULT_PARAMETERS.assembly_per_meter_kitchen,
-    assembly_per_meter_wardrobe:
-      parsePrice(form.assembly_per_meter_wardrobe) ?? DEFAULT_PARAMETERS.assembly_per_meter_wardrobe,
+    assembly_pct: parsePercent(form.assembly_pct) ?? 0,
+    assembly_per_meter_kitchen: parsePrice(form.assembly_per_meter_kitchen) ?? 0,
+    assembly_per_meter_wardrobe: parsePrice(form.assembly_per_meter_wardrobe) ?? 0,
     technolog_mode: form.technolog_mode,
-    technolog_pct: parsePercent(form.technolog_pct) ?? DEFAULT_PARAMETERS.technolog_pct,
-    technolog_per_sheet:
-      parsePrice(form.technolog_per_sheet) ?? DEFAULT_PARAMETERS.technolog_per_sheet,
-    waste_edge_pct: parsePercent(form.waste_edge_pct) ?? DEFAULT_PARAMETERS.waste_edge_pct,
-    risk_reserve_pct: parsePercent(form.risk_reserve_pct) ?? DEFAULT_PARAMETERS.risk_reserve_pct,
+    technolog_pct: parsePercent(form.technolog_pct) ?? 0,
+    technolog_per_sheet: parsePrice(form.technolog_per_sheet) ?? 0,
+    waste_edge_pct: parsePercent(form.waste_edge_pct) ?? 0,
+    risk_reserve_pct: parsePercent(form.risk_reserve_pct) ?? 0,
   };
 
   const denomEval = evaluateDenominator(currentMap);
@@ -110,6 +107,16 @@ export function ParametersPage() {
     setSaving(true);
     setError(null);
     setSaveSuccess(false);
+
+    // Блокируем сохранение при критической ошибке формулы (знаменатель <= 0 / сумма ставок >= 100%)
+    if (denomEval.status === "error") {
+      setError(
+        denomEval.message ||
+          "Критическая ошибка: сумма процентных ставок и маржи ≥ 100% (знаменатель ≤ 0). Сохранение невозможно."
+      );
+      setSaving(false);
+      return;
+    }
 
     // Валидация полей
     const targetMargin = parsePercent(form.target_margin_pct);
@@ -164,35 +171,27 @@ export function ParametersPage() {
       return;
     }
 
-    const updates = [
-      { key: "target_margin_pct", value_num: targetMargin, value_text: null },
-      { key: "assembly_mode", value_num: null, value_text: form.assembly_mode },
-      { key: "assembly_pct", value_num: assemblyPct, value_text: null },
-      { key: "assembly_per_meter_kitchen", value_num: assemblyKitchen, value_text: null },
-      { key: "assembly_per_meter_wardrobe", value_num: assemblyWardrobe, value_text: null },
-      { key: "technolog_mode", value_num: null, value_text: form.technolog_mode },
-      { key: "technolog_pct", value_num: technologPct, value_text: null },
-      { key: "technolog_per_sheet", value_num: technologSheet, value_text: null },
-      { key: "waste_edge_pct", value_num: wasteEdge, value_text: null },
-      { key: "risk_reserve_pct", value_num: riskReserve, value_text: null },
-      { key: "price_rounding", value_num: priceRounding, value_text: null },
-    ];
-
     try {
       const supabase = getSupabase();
-      for (const row of updates) {
-        const { error: upsertErr } = await supabase
-          .from("parameters")
-          .update({
-            value_num: row.value_num,
-            value_text: row.value_text,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("key", row.key);
+      // Атомарное сохранение 11 параметров в единой транзакции через RPC-функцию save_parameters
+      const { error: rpcErr } = await supabase.rpc("save_parameters", {
+        p_params: {
+          target_margin_pct: targetMargin,
+          price_rounding: priceRounding,
+          assembly_mode: form.assembly_mode,
+          assembly_pct: assemblyPct,
+          assembly_per_meter_kitchen: assemblyKitchen,
+          assembly_per_meter_wardrobe: assemblyWardrobe,
+          technolog_mode: form.technolog_mode,
+          technolog_pct: technologPct,
+          technolog_per_sheet: technologSheet,
+          waste_edge_pct: wasteEdge,
+          risk_reserve_pct: riskReserve,
+        },
+      });
 
-        if (upsertErr) {
-          throw new Error(`Ошибка сохранения параметра ${row.key}: ${formatErrorMessage(upsertErr)}`);
-        }
+      if (rpcErr) {
+        throw new Error(formatErrorMessage(rpcErr, "Не удалось сохранить параметры."));
       }
 
       setSaveSuccess(true);
@@ -218,7 +217,7 @@ export function ParametersPage() {
         <button
           type="submit"
           form="parameters-form"
-          disabled={saving || loading}
+          disabled={saving || loading || denomEval.status === "error"}
           className="min-h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-900 px-6 text-sm font-semibold text-white shadow-xs hover:bg-emerald-800 active:scale-98 transition-all disabled:opacity-50"
         >
           {saving ? "Сохранение…" : "Сохранить параметры"}
@@ -348,6 +347,11 @@ export function ParametersPage() {
                     %
                   </span>
                 </div>
+                {form.target_margin_pct.trim().startsWith("0.") || form.target_margin_pct.trim().startsWith("0,") ? (
+                  <p className="mt-1 text-[11px] text-emerald-700 font-medium">
+                    Распознано как {formatPercent(parsePercent(form.target_margin_pct))} (введена доля).
+                  </p>
+                ) : null}
                 <p className="mt-1 text-[11px] text-stone-500">
                   {PARAMETER_DEFINITIONS.target_margin_pct.description}
                 </p>
@@ -676,7 +680,7 @@ export function ParametersPage() {
           <div className="mt-2 flex items-center justify-end">
             <button
               type="submit"
-              disabled={saving || loading}
+              disabled={saving || loading || denomEval.status === "error"}
               className="min-h-12 w-full sm:w-auto rounded-2xl bg-emerald-900 px-8 text-base font-semibold text-white shadow-md hover:bg-emerald-800 active:scale-98 transition-all disabled:opacity-50"
             >
               {saving ? "Сохранение параметров…" : "Сохранить параметры"}
