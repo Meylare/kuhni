@@ -13,6 +13,7 @@ import {
   getPlanCalculation,
   getVisibleAdjustments,
   isOrderLocked,
+  normalizeOrderCalculation,
   prepareCalculationSnapshot,
   resolveOrderDisplayCalculation,
   shouldConfirmCalculationSave,
@@ -1333,12 +1334,12 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                   hour: "2-digit",
                   minute: "2-digit",
                 });
-                const paramsSnap = (calc.params_snapshot || {}) as Record<string, unknown>;
-                const resSnap = (calc.result || {}) as Record<string, unknown>;
-                const inputSnap = (calc.input_snapshot || {}) as Record<string, unknown>;
-                const inputLines = (inputSnap?.lines as Array<Record<string, unknown>>) || [];
-                const catTotals = (resSnap?.categoryTotals as Record<string, number>) || {};
-                const warnings = (resSnap?.warnings as string[]) || [];
+                const normalized = normalizeOrderCalculation(calc);
+                const paramsSnap = normalized.parameters;
+                const resSnap = normalized.result;
+                const inputLines = normalized.input.lines;
+                const catTotals = resSnap.categoryTotals;
+                const warnings = resSnap.warnings;
 
                 return (
                   <div
@@ -1436,36 +1437,36 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                             <div>
                               <span className="text-stone-400 block">Целевая маржа:</span>
                               <span className="font-semibold">
-                                {typeof paramsSnap.target_margin_pct === "number"
-                                  ? formatPercent(paramsSnap.target_margin_pct as number)
+                                {typeof paramsSnap.targetMarginPct === "number"
+                                  ? formatPercent(paramsSnap.targetMarginPct)
                                   : "—"}
                               </span>
                             </div>
                             <div>
                               <span className="text-stone-400 block">Сборка:</span>
                               <span className="font-semibold">
-                                {paramsSnap.assembly_mode === "per_meter"
+                                {paramsSnap.assemblyMode === "per_meter"
                                   ? "за пог. метр"
-                                  : typeof paramsSnap.assembly_pct === "number"
-                                  ? formatPercent(paramsSnap.assembly_pct as number)
+                                  : typeof paramsSnap.assemblyPct === "number"
+                                  ? formatPercent(paramsSnap.assemblyPct)
                                   : "—"}
                               </span>
                             </div>
                             <div>
                               <span className="text-stone-400 block">Технолог:</span>
                               <span className="font-semibold">
-                                {paramsSnap.technolog_mode === "per_sheet"
+                                {paramsSnap.technologMode === "per_sheet"
                                   ? "за лист"
-                                  : typeof paramsSnap.technolog_pct === "number"
-                                  ? formatPercent(paramsSnap.technolog_pct as number)
+                                  : typeof paramsSnap.technologPct === "number"
+                                  ? formatPercent(paramsSnap.technologPct)
                                   : "—"}
                               </span>
                             </div>
                             <div>
                               <span className="text-stone-400 block">Резерв на риск:</span>
                               <span className="font-semibold">
-                                {typeof paramsSnap.risk_reserve_pct === "number"
-                                  ? formatPercent(paramsSnap.risk_reserve_pct as number)
+                                {typeof paramsSnap.riskReservePct === "number"
+                                  ? formatPercent(paramsSnap.riskReservePct)
                                   : "—"}
                               </span>
                             </div>
@@ -1482,32 +1483,32 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                               <div key={cat}>
                                 <span className="text-stone-400 block">{CATEGORY_LABELS[cat]}:</span>
                                 <span className="font-semibold text-stone-800">
-                                  {formatKzt(catTotals[cat] || 0)} ₸
+                                  {formatKzt((catTotals as Record<string, number>)[cat] || 0)} ₸
                                 </span>
                               </div>
                             ))}
                             <div>
                               <span className="text-stone-400 block">Сборка:</span>
                               <span className="font-semibold text-stone-800">
-                                {formatKzt(Number(resSnap.assembly || resSnap.fixedAssembly || 0))} ₸
+                                {formatKzt(resSnap.assembly)} ₸
                               </span>
                             </div>
                             <div>
                               <span className="text-stone-400 block">Технолог:</span>
                               <span className="font-semibold text-stone-800">
-                                {formatKzt(Number(resSnap.technolog || resSnap.fixedTechnolog || 0))} ₸
+                                {formatKzt(resSnap.technolog)} ₸
                               </span>
                             </div>
                             <div>
                               <span className="text-stone-400 block">Резерв на риск:</span>
                               <span className="font-semibold text-stone-800">
-                                {formatKzt(Number(resSnap.riskReserve || 0))} ₸
+                                {formatKzt(resSnap.riskReserve)} ₸
                               </span>
                             </div>
                             <div>
                               <span className="text-stone-400 block">Мин. цена для маржи:</span>
                               <span className="font-semibold text-stone-800">
-                                {formatKzt(Number(resSnap.minPriceForTargetMargin || 0))} ₸
+                                {formatKzt(resSnap.minPriceForTargetMargin)} ₸
                               </span>
                             </div>
                           </div>
@@ -1524,15 +1525,15 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                                 <div key={idx} className="flex items-center justify-between p-2.5 text-[11px]">
                                   <div>
                                     <div className="font-semibold text-stone-900">
-                                      {String(l.name)}
+                                      {l.name}
                                     </div>
                                     <div className="text-stone-500">
-                                      {String(l.qty)} {String(l.unit)} × {formatKzt(Number(l.unit_price))} ₸
-                                      {Number(l.waste_pct) > 0 && ` (+${(Number(l.waste_pct) * 100).toFixed(0)}% отход)`}
+                                      {l.qty} {l.unit} × {formatKzt(l.unitPrice)} ₸
+                                      {l.wastePct > 0 && ` (+${(l.wastePct * 100).toFixed(0)}% отход)`}
                                     </div>
                                   </div>
                                   <div className="font-bold text-stone-900">
-                                    {formatKzt(Number(l.qty) * Number(l.unit_price) * (1 + Number(l.waste_pct || 0)))} ₸
+                                    {formatKzt(l.qty * l.unitPrice * (1 + (l.wastePct || 0)))} ₸
                                   </div>
                                 </div>
                               ))}

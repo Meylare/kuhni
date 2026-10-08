@@ -1,17 +1,22 @@
 import {
   calculate,
   calculateLine,
+  createCalculationVersion,
+  type CalculationAdjustment,
   type CalculationInput,
   type CalculationLine,
   type CalculationOrderItem,
-  type CalculationAdjustment,
   type CalculationOutcome,
   type CalculationParameters,
+  type CalculationSnapshotAdjustment,
+  type CalculationSnapshotLine,
+  type CalculationSnapshotOrderItem,
   type CostCategory,
   type LineCalculation,
 } from "@kuhni/calc";
 
 import type {
+  BillableQtyRounding,
   Order,
   OrderAdjustment,
   OrderCalculation,
@@ -99,6 +104,313 @@ export function getVisibleAdjustments(
   return adjustments;
 }
 
+export interface NormalizedCalculationParams {
+  targetMarginPct: number;
+  assemblyMode: "percent" | "per_meter";
+  assemblyPct: number;
+  assemblyPerMeterKitchen: number;
+  assemblyPerMeterWardrobe: number;
+  technologMode: "percent" | "per_sheet";
+  technologPct: number;
+  technologPerSheet: number;
+  riskReservePct: number;
+  priceRounding: number;
+}
+
+export interface NormalizedCalculationInputLine {
+  id: string;
+  name: string;
+  category: CostCategory;
+  unit: string;
+  qty: number;
+  unitPrice: number;
+  wastePct: number;
+  billableQtyRounding: BillableQtyRounding;
+  countsForTechnolog: boolean;
+  isManual: boolean;
+  priceItemId: string | null;
+  orderItemId?: string | null;
+  comment?: string | null;
+}
+
+export interface NormalizedCalculationInputItem {
+  id: string;
+  title: string;
+  kind: OrderItemKind;
+  linearMeters: number | null;
+  description?: string | null;
+}
+
+export interface NormalizedCalculationInputAdjustment {
+  id: string;
+  kind: "price" | "cost";
+  category: "adjustments";
+  label: string;
+  amount: number;
+  comment?: string | null;
+}
+
+export interface NormalizedCalculationInput {
+  contractPrice: number | null;
+  items: NormalizedCalculationInputItem[];
+  lines: NormalizedCalculationInputLine[];
+  adjustments: NormalizedCalculationInputAdjustment[];
+}
+
+export interface NormalizedCalculationResult {
+  categoryTotals: Record<CostCategory | "adjustments", number>;
+  lineCalculations: LineCalculation[];
+  fixedAssembly: number;
+  fixedTechnolog: number;
+  fixedCost: number;
+  assembly: number;
+  technolog: number;
+  riskReserve: number;
+  costTotal: number;
+  priceTotal: number;
+  margin: number;
+  marginPct: number | null;
+  minPriceForTargetMargin: number;
+  warnings: string[];
+}
+
+export interface NormalizedOrderCalculation {
+  id: string;
+  orderId: string;
+  version: number;
+  mode: "quote" | "check_contract";
+  isContractBaseline: boolean;
+  createdAt: string;
+  costTotal: number;
+  priceTotal: number;
+  marginPct: number | null;
+  parameters: NormalizedCalculationParams;
+  input: NormalizedCalculationInput;
+  result: NormalizedCalculationResult;
+}
+
+/**
+ * Нормализует снимок параметров расчёта, поддерживая как новый camelCase (packages/calc),
+ * так и исторический snake_case (Step B5).
+ */
+export function normalizeCalculationParams(
+  raw: Record<string, unknown> | null | undefined,
+): NormalizedCalculationParams {
+  const p = raw || {};
+  return {
+    targetMarginPct: Number(p.targetMarginPct ?? p.target_margin_pct ?? 0.18),
+    assemblyMode:
+      p.assemblyMode === "per_meter" || p.assembly_mode === "per_meter"
+        ? "per_meter"
+        : "percent",
+    assemblyPct: Number(p.assemblyPct ?? p.assembly_pct ?? 0.145),
+    assemblyPerMeterKitchen: Number(
+      p.assemblyPerMeterKitchen ?? p.assembly_per_meter_kitchen ?? 35000,
+    ),
+    assemblyPerMeterWardrobe: Number(
+      p.assemblyPerMeterWardrobe ?? p.assembly_per_meter_wardrobe ?? 25000,
+    ),
+    technologMode:
+      p.technologMode === "per_sheet" || p.technolog_mode === "per_sheet"
+        ? "per_sheet"
+        : "percent",
+    technologPct: Number(p.technologPct ?? p.technolog_pct ?? 0.04),
+    technologPerSheet: Number(
+      p.technologPerSheet ?? p.technolog_per_sheet ?? 4000,
+    ),
+    riskReservePct: Number(p.riskReservePct ?? p.risk_reserve_pct ?? 0),
+    priceRounding: Number(p.priceRounding ?? p.price_rounding ?? 1000),
+  };
+}
+
+/**
+ * Нормализует входной снимок расчёта, поддерживая как новый camelCase (packages/calc),
+ * так и исторический snake_case (Step B5).
+ */
+export function normalizeCalculationInput(
+  raw: Record<string, unknown> | null | undefined,
+): NormalizedCalculationInput {
+  const inp = raw || {};
+  const rawItems = Array.isArray(inp.orderItems)
+    ? inp.orderItems
+    : Array.isArray(inp.items)
+    ? inp.items
+    : [];
+  const rawLines = Array.isArray(inp.lines) ? inp.lines : [];
+  const rawAdjs = Array.isArray(inp.adjustments) ? inp.adjustments : [];
+
+  const items: NormalizedCalculationInputItem[] = rawItems.map(
+    (it: Record<string, unknown>) => ({
+      id: String(it.id ?? ""),
+      title: String(it.title ?? ""),
+      kind: (it.kind as OrderItemKind) ?? "kitchen",
+      linearMeters:
+        it.linearMeters !== undefined && it.linearMeters !== null
+          ? Number(it.linearMeters)
+          : it.linear_meters !== undefined && it.linear_meters !== null
+          ? Number(it.linear_meters)
+          : null,
+      description:
+        it.description !== undefined && it.description !== null
+          ? String(it.description)
+          : null,
+    }),
+  );
+
+  const lines: NormalizedCalculationInputLine[] = rawLines.map(
+    (l: Record<string, unknown>) => ({
+      id: String(l.id ?? ""),
+      name: String(l.name ?? ""),
+      category: (l.category as CostCategory) ?? "other",
+      unit: String(l.unit ?? "шт"),
+      qty: Number(l.qty ?? 0),
+      unitPrice: Number(l.unitPrice ?? l.unit_price ?? 0),
+      wastePct: Number(l.wastePct ?? l.waste_pct ?? 0),
+      billableQtyRounding: (l.billableQtyRounding ??
+        l.billable_qty_rounding ??
+        "none") as BillableQtyRounding,
+      countsForTechnolog: Boolean(
+        l.countsForTechnolog ?? l.counts_for_technolog,
+      ),
+      isManual: Boolean(l.isManual ?? l.is_manual),
+      priceItemId:
+        l.priceItemId !== undefined
+          ? (l.priceItemId as string | null)
+          : (l.price_item_id as string | null) ?? null,
+      orderItemId:
+        l.orderItemId !== undefined
+          ? (l.orderItemId as string | null)
+          : (l.order_item_id as string | null) ?? null,
+      comment:
+        l.comment !== undefined && l.comment !== null
+          ? String(l.comment)
+          : null,
+    }),
+  );
+
+  const adjustments: NormalizedCalculationInputAdjustment[] = rawAdjs.map(
+    (a: Record<string, unknown>) => ({
+      id: String(a.id ?? ""),
+      kind: (a.kind as "price" | "cost") ?? "price",
+      category: "adjustments",
+      label: String(a.label ?? ""),
+      amount: Number(a.amount ?? 0),
+      comment:
+        a.comment !== undefined && a.comment !== null
+          ? String(a.comment)
+          : null,
+    }),
+  );
+
+  const contractPrice =
+    inp.contractPrice !== undefined && inp.contractPrice !== null
+      ? Number(inp.contractPrice)
+      : inp.contract_price !== undefined && inp.contract_price !== null
+      ? Number(inp.contract_price)
+      : null;
+
+  return {
+    contractPrice,
+    items,
+    lines,
+    adjustments,
+  };
+}
+
+/**
+ * Нормализует результаты расчёта, поддерживая camelCase и snake_case (Step B5).
+ */
+export function normalizeCalculationResult(
+  raw: Record<string, unknown> | null | undefined,
+  defaults?: { priceTotal?: number; costTotal?: number; marginPct?: number | null },
+): NormalizedCalculationResult {
+  const r = raw || {};
+  const catTotals = (r.categoryTotals ||
+    r.category_totals ||
+    {}) as Record<string, number>;
+  const costTotal = Number(r.costTotal ?? r.cost_total ?? defaults?.costTotal ?? 0);
+  const priceTotal = Number(r.priceTotal ?? r.price_total ?? defaults?.priceTotal ?? 0);
+  const margin = Number(r.margin ?? priceTotal - costTotal);
+  const marginPct =
+    r.marginPct !== undefined && r.marginPct !== null
+      ? Number(r.marginPct)
+      : r.margin_pct !== undefined && r.margin_pct !== null
+      ? Number(r.margin_pct)
+      : defaults?.marginPct ?? null;
+  const fixedCost = Number(r.fixedCost ?? r.fixed_cost ?? 0);
+  const fixedAssembly = Number(r.fixedAssembly ?? r.fixed_assembly ?? 0);
+  const fixedTechnolog = Number(r.fixedTechnolog ?? r.fixed_technolog ?? 0);
+  const assembly = Number(r.assembly ?? fixedAssembly);
+  const technolog = Number(r.technolog ?? fixedTechnolog);
+  const riskReserve = Number(r.riskReserve ?? r.risk_reserve ?? 0);
+  const minPriceForTargetMargin = Number(
+    r.minPriceForTargetMargin ?? r.min_price_for_target_margin ?? 0,
+  );
+  const warnings = Array.isArray(r.warnings) ? (r.warnings as string[]) : [];
+  const lineCalculations = Array.isArray(r.lineCalculations ?? r.line_calculations)
+    ? (r.lineCalculations ?? r.line_calculations)
+    : [];
+
+  return {
+    categoryTotals: {
+      materials: Number(catTotals.materials ?? 0),
+      workshop: Number(catTotals.workshop ?? 0),
+      facades: Number(catTotals.facades ?? 0),
+      hardware: Number(catTotals.hardware ?? 0),
+      transport: Number(catTotals.transport ?? 0),
+      labor: Number(catTotals.labor ?? 0),
+      other: Number(catTotals.other ?? 0),
+      adjustments: Number(catTotals.adjustments ?? 0),
+    },
+    lineCalculations: lineCalculations as LineCalculation[],
+    fixedAssembly,
+    fixedTechnolog,
+    fixedCost,
+    assembly,
+    technolog,
+    riskReserve,
+    costTotal,
+    priceTotal,
+    margin,
+    marginPct,
+    minPriceForTargetMargin,
+    warnings,
+  };
+}
+
+/**
+ * Единый слой совместимости для версий расчёта (Step B5, п. 2.12).
+ * Распознаёт как новый формат packages/calc, так и исторический snake_case.
+ */
+export function normalizeOrderCalculation(
+  calc: OrderCalculation,
+): NormalizedOrderCalculation {
+  return {
+    id: calc.id,
+    orderId: calc.order_id,
+    version: calc.version,
+    mode: calc.mode,
+    isContractBaseline: Boolean(calc.is_contract_baseline),
+    createdAt: calc.created_at,
+    costTotal: Number(calc.cost_total),
+    priceTotal: Number(calc.price_total),
+    marginPct:
+      calc.margin_pct !== null && calc.margin_pct !== undefined
+        ? Number(calc.margin_pct)
+        : null,
+    parameters: normalizeCalculationParams(calc.params_snapshot),
+    input: normalizeCalculationInput(calc.input_snapshot),
+    result: normalizeCalculationResult(calc.result, {
+      costTotal: Number(calc.cost_total),
+      priceTotal: Number(calc.price_total),
+      marginPct:
+        calc.margin_pct !== null && calc.margin_pct !== undefined
+          ? Number(calc.margin_pct)
+          : null,
+    }),
+  };
+}
+
 /**
  * Определяет расчёт для отображения в сводке заказа (Step A6, Q2):
  * - Если у заказа есть сохранённые версии и не включён предпросмотр (showLivePreview = false),
@@ -115,60 +427,42 @@ export function resolveOrderDisplayCalculation(
   const activeSaved = getPlanCalculation(candidateCalcs);
 
   if (activeSaved && !showLivePreview) {
-    const res = (activeSaved.result || {}) as Record<string, unknown>;
-    const catTotals = (res.categoryTotals || res.category_totals || {}) as Record<string, number>;
-    const rawPriceTotal = Number(activeSaved.price_total ?? res.priceTotal ?? 0);
+    const normalized = normalizeOrderCalculation(activeSaved);
+    const rawPriceTotal = normalized.priceTotal;
     const priceTotal =
-      (mode === "check_contract" || activeSaved.mode === "check_contract") &&
+      (mode === "check_contract" || normalized.mode === "check_contract") &&
       options.order.contract_price !== null
         ? Number(options.order.contract_price)
         : rawPriceTotal;
-    const costTotal = Number(activeSaved.cost_total ?? res.costTotal ?? 0);
-    const margin = typeof res.margin === "number" ? res.margin : priceTotal - costTotal;
+    const costTotal = normalized.costTotal;
+    const margin =
+      typeof normalized.result.margin === "number"
+        ? normalized.result.margin
+        : priceTotal - costTotal;
     const marginPct =
-      activeSaved.margin_pct !== undefined && activeSaved.margin_pct !== null
-        ? Number(activeSaved.margin_pct)
-        : ((res.marginPct as number | null) ?? null);
-    const fixedCost = Number(res.fixedCost ?? res.fixed_cost ?? 0);
-    const minPriceForTargetMargin = Number(
-      res.minPriceForTargetMargin ?? res.min_price_for_target_margin ?? 0,
-    );
-    const warnings = Array.isArray(res.warnings) ? (res.warnings as string[]) : [];
-    const assembly = Number(res.assembly ?? res.fixedAssembly ?? res.fixed_assembly ?? 0);
-    const technolog = Number(res.technolog ?? res.fixedTechnolog ?? res.fixed_technolog ?? 0);
-    const riskReserve = Number(res.riskReserve ?? res.risk_reserve ?? 0);
-    const lineCalculations = Array.isArray(res.lineCalculations)
-      ? (res.lineCalculations as LineCalculation[])
-      : [];
+      normalized.marginPct !== null
+        ? normalized.marginPct
+        : priceTotal === 0
+        ? null
+        : margin / priceTotal;
 
     return {
       source: "saved",
-      version: activeSaved.version,
-      createdAt: activeSaved.created_at,
-      isContractBaseline: Boolean(activeSaved.is_contract_baseline),
+      version: normalized.version,
+      createdAt: normalized.createdAt,
+      isContractBaseline: normalized.isContractBaseline,
       priceTotal,
       costTotal,
       margin,
       marginPct,
-      fixedCost,
-      minPriceForTargetMargin,
-      warnings,
-      categoryTotals: {
-        materials: Number(catTotals.materials ?? 0),
-        workshop: Number(catTotals.workshop ?? 0),
-        facades: Number(catTotals.facades ?? 0),
-        hardware: Number(catTotals.hardware ?? 0),
-        transport: Number(catTotals.transport ?? 0),
-        labor: Number(catTotals.labor ?? 0),
-        assembly: Number(catTotals.assembly ?? assembly),
-        technolog: Number(catTotals.technolog ?? technolog),
-        other: Number(catTotals.other ?? 0),
-        adjustments: Number(catTotals.adjustments ?? 0),
-      },
-      assembly,
-      technolog,
-      riskReserve,
-      lineCalculations,
+      fixedCost: normalized.result.fixedCost,
+      minPriceForTargetMargin: normalized.result.minPriceForTargetMargin,
+      warnings: normalized.result.warnings,
+      categoryTotals: normalized.result.categoryTotals,
+      assembly: normalized.result.assembly,
+      technolog: normalized.result.technolog,
+      riskReserve: normalized.result.riskReserve,
+      lineCalculations: normalized.result.lineCalculations,
     };
   }
 
@@ -544,7 +838,8 @@ export interface SaveCalculationPayload {
 }
 
 /**
- * Формирует неизменяемый снимок расчёта для сохранения в базу данных.
+ * Формирует неизменяемый снимок расчёта для сохранения в базу данных,
+ * используя чистую функцию createCalculationVersion из packages/calc (Step B5, п. 2.12).
  */
 export function prepareCalculationSnapshot(params: {
   order: Order;
@@ -553,68 +848,83 @@ export function prepareCalculationSnapshot(params: {
   adjustments: OrderAdjustment[];
   globalParams: ParametersMap;
   mode: "quote" | "check_contract";
-  outcome: CalculationOutcome;
+  outcome?: CalculationOutcome;
   isContractBaseline?: boolean;
 }): SaveCalculationPayload {
-  if (!params.outcome.ok) {
-    throw new Error(`Невозможно сохранить расчёт с ошибкой: ${params.outcome.error}`);
+  const calcParams = mergeOrderParameters(params.globalParams, params.order.settings);
+
+  const snapshotLines: CalculationSnapshotLine[] = params.lines.map((l) => ({
+    id: l.id,
+    name: l.name,
+    category: l.category as CostCategory,
+    unit: l.unit,
+    qty: Number(l.qty),
+    unitPrice: Number(l.unit_price),
+    wastePct: Number(l.waste_pct),
+    billableQtyRounding: l.billable_qty_rounding,
+    priceItemId: l.price_item_id || null,
+    isManual: Boolean(l.is_manual),
+    countsForTechnolog: Boolean(l.counts_for_technolog),
+    comment: l.comment || null,
+  }));
+
+  const snapshotItems: CalculationSnapshotOrderItem[] = params.items.map((it) => ({
+    id: it.id,
+    title: it.title,
+    kind: it.kind,
+    linearMeters: it.linear_meters !== null ? Number(it.linear_meters) : undefined,
+    description: it.description || null,
+    dims: it.dims || {},
+  }));
+
+  const snapshotAdjustments: CalculationSnapshotAdjustment[] = params.adjustments.map((a) => ({
+    id: a.id,
+    kind: a.kind,
+    category: "adjustments",
+    label: a.label,
+    amount: Number(a.amount),
+    comment: a.comment || null,
+  }));
+
+  const versionOutcome = createCalculationVersion({
+    mode: params.mode,
+    parameters: {
+      targetMarginPct: calcParams.targetMarginPct,
+      assemblyMode: calcParams.assemblyMode,
+      assemblyPct: calcParams.assemblyPct,
+      assemblyPerMeterKitchen: calcParams.assemblyPerMeterKitchen,
+      assemblyPerMeterWardrobe: calcParams.assemblyPerMeterWardrobe,
+      technologMode: calcParams.technologMode,
+      technologPct: calcParams.technologPct,
+      technologPerSheet: calcParams.technologPerSheet,
+      riskReservePct: calcParams.riskReservePct,
+      priceRounding: calcParams.priceRounding,
+    },
+    lines: snapshotLines,
+    orderItems: snapshotItems,
+    adjustments: snapshotAdjustments,
+    contractPrice:
+      params.mode === "check_contract"
+        ? (params.order.contract_price !== null ? Number(params.order.contract_price) : undefined)
+        : undefined,
+  });
+
+  if (!versionOutcome.ok) {
+    throw new Error(`Невозможно сохранить расчёт с ошибкой: ${versionOutcome.error}`);
   }
 
-  const calcParams = mergeOrderParameters(params.globalParams, params.order.settings);
+  const { version } = versionOutcome;
 
   return {
     order_id: params.order.id,
     version: 0, // Базовый триггер БД назначит atomic следующий номер версии
-    mode: params.mode,
-    params_snapshot: {
-      target_margin_pct: calcParams.targetMarginPct,
-      assembly_mode: calcParams.assemblyMode,
-      assembly_pct: calcParams.assemblyPct,
-      assembly_per_meter_kitchen: calcParams.assemblyPerMeterKitchen,
-      assembly_per_meter_wardrobe: calcParams.assemblyPerMeterWardrobe,
-      technolog_mode: calcParams.technologMode,
-      technolog_pct: calcParams.technologPct,
-      technolog_per_sheet: calcParams.technologPerSheet,
-      risk_reserve_pct: calcParams.riskReservePct,
-      price_rounding: calcParams.priceRounding,
-    },
-    input_snapshot: {
-      contract_price: params.order.contract_price,
-      items: params.items.map((it) => ({
-        id: it.id,
-        kind: it.kind,
-        title: it.title,
-        linear_meters: it.linear_meters,
-        description: it.description,
-      })),
-      lines: params.lines.map((l) => ({
-        id: l.id,
-        price_item_id: l.price_item_id,
-        order_item_id: l.order_item_id,
-        category: l.category,
-        name: l.name,
-        unit: l.unit,
-        qty: Number(l.qty),
-        unit_price: Number(l.unit_price),
-        waste_pct: Number(l.waste_pct),
-        billable_qty_rounding: l.billable_qty_rounding,
-        counts_for_technolog: l.counts_for_technolog,
-        is_manual: l.is_manual,
-        comment: l.comment,
-      })),
-      adjustments: params.adjustments.map((a) => ({
-        id: a.id,
-        kind: a.kind,
-        category: a.category,
-        label: a.label,
-        amount: Number(a.amount),
-        comment: a.comment,
-      })),
-    },
-    result: params.outcome.result as unknown as Record<string, unknown>,
-    cost_total: params.outcome.result.costTotal,
-    price_total: params.outcome.result.priceTotal,
-    margin_pct: params.outcome.result.marginPct,
+    mode: version.mode,
+    params_snapshot: version.paramsSnapshot as unknown as Record<string, unknown>,
+    input_snapshot: version.inputSnapshot as unknown as Record<string, unknown>,
+    result: version.result as unknown as Record<string, unknown>,
+    cost_total: version.costTotal,
+    price_total: version.priceTotal,
+    margin_pct: version.marginPct,
     is_contract_baseline: params.isContractBaseline ?? false,
   };
 }

@@ -1094,12 +1094,17 @@ describe("orders helpers", () => {
       expect(snapshot.is_contract_baseline).toBe(true);
 
       const params = snapshot.params_snapshot as Record<string, unknown>;
-      expect(params.target_margin_pct).toBe(DEFAULT_PARAMETERS.target_margin_pct);
+      expect(params.targetMarginPct ?? params.target_margin_pct).toBe(
+        DEFAULT_PARAMETERS.target_margin_pct,
+      );
 
       const input = snapshot.input_snapshot as Record<string, unknown>;
-      const inputLines = input.lines as Array<{ unit_price: number }>;
+      const inputLines = input.lines as Array<{
+        unitPrice?: number;
+        unit_price?: number;
+      }>;
       expect(inputLines).toHaveLength(baseLines.length);
-      expect(inputLines[0].unit_price).toBe(14_000);
+      expect(inputLines[0].unitPrice ?? inputLines[0].unit_price).toBe(14_000);
     });
 
     it("computes price updates diff when catalog price changes", () => {
@@ -1226,10 +1231,10 @@ describe("orders helpers", () => {
 
       // 6.1: Сохранённая версия 1 НЕ изменилась
       const ver1Input = calculationHistory[0].input_snapshot as {
-        lines: Array<{ id: string; unit_price: number }>;
+        lines: Array<{ id: string; unitPrice?: number; unit_price?: number }>;
       };
       const savedLdspLine = ver1Input.lines.find((l) => l.id === "l-ldsp");
-      expect(savedLdspLine?.unit_price).toBe(14_000);
+      expect(savedLdspLine?.unitPrice ?? savedLdspLine?.unit_price).toBe(14_000);
       expect(calculationHistory[0].price_total).toBe(886_000);
 
       // 6.2: Позиция в заказе также сохраняет свой снимок (14 000)
