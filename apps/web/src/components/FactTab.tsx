@@ -10,7 +10,7 @@ import {
   validatePaymentInput,
 } from "../lib/actuals";
 import { getPlanCalculation } from "../lib/orders";
-import { getSupabase } from "../lib/supabase";
+import { assertSingleRowAffected, getSupabase } from "../lib/supabase";
 import {
   ALL_CATEGORIES,
   CATEGORY_LABELS,
@@ -151,15 +151,13 @@ export function FactTab({
     if (!confirm("Удалить этот расход?")) return;
     try {
       const supabase = getSupabase();
-      const { error: delErr } = await supabase
+      const res = await supabase
         .from("actual_expenses")
         .delete()
-        .eq("id", expId);
-      if (delErr) {
-        alert("Ошибка удаления: " + formatErrorMessage(delErr));
-      } else {
-        onExpensesChange(expenses.filter((e) => e.id !== expId));
-      }
+        .eq("id", expId)
+        .select();
+      assertSingleRowAffected(res);
+      onExpensesChange(expenses.filter((e) => e.id !== expId));
     } catch (err) {
       alert("Ошибка удаления: " + formatErrorMessage(err));
     }
@@ -207,15 +205,13 @@ export function FactTab({
     if (!confirm("Удалить это поступление?")) return;
     try {
       const supabase = getSupabase();
-      const { error: delErr } = await supabase
+      const res = await supabase
         .from("payments")
         .delete()
-        .eq("id", payId);
-      if (delErr) {
-        alert("Ошибка удаления: " + formatErrorMessage(delErr));
-      } else {
-        onPaymentsChange(payments.filter((p) => p.id !== payId));
-      }
+        .eq("id", payId)
+        .select();
+      assertSingleRowAffected(res);
+      onPaymentsChange(payments.filter((p) => p.id !== payId));
     } catch (err) {
       alert("Ошибка удаления: " + formatErrorMessage(err));
     }

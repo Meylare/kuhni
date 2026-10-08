@@ -26,7 +26,7 @@ import {
   parsePercent,
   type ParametersMap,
 } from "../lib/parameters";
-import { getSupabase } from "../lib/supabase";
+import { assertSingleRowAffected, getSupabase } from "../lib/supabase";
 import {
   ALL_CATEGORIES,
   CATEGORY_LABELS,
@@ -373,7 +373,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       setHeaderError(null);
       const supabase = getSupabase();
 
-      const { data, error: updateErr } = await supabase
+      const res = await supabase
         .from("orders")
         .update({
           name: headerName.trim(),
@@ -384,15 +384,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", order.id)
-        .select()
-        .single();
+        .select();
 
-      if (updateErr) {
-        setHeaderError(formatErrorMessage(updateErr, "Ошибка при сохранении."));
-      } else if (data) {
-        setOrder(data as Order);
-        setIsEditingHeader(false);
-      }
+      const updatedOrder = assertSingleRowAffected<Order>(res);
+      setOrder(updatedOrder);
+      setIsEditingHeader(false);
     } catch (err: unknown) {
       setHeaderError(formatErrorMessage(err, "Ошибка при сохранении."));
     } finally {
@@ -427,21 +423,17 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       if (riskParsed !== null) newSettings.risk_reserve_pct = riskParsed;
 
       const supabase = getSupabase();
-      const { data, error: updateErr } = await supabase
+      const res = await supabase
         .from("orders")
         .update({
           settings: newSettings,
           updated_at: new Date().toISOString(),
         })
         .eq("id", order.id)
-        .select()
-        .single();
+        .select();
 
-      if (updateErr) {
-        alert("Ошибка сохранения параметров: " + formatErrorMessage(updateErr));
-      } else if (data) {
-        setOrder(data as Order);
-      }
+      const updatedOrder = assertSingleRowAffected<Order>(res);
+      setOrder(updatedOrder);
     } catch (err) {
       alert("Ошибка сохранения параметров: " + formatErrorMessage(err));
     } finally {
@@ -496,7 +488,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       const supabase = getSupabase();
 
       if (editingItem) {
-        const { data, error: updateErr } = await supabase
+        const res = await supabase
           .from("order_items")
           .update({
             title: itemTitle.trim(),
@@ -505,17 +497,13 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             description: itemDesc.trim() || null,
           })
           .eq("id", editingItem.id)
-          .select()
-          .single();
+          .select();
 
-        if (updateErr) {
-          setItemError(formatErrorMessage(updateErr, "Ошибка при сохранении изделия."));
-        } else if (data) {
-          setItems((prev) =>
-            prev.map((i) => (i.id === editingItem.id ? (data as OrderItem) : i))
-          );
-          setIsItemModalOpen(false);
-        }
+        const updated = assertSingleRowAffected<OrderItem>(res);
+        setItems((prev) =>
+          prev.map((i) => (i.id === editingItem.id ? updated : i))
+        );
+        setIsItemModalOpen(false);
       } else {
         const { data, error: insertErr } = await supabase
           .from("order_items")
@@ -548,16 +536,15 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     if (locked || !confirm("Удалить это изделие и все привязанные к нему позиции?")) return;
     try {
       const supabase = getSupabase();
-      const { error: delErr } = await supabase
+      const res = await supabase
         .from("order_items")
         .delete()
-        .eq("id", itemId);
-      if (delErr) {
-        alert("Ошибка удаления изделия: " + formatErrorMessage(delErr));
-      } else {
-        setItems((prev) => prev.filter((i) => i.id !== itemId));
-        setLines((prev) => prev.filter((l) => l.order_item_id !== itemId));
-      }
+        .eq("id", itemId)
+        .select();
+
+      assertSingleRowAffected(res);
+      setItems((prev) => prev.filter((i) => i.id !== itemId));
+      setLines((prev) => prev.filter((l) => l.order_item_id !== itemId));
     } catch (err) {
       alert("Ошибка удаления изделия: " + formatErrorMessage(err));
     }
@@ -633,10 +620,12 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         // Если триггер перезаписал waste_pct, а пользователь указал своё значение
         const insertedLine = data as OrderLine;
         if (Math.abs(Number(insertedLine.waste_pct) - wasteNum) > 0.0001) {
-          await supabase
+          const res = await supabase
             .from("order_lines")
             .update({ waste_pct: wasteNum })
-            .eq("id", insertedLine.id);
+            .eq("id", insertedLine.id)
+            .select();
+          assertSingleRowAffected(res);
           insertedLine.waste_pct = wasteNum;
         }
 
@@ -728,21 +717,17 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           updatePayload.counts_for_technolog = manualTechnolog;
         }
 
-        const { data, error: updateErr } = await supabase
+        const res = await supabase
           .from("order_lines")
           .update(updatePayload)
           .eq("id", editingLine.id)
-          .select()
-          .single();
+          .select();
 
-        if (updateErr) {
-          setManualError(formatErrorMessage(updateErr, "Ошибка сохранения позиции."));
-        } else if (data) {
-          setLines((prev) =>
-            prev.map((l) => (l.id === editingLine.id ? (data as OrderLine) : l))
-          );
-          setIsManualLineModalOpen(false);
-        }
+        const updated = assertSingleRowAffected<OrderLine>(res);
+        setLines((prev) =>
+          prev.map((l) => (l.id === editingLine.id ? updated : l))
+        );
+        setIsManualLineModalOpen(false);
       } else {
         const { data, error: insertErr } = await supabase
           .from("order_lines")
@@ -782,15 +767,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     if (locked || !confirm("Удалить эту позицию из заказа?")) return;
     try {
       const supabase = getSupabase();
-      const { error: delErr } = await supabase
+      const res = await supabase
         .from("order_lines")
         .delete()
-        .eq("id", lineId);
-      if (delErr) {
-        alert("Ошибка удаления: " + formatErrorMessage(delErr));
-      } else {
-        setLines((prev) => prev.filter((l) => l.id !== lineId));
-      }
+        .eq("id", lineId)
+        .select();
+
+      assertSingleRowAffected(res);
+      setLines((prev) => prev.filter((l) => l.id !== lineId));
     } catch (err) {
       alert("Ошибка удаления: " + formatErrorMessage(err));
     }
@@ -804,11 +788,17 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       setIsUpdatingPrices(true);
       const supabase = getSupabase();
 
-      for (const item of priceDiff.lines) {
-        await supabase
-          .from("order_lines")
-          .update({ unit_price: item.newUnitPrice })
-          .eq("id", item.lineId);
+      // Массовое обновление цен в единой транзакции через RPC-функцию apply_price_updates_to_order (Step B2)
+      const { error: rpcErr } = await supabase.rpc("apply_price_updates_to_order", {
+        p_order_id: order!.id,
+        p_updates: priceDiff.lines.map((item) => ({
+          line_id: item.lineId,
+          unit_price: item.newUnitPrice,
+        })),
+      });
+
+      if (rpcErr) {
+        throw new Error(formatErrorMessage(rpcErr, "Ошибка при обновлении цен."));
       }
 
       // Перезагрузка строк
@@ -937,22 +927,18 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       }
 
       // Переводим заказ в статус 'quoted' для возможности редактирования
-      const { data: updatedOrder, error: updateErr } = await supabase
+      const res = await supabase
         .from("orders")
         .update({
           status: "quoted",
           updated_at: new Date().toISOString(),
         })
         .eq("id", order.id)
-        .select()
-        .single();
+        .select();
 
-      if (updateErr) {
-        alert("Ошибка смены статуса: " + formatErrorMessage(updateErr));
-      } else if (updatedOrder) {
-        setOrder(updatedOrder as Order);
-        setIsUnlockModalOpen(false);
-      }
+      const updatedOrder = assertSingleRowAffected<Order>(res);
+      setOrder(updatedOrder);
+      setIsUnlockModalOpen(false);
     } catch (err) {
       alert("Ошибка смены статуса: " + formatErrorMessage(err));
     } finally {
@@ -1022,15 +1008,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     if (locked || !confirm("Удалить эту корректировку?")) return;
     try {
       const supabase = getSupabase();
-      const { error: delErr } = await supabase
+      const res = await supabase
         .from("adjustments")
         .delete()
-        .eq("id", adjId);
-      if (delErr) {
-        alert("Ошибка удаления: " + formatErrorMessage(delErr));
-      } else {
-        setAdjustments((prev) => prev.filter((a) => a.id !== adjId));
-      }
+        .eq("id", adjId)
+        .select();
+
+      assertSingleRowAffected(res);
+      setAdjustments((prev) => prev.filter((a) => a.id !== adjId));
     } catch (err) {
       alert("Ошибка удаления: " + formatErrorMessage(err));
     }

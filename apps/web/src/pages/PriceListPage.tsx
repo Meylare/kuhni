@@ -8,7 +8,7 @@ import {
   validatePriceItem,
   type PriceItemInput,
 } from "../lib/price-items";
-import { getSupabase } from "../lib/supabase";
+import { assertSingleRowAffected, getSupabase } from "../lib/supabase";
 import {
   ALL_CATEGORIES,
   CATEGORY_LABELS,
@@ -118,19 +118,17 @@ export function PriceListPage() {
     setInlineError(null);
     try {
       const supabase = getSupabase();
-      const { error: updateErr } = await supabase
+      const res = await supabase
         .from("price_items")
         .update({ price: parsed, updated_at: new Date().toISOString() })
-        .eq("id", item.id);
+        .eq("id", item.id)
+        .select();
 
-      if (updateErr) {
-        setInlineError(formatErrorMessage(updateErr, "Не удалось обновить цену."));
-      } else {
-        setItems((prev) =>
-          prev.map((it) => (it.id === item.id ? { ...it, price: parsed } : it)),
-        );
-        setInlineEditingId(null);
-      }
+      assertSingleRowAffected(res);
+      setItems((prev) =>
+        prev.map((it) => (it.id === item.id ? { ...it, price: parsed } : it)),
+      );
+      setInlineEditingId(null);
     } catch (err: unknown) {
       setInlineError(formatErrorMessage(err, "Не удалось обновить цену."));
     } finally {
@@ -167,7 +165,7 @@ export function PriceListPage() {
 
     try {
       const supabase = getSupabase();
-      const { data, error: updateErr } = await supabase
+      const res = await supabase
         .from("price_items")
         .update({
           name: merged.name.trim(),
@@ -184,17 +182,12 @@ export function PriceListPage() {
           updated_at: new Date().toISOString(),
         })
         .eq("id", selectedItem.id)
-        .select()
-        .single();
+        .select();
 
-      if (updateErr) {
-        setModalError(formatErrorMessage(updateErr, "Не удалось сохранить изменения."));
-      } else if (data) {
-        const updatedItem = data as PriceItem;
-        setSelectedItem(updatedItem);
-        setItems((prev) => prev.map((it) => (it.id === updatedItem.id ? updatedItem : it)));
-        void loadItemHistory(updatedItem.id);
-      }
+      const updatedItem = assertSingleRowAffected<PriceItem>(res);
+      setSelectedItem(updatedItem);
+      setItems((prev) => prev.map((it) => (it.id === updatedItem.id ? updatedItem : it)));
+      void loadItemHistory(updatedItem.id);
     } catch (err: unknown) {
       setModalError(formatErrorMessage(err, "Не удалось сохранить изменения."));
     } finally {
@@ -207,19 +200,17 @@ export function PriceListPage() {
     const nextActive = !item.active;
     try {
       const supabase = getSupabase();
-      const { error: updateErr } = await supabase
+      const res = await supabase
         .from("price_items")
         .update({ active: nextActive, updated_at: new Date().toISOString() })
-        .eq("id", item.id);
+        .eq("id", item.id)
+        .select();
 
-      if (updateErr) {
-        alert("Ошибка: " + formatErrorMessage(updateErr));
-      } else {
-        const updated = { ...item, active: nextActive };
-        setItems((prev) => prev.map((it) => (it.id === item.id ? updated : it)));
-        if (selectedItem?.id === item.id) {
-          setSelectedItem(updated);
-        }
+      assertSingleRowAffected(res);
+      const updated = { ...item, active: nextActive };
+      setItems((prev) => prev.map((it) => (it.id === item.id ? updated : it)));
+      if (selectedItem?.id === item.id) {
+        setSelectedItem(updated);
       }
     } catch (err: unknown) {
       alert("Ошибка: " + formatErrorMessage(err));
