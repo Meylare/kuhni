@@ -617,19 +617,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       if (insertErr) {
         setPickerError(formatErrorMessage(insertErr, "Ошибка добавления позиции."));
       } else if (data) {
-        // Если триггер перезаписал waste_pct, а пользователь указал своё значение
-        const insertedLine = data as OrderLine;
-        if (Math.abs(Number(insertedLine.waste_pct) - wasteNum) > 0.0001) {
-          const res = await supabase
-            .from("order_lines")
-            .update({ waste_pct: wasteNum })
-            .eq("id", insertedLine.id)
-            .select();
-          assertSingleRowAffected(res);
-          insertedLine.waste_pct = wasteNum;
-        }
-
-        setLines((prev) => [...prev, insertedLine]);
+        setLines((prev) => [...prev, data as OrderLine]);
         setIsPricePickerOpen(false);
       }
     } catch (err: unknown) {
