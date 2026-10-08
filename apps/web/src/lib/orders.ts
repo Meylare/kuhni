@@ -7,6 +7,7 @@ import {
   type CalculationAdjustment,
   type CalculationOutcome,
   type CalculationParameters,
+  type CostCategory,
   type LineCalculation,
 } from "@kuhni/calc";
 
@@ -183,7 +184,7 @@ export function buildCalculationInput(params: {
 
   const calcLines: CalculationLine[] = lines.map((line) => ({
     id: line.id,
-    category: line.category,
+    category: line.category as CostCategory,
     qty: Number(line.qty),
     unitPrice: Number(line.unit_price),
     wastePct: Number(line.waste_pct),
@@ -253,7 +254,7 @@ export function getLineCalculationsMap(
 export function getOrderLineCalculation(line: OrderLine): LineCalculation {
   return calculateLine({
     id: line.id,
-    category: line.category,
+    category: line.category as CostCategory,
     qty: Number(line.qty),
     unitPrice: Number(line.unit_price),
     wastePct: Number(line.waste_pct),

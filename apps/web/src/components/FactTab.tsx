@@ -4,7 +4,7 @@ import { formatErrorMessage } from "../lib/errors";
 import { formatKzt } from "../lib/money";
 import { formatPercent } from "../lib/parameters";
 import {
-  sumExpensesByCategory,
+  buildPlanFactRows,
   sumReworks,
   sumPayments,
   sumAllExpenses,
@@ -66,11 +66,11 @@ export function FactTab({
     return [...calculations].sort((a, b) => b.version - a.version)[0] ?? null;
   }, [calculations]);
 
-  const planCategoryTotals = useMemo(() => {
-    if (!latestCalc) return null;
+  const planFactRows = useMemo(() => {
+    if (!latestCalc) return [];
     const res = latestCalc.result as Record<string, unknown>;
-    return (res?.categoryTotals as Record<string, number>) ?? null;
-  }, [latestCalc]);
+    return buildPlanFactRows(res as any, expenses);
+  }, [latestCalc, expenses]);
 
   const planCostTotal = latestCalc ? Number(latestCalc.cost_total) : 0;
 
@@ -252,35 +252,30 @@ export function FactTab({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
-                  {ALL_CATEGORIES.map((cat) => {
-                    const plan = planCategoryTotals ? Number(planCategoryTotals[cat] || 0) : 0;
-                    const fact = sumExpensesByCategory(expenses, cat);
-                    const diff = fact - plan;
-                    return (
-                      <tr key={cat} className="hover:bg-stone-50/50">
-                        <td className="px-3 py-2 font-medium text-stone-800">
-                          {CATEGORY_LABELS[cat]}
-                        </td>
-                        <td className="px-3 py-2 text-right text-stone-600">
-                          {formatKzt(plan)} ₸
-                        </td>
-                        <td className="px-3 py-2 text-right font-semibold text-stone-900">
-                          {fact > 0 ? `${formatKzt(fact)} ₸` : "—"}
-                        </td>
-                        <td className={`px-3 py-2 text-right font-semibold ${
-                          diff > 0
-                            ? "text-rose-700"
-                            : diff < 0
-                            ? "text-emerald-700"
-                            : "text-stone-400"
-                        }`}>
-                          {fact > 0
-                            ? `${diff > 0 ? "+" : ""}${formatKzt(diff)} ₸`
-                            : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {planFactRows.map((row) => (
+                    <tr key={row.key} className="hover:bg-stone-50/50">
+                      <td className="px-3 py-2 font-medium text-stone-800">
+                        {row.label}
+                      </td>
+                      <td className="px-3 py-2 text-right text-stone-600">
+                        {row.plan > 0 ? `${formatKzt(row.plan)} ₸` : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right font-semibold text-stone-900">
+                        {row.fact > 0 ? `${formatKzt(row.fact)} ₸` : "—"}
+                      </td>
+                      <td className={`px-3 py-2 text-right font-semibold ${
+                        row.diff > 0
+                          ? "text-rose-700"
+                          : row.diff < 0
+                          ? "text-emerald-700"
+                          : "text-stone-400"
+                      }`}>
+                        {row.fact > 0 || row.plan > 0
+                          ? `${row.diff > 0 ? "+" : ""}${formatKzt(row.diff)} ₸`
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
                 <tfoot className="border-t-2 border-stone-300 bg-stone-50/80 text-xs font-bold">
                   <tr>

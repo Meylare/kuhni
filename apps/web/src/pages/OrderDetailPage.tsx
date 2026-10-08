@@ -1672,7 +1672,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                   const catLines = lines.filter((l) => l.category === cat);
                   if (catLines.length === 0) return null;
 
-                  const catTotal = categoryTotals ? (categoryTotals[cat] ?? 0) : 0;
+                  const catTotal = categoryTotals ? ((categoryTotals as Record<string, number>)[cat] ?? 0) : 0;
 
                   return (
                     <div key={cat} className="py-3 first:pt-0 last:pb-0">

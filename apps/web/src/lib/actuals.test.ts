@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildPlanFactRows,
   computeActualMargin,
   sumAllExpenses,
   sumExpensesByCategory,
@@ -216,5 +217,55 @@ describe("computeActualMargin", () => {
     const result = computeActualMargin(expenses, payments);
     expect(result).not.toBeNull();
     expect(result!.margin).toBe(-100000);
+  });
+});
+
+describe("Step A3: Plan/Fact rows and categories (assembly & technolog)", () => {
+  it("sums expenses for assembly and technolog categories", () => {
+    const expenses: ActualExpense[] = [
+      makeExpense({ id: "1", category: "assembly", amount: 35000 }),
+      makeExpense({ id: "2", category: "technolog", amount: 15000 }),
+    ];
+    expect(sumExpensesByCategory(expenses, "assembly")).toBe(35000);
+    expect(sumExpensesByCategory(expenses, "technolog")).toBe(15000);
+  });
+
+  it("buildPlanFactRows produces rows whose plan sum strictly equals cost_total for benchmark kitchen 3m", () => {
+    // Benchmark order calculation result (SPEC Example A)
+    const benchmarkResult = {
+      categoryTotals: {
+        materials: 163_240,
+        facades: 168_000,
+        workshop: 133_000,
+        hardware: 47_500,
+        transport: 20_000,
+        labor: 15_000,
+        other: 0,
+        adjustments: 0,
+      },
+      fixedAssembly: 0,
+      fixedTechnolog: 0,
+      assembly: 124_845,
+      technolog: 34_440,
+      riskReserve: 0,
+      costTotal: 706_025,
+      priceTotal: 861_000,
+    };
+
+    const rows = buildPlanFactRows(benchmarkResult, []);
+    expect(rows).toHaveLength(11);
+
+    const planSum = rows.reduce((acc, row) => acc + row.plan, 0);
+    expect(planSum).toBe(706_025);
+    expect(planSum).toBe(benchmarkResult.costTotal);
+
+    // Verify presence of assembly and technolog
+    const assemblyRow = rows.find((r) => r.key === "assembly");
+    expect(assemblyRow).toBeDefined();
+    expect(assemblyRow!.plan).toBe(124_845);
+
+    const technologRow = rows.find((r) => r.key === "technolog");
+    expect(technologRow).toBeDefined();
+    expect(technologRow!.plan).toBe(34_440);
   });
 });

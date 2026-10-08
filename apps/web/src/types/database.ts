@@ -5,6 +5,8 @@ export type PriceCategory =
   | "hardware"
   | "transport"
   | "labor"
+  | "assembly"
+  | "technolog"
   | "other";
 
 export const CATEGORY_LABELS: Record<PriceCategory, string> = {
@@ -14,6 +16,8 @@ export const CATEGORY_LABELS: Record<PriceCategory, string> = {
   hardware: "Фурнитура",
   transport: "Транспорт",
   labor: "Работа",
+  assembly: "Сборка",
+  technolog: "Технолог",
   other: "Остальное",
 };
 
@@ -24,6 +28,8 @@ export const ALL_CATEGORIES: PriceCategory[] = [
   "hardware",
   "transport",
   "labor",
+  "assembly",
+  "technolog",
   "other",
 ];
 
