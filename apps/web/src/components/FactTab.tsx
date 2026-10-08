@@ -5,10 +5,7 @@ import { formatKzt } from "../lib/money";
 import { formatPercent } from "../lib/parameters";
 import {
   buildPlanFactRows,
-  sumReworks,
-  sumPayments,
-  sumAllExpenses,
-  computeActualMargin,
+  computeOrderFinancialSummary,
   validateExpenseInput,
   validatePaymentInput,
 } from "../lib/actuals";
@@ -74,14 +71,14 @@ export function FactTab({
 
   const planCostTotal = latestCalc ? Number(latestCalc.cost_total) : 0;
 
-  // --- Факт: сводные данные ---
-  const factExpensesTotal = sumAllExpenses(expenses);
-  const factReworksTotal = sumReworks(expenses);
-  const factAllExpensesTotal = factExpensesTotal + factReworksTotal;
-  const factPaymentsTotal = sumPayments(payments);
-  const actualMarginData = computeActualMargin(expenses, payments);
-  const contractPrice = order.contract_price !== null ? Number(order.contract_price) : null;
-  const paymentRemaining = contractPrice !== null ? contractPrice - factPaymentsTotal : null;
+  // --- Факт: финансовые итоги и кассовый баланс (Step A4, Q4) ---
+  const financialSummary = useMemo(() => {
+    return computeOrderFinancialSummary({
+      contractPrice: order.contract_price,
+      expenses,
+      payments,
+    });
+  }, [order.contract_price, expenses, payments]);
 
   // --- Обработчики ---
   function resetExpenseForm() {
@@ -284,17 +281,19 @@ export function FactTab({
                       {formatKzt(planCostTotal)} ₸
                     </td>
                     <td className="px-3 py-2 text-right text-stone-900">
-                      {factExpensesTotal > 0 ? `${formatKzt(factExpensesTotal)} ₸` : "—"}
+                      {financialSummary.totalExpenses > 0
+                        ? `${formatKzt(financialSummary.totalExpenses)} ₸`
+                        : "—"}
                     </td>
                     <td className={`px-3 py-2 text-right ${
-                      factExpensesTotal - planCostTotal > 0
+                      financialSummary.totalExpenses - planCostTotal > 0
                         ? "text-rose-700"
-                        : factExpensesTotal - planCostTotal < 0
+                        : financialSummary.totalExpenses - planCostTotal < 0
                         ? "text-emerald-700"
                         : "text-stone-400"
                     }`}>
-                      {factExpensesTotal > 0
-                        ? `${factExpensesTotal - planCostTotal > 0 ? "+" : ""}${formatKzt(factExpensesTotal - planCostTotal)} ₸`
+                      {financialSummary.totalExpenses > 0
+                        ? `${financialSummary.totalExpenses - planCostTotal > 0 ? "+" : ""}${formatKzt(financialSummary.totalExpenses - planCostTotal)} ₸`
                         : "—"}
                     </td>
                   </tr>
@@ -302,81 +301,116 @@ export function FactTab({
               </table>
             </div>
 
-            {/* Переделки отдельно */}
-            {factReworksTotal > 0 && (
-              <div className="mt-2 flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs">
-                <span className="font-semibold text-rose-800">
-                  🔧 Переделки (сверх расходов)
-                </span>
-                <span className="font-extrabold text-rose-900">
-                  {formatKzt(factReworksTotal)} ₸
+            {/* Переделки отдельной информационной строкой (Q4) */}
+            {financialSummary.reworkTotal > 0 && (
+              <div className="mt-2 flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+                <span>из них переделки:</span>
+                <span className="font-semibold text-rose-700">
+                  {formatKzt(financialSummary.reworkTotal)} ₸
                 </span>
               </div>
             )}
 
-            {/* Оплата и остаток */}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Финансовые карточки (Q4): Договор, Оплачено клиентом, Остаток долга, Фактическая прибыль, Кассовый баланс */}
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              {/* 1. Договор */}
               <div className="rounded-xl bg-stone-100 px-3 py-2.5 text-center">
                 <span className="block text-[10px] uppercase tracking-wide text-stone-500">
                   Договор
                 </span>
                 <span className="mt-0.5 block text-sm font-extrabold text-stone-900">
-                  {contractPrice !== null ? `${formatKzt(contractPrice)} ₸` : "—"}
+                  {financialSummary.contractPrice > 0
+                    ? `${formatKzt(financialSummary.contractPrice)} ₸`
+                    : "—"}
                 </span>
               </div>
+
+              {/* 2. Оплачено клиентом */}
               <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5 text-center">
                 <span className="block text-[10px] uppercase tracking-wide text-emerald-600">
-                  Оплачено
+                  Оплачено клиентом
                 </span>
                 <span className="mt-0.5 block text-sm font-extrabold text-emerald-900">
-                  {factPaymentsTotal > 0 ? `${formatKzt(factPaymentsTotal)} ₸` : "—"}
+                  {financialSummary.paymentsTotal > 0
+                    ? `${formatKzt(financialSummary.paymentsTotal)} ₸`
+                    : "—"}
                 </span>
               </div>
+
+              {/* 3. Остаток долга */}
               <div className={`rounded-xl px-3 py-2.5 text-center border ${
-                paymentRemaining !== null && paymentRemaining > 0
+                financialSummary.contractPrice > 0 && financialSummary.paymentRemaining > 0
                   ? "bg-amber-50 border-amber-200"
-                  : paymentRemaining !== null && paymentRemaining <= 0
+                  : financialSummary.contractPrice > 0 && financialSummary.paymentRemaining <= 0
                   ? "bg-emerald-50 border-emerald-200"
                   : "bg-stone-100 border-stone-200"
               }`}>
                 <span className="block text-[10px] uppercase tracking-wide text-stone-500">
-                  Остаток оплаты
+                  Остаток долга
                 </span>
                 <span className={`mt-0.5 block text-sm font-extrabold ${
-                  paymentRemaining !== null && paymentRemaining > 0
+                  financialSummary.contractPrice > 0 && financialSummary.paymentRemaining > 0
                     ? "text-amber-900"
-                    : paymentRemaining !== null && paymentRemaining <= 0
+                    : financialSummary.contractPrice > 0 && financialSummary.paymentRemaining <= 0
                     ? "text-emerald-900"
                     : "text-stone-900"
                 }`}>
-                  {paymentRemaining !== null ? `${formatKzt(paymentRemaining)} ₸` : "—"}
+                  {financialSummary.contractPrice > 0
+                    ? `${formatKzt(financialSummary.paymentRemaining)} ₸`
+                    : "—"}
                 </span>
               </div>
+
+              {/* 4. Фактическая прибыль */}
               <div className={`rounded-xl px-3 py-2.5 text-center border ${
-                actualMarginData && actualMarginData.margin >= 0
+                financialSummary.contractPrice > 0 && financialSummary.actualProfit >= 0
                   ? "bg-emerald-50 border-emerald-200"
-                  : actualMarginData && actualMarginData.margin < 0
+                  : financialSummary.contractPrice > 0 && financialSummary.actualProfit < 0
                   ? "bg-rose-50 border-rose-200"
                   : "bg-stone-100 border-stone-200"
               }`}>
                 <span className="block text-[10px] uppercase tracking-wide text-stone-500">
-                  Факт. маржа
+                  Фактическая прибыль
                 </span>
                 <span className={`mt-0.5 block text-sm font-extrabold ${
-                  actualMarginData && actualMarginData.margin >= 0
+                  financialSummary.contractPrice > 0 && financialSummary.actualProfit >= 0
                     ? "text-emerald-900"
-                    : actualMarginData && actualMarginData.margin < 0
+                    : financialSummary.contractPrice > 0 && financialSummary.actualProfit < 0
                     ? "text-rose-900"
                     : "text-stone-900"
                 }`}>
-                  {actualMarginData
-                    ? `${formatKzt(actualMarginData.margin)} ₸`
-                    : "—"}
-                  {actualMarginData?.marginPct !== null && actualMarginData?.marginPct !== undefined && (
-                    <span className="text-xs font-semibold ml-1">
-                      ({formatPercent(actualMarginData.marginPct)})
-                    </span>
+                  {financialSummary.contractPrice > 0 ? (
+                    <>
+                      {financialSummary.actualProfit > 0 ? "+" : ""}
+                      {formatKzt(financialSummary.actualProfit)} ₸
+                      {financialSummary.profitMarginPct !== null && (
+                        <span className="text-xs font-semibold ml-1">
+                          ({formatPercent(financialSummary.profitMarginPct)})
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    "—"
                   )}
+                </span>
+              </div>
+
+              {/* 5. Кассовый баланс */}
+              <div className={`rounded-xl px-3 py-2.5 text-center border ${
+                financialSummary.cashBalance >= 0
+                  ? "bg-emerald-50 border-emerald-200"
+                  : "bg-rose-50 border-rose-200"
+              }`}>
+                <span className="block text-[10px] uppercase tracking-wide text-stone-500">
+                  Кассовый баланс
+                </span>
+                <span className={`mt-0.5 block text-sm font-extrabold ${
+                  financialSummary.cashBalance >= 0
+                    ? "text-emerald-900"
+                    : "text-rose-900"
+                }`}>
+                  {financialSummary.cashBalance > 0 ? "+" : ""}
+                  {formatKzt(financialSummary.cashBalance)} ₸
                 </span>
               </div>
             </div>
@@ -606,7 +640,7 @@ export function FactTab({
                 Итого расходов: {expenses.length}
               </span>
               <span className="text-stone-900">
-                {formatKzt(factAllExpensesTotal)} ₸
+                {formatKzt(financialSummary.totalExpenses)} ₸
               </span>
             </div>
           </div>
@@ -759,7 +793,7 @@ export function FactTab({
                 Итого поступлений: {payments.length}
               </span>
               <span className="text-emerald-900">
-                {formatKzt(factPaymentsTotal)} ₸
+                {formatKzt(financialSummary.paymentsTotal)} ₸
               </span>
             </div>
           </div>

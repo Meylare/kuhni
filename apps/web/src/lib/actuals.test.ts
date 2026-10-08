@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlanFactRows,
   computeActualMargin,
+  computeOrderFinancialSummary,
   sumAllExpenses,
   sumExpensesByCategory,
   sumPayments,
@@ -269,3 +270,73 @@ describe("Step A3: Plan/Fact rows and categories (assembly & technolog)", () => 
     expect(technologRow!.plan).toBe(34_440);
   });
 });
+
+describe("Step A4: OrderFinancialSummary (Q4 financial totals and cash balance)", () => {
+  it("calculates profit from contract price and separates cash balance under 50% prepayment", () => {
+    // Contract 800 000, expenses 500 000 (including 50 000 rework), prepayment 400 000
+    const expenses: ActualExpense[] = [
+      makeExpense({ id: "1", amount: 450_000, is_rework: false }),
+      makeExpense({ id: "2", amount: 50_000, is_rework: true, rework_reason: "Брак" }),
+    ];
+    const payments: Payment[] = [
+      makePayment({ id: "1", amount: 400_000 }),
+    ];
+
+    const summary = computeOrderFinancialSummary({
+      contractPrice: 800_000,
+      expenses,
+      payments,
+    });
+
+    expect(summary.contractPrice).toBe(800_000);
+    expect(summary.totalExpenses).toBe(500_000);
+    expect(summary.reworkTotal).toBe(50_000);
+    expect(summary.actualProfit).toBe(300_000); // 800 000 - 500 000
+    expect(summary.profitMarginPct).toBeCloseTo(0.375, 4); // 37.5%
+    expect(summary.paymentsTotal).toBe(400_000);
+    expect(summary.paymentRemaining).toBe(400_000); // 800 000 - 400 000
+    expect(summary.cashBalance).toBe(-100_000); // 400 000 - 500 000
+  });
+
+  it("handles zero payments correctly: shows positive profit from contract and negative cash balance", () => {
+    const expenses: ActualExpense[] = [
+      makeExpense({ id: "1", amount: 200_000 }),
+    ];
+
+    const summary = computeOrderFinancialSummary({
+      contractPrice: 500_000,
+      expenses,
+      payments: [],
+    });
+
+    expect(summary.contractPrice).toBe(500_000);
+    expect(summary.totalExpenses).toBe(200_000);
+    expect(summary.actualProfit).toBe(300_000);
+    expect(summary.profitMarginPct).toBeCloseTo(0.6, 2);
+    expect(summary.paymentsTotal).toBe(0);
+    expect(summary.paymentRemaining).toBe(500_000);
+    expect(summary.cashBalance).toBe(-200_000);
+  });
+
+  it("handles null or undefined contract price safely", () => {
+    const expenses: ActualExpense[] = [
+      makeExpense({ id: "1", amount: 100_000 }),
+    ];
+    const payments: Payment[] = [
+      makePayment({ id: "1", amount: 60_000 }),
+    ];
+
+    const summary = computeOrderFinancialSummary({
+      contractPrice: null,
+      expenses,
+      payments,
+    });
+
+    expect(summary.contractPrice).toBe(0);
+    expect(summary.profitMarginPct).toBeNull();
+    expect(summary.actualProfit).toBe(-100_000);
+    expect(summary.paymentRemaining).toBe(-60_000);
+    expect(summary.cashBalance).toBe(-40_000);
+  });
+});
+

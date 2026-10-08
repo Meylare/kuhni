@@ -87,6 +87,53 @@ export function computeActualMargin(
   return { margin, marginPct };
 }
 
+export interface OrderFinancialSummary {
+  contractPrice: number;
+  totalExpenses: number;        // Все расходы, включая переделки
+  actualProfit: number;         // contractPrice - totalExpenses
+  profitMarginPct: number | null;// actualProfit / contractPrice
+  paymentsTotal: number;        // Всего оплачено клиентом
+  paymentRemaining: number;     // contractPrice - paymentsTotal
+  cashBalance: number;          // paymentsTotal - totalExpenses (касса)
+  reworkTotal: number;          // Из них переделки
+}
+
+/**
+ * Единый расчёт управленческой прибыли и кассового баланса проекта (Q4).
+ * Фактическая прибыль = contractPrice - totalExpenses (включая переделки).
+ * Рентабельность % = actualProfit / contractPrice.
+ * Кассовый баланс = paymentsTotal - totalExpenses.
+ */
+export function computeOrderFinancialSummary(params: {
+  contractPrice: number | null | undefined;
+  expenses: ActualExpense[];
+  payments: Payment[];
+}): OrderFinancialSummary {
+  const contractPrice =
+    params.contractPrice !== null && params.contractPrice !== undefined
+      ? Number(params.contractPrice)
+      : 0;
+
+  const totalExpenses = params.expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const actualProfit = contractPrice - totalExpenses;
+  const profitMarginPct = contractPrice > 0 ? actualProfit / contractPrice : null;
+  const paymentsTotal = sumPayments(params.payments);
+  const paymentRemaining = contractPrice - paymentsTotal;
+  const cashBalance = paymentsTotal - totalExpenses;
+  const reworkTotal = sumReworks(params.expenses);
+
+  return {
+    contractPrice,
+    totalExpenses,
+    actualProfit,
+    profitMarginPct,
+    paymentsTotal,
+    paymentRemaining,
+    cashBalance,
+    reworkTotal,
+  };
+}
+
 export interface PlanFactRow {
   key: string;
   label: string;
