@@ -152,7 +152,6 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   const [customTechnologMode, setCustomTechnologMode] = useState<"default" | "percent" | "per_sheet">("default");
   const [customTechnologPct, setCustomTechnologPct] = useState("");
   const [customRiskReservePct, setCustomRiskReservePct] = useState("");
-  const [customWasteEdgePct, setCustomWasteEdgePct] = useState("");
   const [paramsSaving, setParamsSaving] = useState(false);
 
   // Копирование сводки в буфер
@@ -236,9 +235,6 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       );
       setCustomRiskReservePct(
         typeof s.risk_reserve_pct === "number" ? formatPercent(s.risk_reserve_pct) : ""
-      );
-      setCustomWasteEdgePct(
-        typeof s.waste_edge_pct === "number" ? formatPercent(s.waste_edge_pct) : ""
       );
     } catch (err: unknown) {
       setError(formatErrorMessage(err, "Не удалось загрузить данные заказа."));
@@ -397,9 +393,6 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
       const riskParsed = parsePercent(customRiskReservePct);
       if (riskParsed !== null) newSettings.risk_reserve_pct = riskParsed;
-
-      const wasteParsed = parsePercent(customWasteEdgePct);
-      if (wasteParsed !== null) newSettings.waste_edge_pct = wasteParsed;
 
       const supabase = getSupabase();
       const { data, error: updateErr } = await supabase
