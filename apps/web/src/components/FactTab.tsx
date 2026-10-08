@@ -9,6 +9,7 @@ import {
   validateExpenseInput,
   validatePaymentInput,
 } from "../lib/actuals";
+import { getPlanCalculation } from "../lib/orders";
 import { getSupabase } from "../lib/supabase";
 import {
   ALL_CATEGORIES,
@@ -57,19 +58,18 @@ export function FactTab({
   const [paySaving, setPaySaving] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
 
-  // --- План из последней сохранённой версии расчёта ---
-  const latestCalc = useMemo(() => {
-    if (calculations.length === 0) return null;
-    return [...calculations].sort((a, b) => b.version - a.version)[0] ?? null;
+  // --- План: опорная договорная версия или последняя сохранённая (Step A5, Q3) ---
+  const planCalc = useMemo(() => {
+    return getPlanCalculation(calculations);
   }, [calculations]);
 
   const planFactRows = useMemo(() => {
-    if (!latestCalc) return [];
-    const res = latestCalc.result as Record<string, unknown>;
+    if (!planCalc) return [];
+    const res = planCalc.result as Record<string, unknown>;
     return buildPlanFactRows(res as any, expenses);
-  }, [latestCalc, expenses]);
+  }, [planCalc, expenses]);
 
-  const planCostTotal = latestCalc ? Number(latestCalc.cost_total) : 0;
+  const planCostTotal = planCalc ? Number(planCalc.cost_total) : 0;
 
   // --- Факт: финансовые итоги и кассовый баланс (Step A4, Q4) ---
   const financialSummary = useMemo(() => {
@@ -230,8 +230,16 @@ export function FactTab({
 
       {/* ========== СВОДКА ПЛАН / ФАКТ ========== */}
       <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
-        <h2 className="text-base font-bold text-stone-900">📊 План / Факт</h2>
-        {!latestCalc ? (
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-base font-bold text-stone-900">
+            📊 {planCalc
+              ? planCalc.is_contract_baseline
+                ? `План: версия №${planCalc.version} (договорная)`
+                : `План: версия №${planCalc.version}`
+              : "План / Факт"}
+          </h2>
+        </div>
+        {!planCalc ? (
           <p className="mt-2 text-xs text-stone-500">
             Нет сохранённых версий расчёта. Сохраните расчёт на вкладке «Расчёт», чтобы увидеть сравнение план/факт.
           </p>

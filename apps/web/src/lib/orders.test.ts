@@ -16,6 +16,7 @@ import {
   computePriceUpdatesDiff,
   filterOrders,
   getLatestCalculation,
+  getPlanCalculation,
   getLineCalculationsMap,
   getOrderLineCalculation,
   isOrderLocked,
@@ -1307,6 +1308,44 @@ describe("orders helpers", () => {
       expect(latest?.price_total).toBe(850_000);
       expect(latest?.margin_pct).toBeCloseTo(0.1534, 3);
     });
+
+    it("chooses contract baseline calculation for Plan/Fact when available, or falls back to latest version (Step A5)", () => {
+      // 1. Пустой список расчётов
+      expect(getPlanCalculation([])).toBeNull();
+      expect(getPlanCalculation(null)).toBeNull();
+
+      // 2. Нет договорной версии: выбирается последняя по номеру
+      const calcsWithoutBaseline = [
+        { version: 1, cost_total: 600_000, is_contract_baseline: false },
+        { version: 2, cost_total: 650_000, is_contract_baseline: false },
+      ];
+      const planNoBaseline = getPlanCalculation(calcsWithoutBaseline);
+      expect(planNoBaseline?.version).toBe(2);
+      expect(planNoBaseline?.cost_total).toBe(650_000);
+
+      // 3. Версия 1 отмечена как договорная (is_contract_baseline = true), а версия 2 — новая рабочая
+      // План/Факт должен строго использовать договорную версию 1
+      const calcsWithBaseline = [
+        { version: 1, cost_total: 600_000, is_contract_baseline: true },
+        { version: 2, cost_total: 650_000, is_contract_baseline: false },
+        { version: 3, cost_total: 700_000, is_contract_baseline: false },
+      ];
+      const planWithBaseline = getPlanCalculation(calcsWithBaseline);
+      expect(planWithBaseline?.version).toBe(1);
+      expect(planWithBaseline?.cost_total).toBe(600_000);
+      expect(planWithBaseline?.is_contract_baseline).toBe(true);
+
+      // 4. Договорная версия переключена на версию 3
+      const calcsUpdatedBaseline = [
+        { version: 1, cost_total: 600_000, is_contract_baseline: false },
+        { version: 2, cost_total: 650_000, is_contract_baseline: false },
+        { version: 3, cost_total: 700_000, is_contract_baseline: true },
+      ];
+      const planUpdated = getPlanCalculation(calcsUpdatedBaseline);
+      expect(planUpdated?.version).toBe(3);
+      expect(planUpdated?.cost_total).toBe(700_000);
+    });
   });
 });
+
 

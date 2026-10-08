@@ -38,6 +38,26 @@ export function getLatestCalculation(
 }
 
 /**
+ * Выбирает базовую (опорную) версию расчёта для сравнения План/Факт (Step A5, Q3):
+ * 1. Если есть версия с отметкой договора (is_contract_baseline = true), возвращает её.
+ * 2. Если договорная версия не отмечена, возвращает последнюю сохранённую версию (по номеру версии).
+ * 3. Если версий нет, возвращает null.
+ */
+export function getPlanCalculation<
+  T extends { version: number; is_contract_baseline?: boolean }
+>(calculations: T[] | null | undefined): T | null {
+  if (!calculations || calculations.length === 0) {
+    return null;
+  }
+  const baseline = calculations.find((c) => Boolean(c.is_contract_baseline));
+  if (baseline) {
+    return baseline;
+  }
+  return [...calculations].sort((a, b) => b.version - a.version)[0] ?? null;
+}
+
+
+/**
  * Фильтрация списка заказов по поисковой строке и статусу.
  */
 export function filterOrders(

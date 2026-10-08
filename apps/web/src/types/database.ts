@@ -188,6 +188,7 @@ export interface OrderCalculationSummary {
   price_total: number;
   cost_total: number;
   margin_pct: number | null;
+  is_contract_baseline?: boolean;
   created_at: string;
 }
 

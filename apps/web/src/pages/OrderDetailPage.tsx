@@ -828,6 +828,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         setCalculations((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
         setCalcSaveSuccess(`Версия №${saved.version} успешно сохранена в истории`);
         setTimeout(() => setCalcSaveSuccess(null), 4000);
+      } else {
+        alert("Не удалось сохранить расчёт: сервер не вернул созданную запись.");
       }
     } catch (err: unknown) {
       alert("Ошибка при сохранении расчёта: " + formatErrorMessage(err));
@@ -836,36 +838,27 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     }
   }
 
-  // Назначение версии расчёта как базовой для договора (is_contract_baseline)
+  // Назначение версии расчёта как базовой для договора (is_contract_baseline) - атомарно (Step A5)
   async function handleSetBaseline(calcId: string) {
     if (!order) return;
     try {
       const supabase = getSupabase();
-      // Снимаем отметку со старого базового расчёта
-      await supabase
-        .from("calculations")
-        .update({ is_contract_baseline: false })
-        .eq("order_id", order.id)
-        .eq("is_contract_baseline", true);
+      const { error: rpcErr } = await supabase.rpc("set_contract_baseline", {
+        p_order_id: order.id,
+        p_calc_id: calcId,
+      });
 
-      // Назначаем выбранный
-      const { data, error: updateErr } = await supabase
-        .from("calculations")
-        .update({ is_contract_baseline: true })
-        .eq("id", calcId)
-        .select()
-        .single();
-
-      if (updateErr) {
-        alert("Ошибка назначения базового расчёта: " + formatErrorMessage(updateErr));
-      } else if (data) {
-        setCalculations((prev) =>
-          prev.map((c) => ({
-            ...c,
-            is_contract_baseline: c.id === calcId,
-          }))
-        );
+      if (rpcErr) {
+        alert("Ошибка назначения базового расчёта: " + formatErrorMessage(rpcErr));
+        return;
       }
+
+      setCalculations((prev) =>
+        prev.map((c) => ({
+          ...c,
+          is_contract_baseline: c.id === calcId,
+        }))
+      );
     } catch (err) {
       alert("Ошибка назначения базового расчёта: " + formatErrorMessage(err));
     }
@@ -890,16 +883,23 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             mode: calcMode,
             outcome: calcOutcome,
           });
-          const { data: savedCalc } = await supabase
+          const { data: savedCalc, error: insertErr } = await supabase
             .from("calculations")
             .insert(payload)
             .select()
             .single();
-          if (savedCalc) {
+
+          if (insertErr) {
+            console.error("Ошибка фиксации версии расчёта:", insertErr);
+            alert("Предупреждение: не удалось зафиксировать версию расчёта: " + formatErrorMessage(insertErr));
+            return;
+          } else if (savedCalc) {
             setCalculations((prev) => [savedCalc as OrderCalculation, ...prev]);
           }
-        } catch {
-          // Игнорируем дублирование фиксации
+        } catch (calcErr) {
+          console.error("Ошибка при сохранении версии расчёта:", calcErr);
+          alert("Предупреждение: ошибка сохранения версии: " + formatErrorMessage(calcErr));
+          return;
         }
       }
 
