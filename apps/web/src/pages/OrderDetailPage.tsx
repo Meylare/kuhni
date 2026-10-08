@@ -6,6 +6,7 @@ import { formatErrorMessage } from "../lib/errors";
 import { formatKzt } from "../lib/money";
 import {
   calculateOrderLive,
+  checkOrderLoadCriticalErrors,
   computePriceUpdatesDiff,
   getLineCalculationsMap,
   getOrderLineCalculation,
@@ -14,6 +15,7 @@ import {
   isOrderLocked,
   prepareCalculationSnapshot,
   resolveOrderDisplayCalculation,
+  shouldConfirmCalculationSave,
   validateAdjustmentInput,
   validateManualLineInput,
   validateOrderInput,
@@ -164,10 +166,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   // Обновление цен в заказе из актуального прайса
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
 
+  // Ошибка неполной загрузки данных из-за сети (Step B4)
+  const [networkError, setNetworkError] = useState<string | null>(null);
+
   async function loadOrderData() {
     try {
       setLoading(true);
       setError(null);
+      setNetworkError(null);
       const supabase = getSupabase();
 
       // Загрузка заказа
@@ -195,13 +201,32 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         supabase.from("payments").select("*").eq("order_id", orderId).order("paid_at", { ascending: false }),
       ]);
 
-      if (itemsRes.error) console.error("items error", itemsRes.error);
-      if (linesRes.error) console.error("lines error", linesRes.error);
-      if (adjRes.error) console.error("adjustments error", adjRes.error);
-      if (pricesRes.error) console.error("prices error", pricesRes.error);
-      if (calcsRes.error) console.error("calculations error", calcsRes.error);
-      if (expensesRes.error) console.error("expenses error", expensesRes.error);
-      if (paymentsRes.error) console.error("payments error", paymentsRes.error);
+      const loadStatus = checkOrderLoadCriticalErrors({
+        itemsError: itemsRes.error,
+        linesError: linesRes.error,
+        adjustmentsError: adjRes.error,
+        pricesError: pricesRes.error,
+        parametersError: paramsRes.error,
+        calculationsError: calcsRes.error,
+        expensesError: expensesRes.error,
+        paymentsError: paymentsRes.error,
+      });
+
+      if (loadStatus.hasError) {
+        setNetworkError(loadStatus.errorMessage);
+        console.error("Order data partially failed to load due to network error:", {
+          items: itemsRes.error,
+          lines: linesRes.error,
+          adjustments: adjRes.error,
+          prices: pricesRes.error,
+          parameters: paramsRes.error,
+          calculations: calcsRes.error,
+          expenses: expensesRes.error,
+          payments: paymentsRes.error,
+        });
+      } else {
+        setNetworkError(null);
+      }
 
       setItems((itemsRes.data as OrderItem[]) || []);
       setLines((linesRes.data as OrderLine[]) || []);
@@ -806,9 +831,22 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     }
   }
 
-  // Сохранение новой неизменяемой версии расчёта (U5)
+  // Сохранение новой неизменяемой версии расчёта (U5, Step B4)
   async function handleSaveCalculation() {
-    if (!order || !calcOutcome || !calcOutcome.ok) return;
+    if (!order || !calcOutcome || !calcOutcome.ok || Boolean(networkError)) return;
+
+    // Запретить сохранение расчёта, если в заказе 0 позиций или итоговая цена равна 0, без явного подтверждения (Step B4)
+    const saveCheck = shouldConfirmCalculationSave({
+      linesCount: lines.length,
+      priceTotal: calcOutcome.result.priceTotal,
+    });
+
+    if (saveCheck.needsConfirmation) {
+      const confirmed = window.confirm(
+        `Внимание: ${saveCheck.reason} Вы действительно хотите сохранить этот расчёт в истории?`
+      );
+      if (!confirmed) return;
+    }
 
     try {
       setCalcSaving(true);
@@ -877,7 +915,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
   // Разблокировка заблокированного заказа для создания новой версии (U5)
   async function handleConfirmCreateNewVersion() {
-    if (!order) return;
+    if (!order || Boolean(networkError)) return;
     try {
       setUnlockSaving(true);
       const supabase = getSupabase();
@@ -1111,6 +1149,30 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         </div>
       </div>
 
+      {/* Баннер сетевой ошибки загрузки заказа (Step B4) */}
+      {networkError && (
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border-2 border-rose-300 bg-rose-50 p-4 text-xs text-rose-950 shadow-sm">
+          <div className="flex items-start gap-2.5">
+            <span className="text-xl leading-none">⚠️</span>
+            <div>
+              <strong className="text-sm font-bold text-rose-900 block">
+                {networkError}
+              </strong>
+              <p className="mt-0.5 text-rose-700">
+                Редактирование, добавление позиций и сохранение расчёта заблокированы для предотвращения потери данных.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadOrderData()}
+            className="self-start sm:self-auto min-h-10 whitespace-nowrap rounded-xl bg-rose-800 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-900 active:scale-98 cursor-pointer"
+          >
+            🔄 Повторить загрузку
+          </button>
+        </div>
+      )}
+
       {/* Предупреждение о блокировке (U5) */}
       {locked && (
         <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-xs">
@@ -1224,9 +1286,10 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             {!locked && calcOutcome && calcOutcome.ok && (
               <button
                 type="button"
-                disabled={calcSaving}
+                disabled={calcSaving || Boolean(networkError)}
                 onClick={handleSaveCalculation}
-                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-900 px-4 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 active:scale-98 disabled:opacity-50"
+                className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-900 px-4 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={networkError ? "Сохранение заблокировано из-за сетевой ошибки" : undefined}
               >
                 <span>💾</span>
                 <span>{calcSaving ? "Сохранение…" : "Сохранить текущий расчёт"}</span>
@@ -1250,9 +1313,10 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               {!locked && calcOutcome && calcOutcome.ok && (
                 <button
                   type="button"
-                  disabled={calcSaving}
+                  disabled={calcSaving || Boolean(networkError)}
                   onClick={handleSaveCalculation}
-                  className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-900 px-5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950"
+                  className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-900 px-5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={networkError ? "Сохранение заблокировано из-за сетевой ошибки" : undefined}
                 >
                   <span>💾 Сохранить версию 1</span>
                 </button>
@@ -1570,8 +1634,10 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               {!locked && (
                 <button
                   type="button"
+                  disabled={Boolean(networkError)}
                   onClick={handleOpenAddItem}
-                  className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98"
+                  className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={networkError ? "Действие заблокировано из-за сетевой ошибки" : undefined}
                 >
                   <span>+</span>
                   <span>Добавить изделие</span>
@@ -1654,16 +1720,20 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
+                    disabled={Boolean(networkError)}
                     onClick={handleOpenPricePicker}
-                    className="flex min-h-11 flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-xl bg-emerald-900 px-4 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 active:scale-98"
+                    className="flex min-h-11 flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-xl bg-emerald-900 px-4 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={networkError ? "Действие заблокировано из-за сетевой ошибки" : undefined}
                   >
                     <span>+</span>
                     <span>Из справочника</span>
                   </button>
                   <button
                     type="button"
+                    disabled={Boolean(networkError)}
                     onClick={handleOpenAddManualLine}
-                    className="flex min-h-11 flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3.5 text-xs font-semibold text-stone-800 hover:bg-stone-50 active:scale-98"
+                    className="flex min-h-11 flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3.5 text-xs font-semibold text-stone-800 hover:bg-stone-50 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={networkError ? "Действие заблокировано из-за сетевой ошибки" : undefined}
                   >
                     <span>+</span>
                     <span>Ручная позиция</span>
@@ -1815,8 +1885,10 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               {!locked && (
                 <button
                   type="button"
+                  disabled={Boolean(networkError)}
                   onClick={handleOpenAddAdjustment}
-                  className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98"
+                  className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={networkError ? "Действие заблокировано из-за сетевой ошибки" : undefined}
                 >
                   <span>+</span>
                   <span>{calcMode === "check_contract" ? "Корректировка затрат" : "Корректировка"}</span>
@@ -2041,10 +2113,10 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                     {!locked ? (
                       <button
                         type="button"
-                        disabled={calcSaving}
+                        disabled={calcSaving || Boolean(networkError)}
                         onClick={handleSaveCalculation}
-                        className="min-h-11 rounded-xl bg-emerald-900 px-3.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-950 active:scale-95 disabled:opacity-50"
-                        title="Зафиксировать версию расчёта в базе"
+                        className="min-h-11 rounded-xl bg-emerald-900 px-3.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-950 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={networkError ? "Сохранение заблокировано из-за сетевой ошибки" : "Зафиксировать версию расчёта в базе"}
                       >
                         {calcSaving ? "Сохранение…" : "💾 Сохранить"}
                       </button>

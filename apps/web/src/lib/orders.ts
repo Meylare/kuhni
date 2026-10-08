@@ -694,3 +694,81 @@ export function computePriceUpdatesDiff(
   };
 }
 
+export interface OrderLoadQueryResults {
+  itemsError?: unknown;
+  linesError?: unknown;
+  adjustmentsError?: unknown;
+  pricesError?: unknown;
+  parametersError?: unknown;
+  calculationsError?: unknown;
+  expensesError?: unknown;
+  paymentsError?: unknown;
+}
+
+export const ORDER_LOAD_NETWORK_ERROR_MESSAGE =
+  "Данные заказа загружены не полностью из-за сетевой ошибки. Редактирование заблокировано.";
+
+/**
+ * Проверяет наличие сетевых и серверных ошибок при параллельной загрузке связанных таблиц заказа (Step B4).
+ */
+export function checkOrderLoadCriticalErrors(results: OrderLoadQueryResults): {
+  hasError: boolean;
+  errorMessage: string | null;
+} {
+  const criticalErrors = [
+    results.itemsError,
+    results.linesError,
+    results.adjustmentsError,
+    results.pricesError,
+    results.parametersError,
+    results.calculationsError,
+    results.expensesError,
+    results.paymentsError,
+  ].filter(Boolean);
+
+  if (criticalErrors.length > 0) {
+    return {
+      hasError: true,
+      errorMessage: ORDER_LOAD_NETWORK_ERROR_MESSAGE,
+    };
+  }
+
+  return {
+    hasError: false,
+    errorMessage: null,
+  };
+}
+
+/**
+ * Защита от сохранения пустого расчёта: требует явного подтверждения,
+ * если в заказе 0 позиций или итоговая цена равна 0 (Step B4).
+ */
+export function shouldConfirmCalculationSave(options: {
+  linesCount: number;
+  priceTotal: number;
+}): {
+  needsConfirmation: boolean;
+  reason: string | null;
+} {
+  const hasZeroLines = options.linesCount === 0;
+  const hasZeroPrice = options.priceTotal === 0;
+
+  if (hasZeroLines || hasZeroPrice) {
+    const reason =
+      hasZeroLines && hasZeroPrice
+        ? "В заказе нет позиций и итоговая цена равна 0."
+        : hasZeroLines
+        ? "В заказе нет позиций."
+        : "Итоговая цена заказа равна 0.";
+    return {
+      needsConfirmation: true,
+      reason,
+    };
+  }
+
+  return {
+    needsConfirmation: false,
+    reason: null,
+  };
+}
+
