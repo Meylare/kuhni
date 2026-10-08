@@ -10,6 +10,7 @@ import {
   getLineCalculationsMap,
   getOrderLineCalculation,
   getPlanCalculation,
+  getVisibleAdjustments,
   isOrderLocked,
   prepareCalculationSnapshot,
   resolveOrderDisplayCalculation,
@@ -286,16 +287,17 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     });
   }, [order, items, lines, adjustments, globalParams, calcMode, baseCalcOutcome]);
 
-  // Определение расчёта для отображения в сводке (Step A6, Q2)
+  // Определение расчёта для отображения в сводке (Step A6, A7, Q2, Q7)
   const displayCalc = useMemo(() => {
     if (!order) return null;
     return resolveOrderDisplayCalculation({
       order,
       calculations,
       liveOutcome: calcOutcome,
+      mode: calcMode,
       showLivePreview,
     });
-  }, [order, calculations, calcOutcome, showLivePreview]);
+  }, [order, calculations, calcOutcome, calcMode, showLivePreview]);
 
   // Карта расчётов строк из чистого модуля packages/calc
   const lineCalculationsById = useMemo(() => {
@@ -321,7 +323,17 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     return computePriceUpdatesDiff(lines, priceItemsById);
   }, [lines, priceItemsById]);
 
-  const changedPriceLines = priceDiff.lines;
+  // Переключение режима расчёта (Step A7, Q7)
+  function handleSelectCalcMode(mode: "quote" | "check_contract") {
+    setCalcMode(mode);
+    if (mode === "check_contract") {
+      setAdjKind("cost");
+    }
+    const hasSavedMatching = calculations.some((c) => c.mode === mode);
+    if (!hasSavedMatching && calculations.length > 0) {
+      setShowLivePreview(true);
+    }
+  }
 
   // Открытие редактирования шапки
   function handleOpenEditHeader() {
@@ -950,7 +962,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
   // Добавление корректировки
   function handleOpenAddAdjustment() {
-    setAdjKind("price");
+    setAdjKind(calcMode === "check_contract" ? "cost" : "price");
     setAdjLabel("");
     setAdjAmount("");
     setAdjComment("");
@@ -973,6 +985,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       return;
     }
 
+    const effectiveKind = calcMode === "check_contract" ? "cost" : adjKind;
+
     try {
       setAdjSaving(true);
       setAdjError(null);
@@ -982,7 +996,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .from("adjustments")
         .insert({
           order_id: order.id,
-          kind: adjKind,
+          kind: effectiveKind,
           category: "adjustments",
           label: adjLabel.trim(),
           amount: amountNum,
@@ -1519,7 +1533,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             <div className="flex items-center gap-1 rounded-xl bg-stone-100 p-1">
               <button
                 type="button"
-                onClick={() => setCalcMode("quote")}
+                onClick={() => handleSelectCalcMode("quote")}
                 className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-all ${
                   calcMode === "quote"
                     ? "bg-white text-stone-900 shadow-xs"
@@ -1530,7 +1544,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               </button>
               <button
                 type="button"
-                onClick={() => setCalcMode("check_contract")}
+                onClick={() => handleSelectCalcMode("check_contract")}
                 className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-all ${
                   calcMode === "check_contract"
                     ? "bg-white text-stone-900 shadow-xs"
@@ -1550,10 +1564,10 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           )}
 
           {/* Баннер изменившихся цен в справочнике */}
-          {changedPriceLines.length > 0 && (
+          {priceDiff.lines.length > 0 && (
             <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50/80 p-3 sm:flex-row sm:items-center sm:justify-between text-xs text-amber-900">
               <div>
-                <strong>Внимание:</strong> в справочнике цен изменились цены для {changedPriceLines.length} поз. из этого заказа.
+                <strong>Внимание:</strong> в справочнике цен изменились цены для {priceDiff.lines.length} поз. из этого заказа.
               </div>
               {!locked && (
                 <button
@@ -1814,10 +1828,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-stone-900">
-                  Корректировки ({adjustments.length})
+                  {calcMode === "check_contract"
+                    ? `Корректировки себестоимости (${getVisibleAdjustments(adjustments, calcMode).length})`
+                    : `Корректировки (${adjustments.length})`}
                 </h2>
                 <p className="text-xs text-stone-500">
-                  Скидки клиенту, наценка за срочность, непредвиденные расходы
+                  {calcMode === "check_contract"
+                    ? "Дополнительные затраты (к себестоимости). Скидки к цене в режиме договора скрыты."
+                    : "Скидки клиенту, наценка за срочность, непредвиденные расходы"}
                 </p>
               </div>
 
@@ -1828,18 +1846,20 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                   className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98"
                 >
                   <span>+</span>
-                  <span>Корректировка</span>
+                  <span>{calcMode === "check_contract" ? "Корректировка затрат" : "Корректировка"}</span>
                 </button>
               )}
             </div>
 
-            {adjustments.length === 0 ? (
+            {getVisibleAdjustments(adjustments, calcMode).length === 0 ? (
               <div className="mt-3 rounded-xl border border-dashed border-stone-200 bg-stone-50/50 p-3 text-center text-xs text-stone-400">
-                Корректировок нет
+                {calcMode === "check_contract"
+                  ? "Корректировок себестоимости нет"
+                  : "Корректировок нет"}
               </div>
             ) : (
               <div className="mt-3 flex flex-col gap-1.5">
-                {adjustments.map((adj) => (
+                {getVisibleAdjustments(adjustments, calcMode).map((adj) => (
                   <div
                     key={adj.id}
                     className="flex items-center justify-between rounded-xl border border-stone-100 bg-stone-50 p-2.5 text-xs"
@@ -2824,35 +2844,44 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             )}
 
             <form onSubmit={handleSaveAdjustment} className="mt-3 flex flex-col gap-3 text-xs">
-              <div>
-                <label className="block font-semibold text-stone-700 mb-1">
-                  Тип корректировки
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAdjKind("price")}
-                    className={`min-h-10 rounded-xl font-semibold border ${
-                      adjKind === "price"
-                        ? "bg-emerald-900 text-white border-emerald-900"
-                        : "bg-white text-stone-700 border-stone-300"
-                    }`}
-                  >
-                    К цене (скидка/наценка)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAdjKind("cost")}
-                    className={`min-h-10 rounded-xl font-semibold border ${
-                      adjKind === "cost"
-                        ? "bg-emerald-900 text-white border-emerald-900"
-                        : "bg-white text-stone-700 border-stone-300"
-                    }`}
-                  >
-                    К затратам (себестоимость)
-                  </button>
+              {calcMode === "check_contract" ? (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs text-stone-700">
+                  <div className="font-semibold text-stone-900">Тип: К затратам (себестоимость)</div>
+                  <div className="text-stone-500 text-[11px] mt-0.5">
+                    В режиме «Проверить договор» цена зафиксирована договором, поэтому доступны только корректировки себестоимости.
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="block font-semibold text-stone-700 mb-1">
+                    Тип корректировки
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAdjKind("price")}
+                      className={`min-h-10 rounded-xl font-semibold border ${
+                        adjKind === "price"
+                          ? "bg-emerald-900 text-white border-emerald-900"
+                          : "bg-white text-stone-700 border-stone-300"
+                      }`}
+                    >
+                      К цене (скидка/наценка)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAdjKind("cost")}
+                      className={`min-h-10 rounded-xl font-semibold border ${
+                        adjKind === "cost"
+                          ? "bg-emerald-900 text-white border-emerald-900"
+                          : "bg-white text-stone-700 border-stone-300"
+                      }`}
+                    >
+                      К затратам (себестоимость)
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block font-semibold text-stone-700 mb-1">
@@ -2863,7 +2892,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                   required
                   value={adjLabel}
                   onChange={(e) => setAdjLabel(e.target.value)}
-                  placeholder="Например: Скидка постоянному клиенту"
+                  placeholder={
+                    calcMode === "check_contract"
+                      ? "Например: Дополнительный монтаж"
+                      : "Например: Скидка постоянному клиенту"
+                  }
                   className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
                 />
               </div>
@@ -2871,14 +2904,16 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               <div>
                 <label className="block font-semibold text-stone-700 mb-1">
                   Сумма (₸) <span className="text-rose-600">*</span>
-                  <span className="text-stone-400 font-normal"> (для скидки введите минус: -11000)</span>
+                  {calcMode !== "check_contract" && (
+                    <span className="text-stone-400 font-normal"> (для скидки введите минус: -11000)</span>
+                  )}
                 </label>
                 <input
                   type="text"
                   required
                   value={adjAmount}
                   onChange={(e) => setAdjAmount(e.target.value)}
-                  placeholder="-10 000 или 25 000"
+                  placeholder={calcMode === "check_contract" ? "25 000" : "-10 000 или 25 000"}
                   className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
                 />
               </div>

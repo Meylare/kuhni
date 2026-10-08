@@ -17,6 +17,7 @@ import {
   filterOrders,
   getLatestCalculation,
   getPlanCalculation,
+  getVisibleAdjustments,
   resolveOrderDisplayCalculation,
   getLineCalculationsMap,
   getOrderLineCalculation,
@@ -1460,6 +1461,91 @@ describe("orders helpers", () => {
 
       expect(displayNewOrder?.source).toBe("live");
       expect(displayNewOrder?.priceTotal).toBe(980_000);
+    });
+
+    it("simplifies check_contract mode by hiding price adjustments and strictly using contract price (Step A7, Q7)", () => {
+      const adjustments: OrderAdjustment[] = [
+        {
+          id: "adj-1",
+          order_id: "ord-1",
+          kind: "price",
+          category: "adjustments",
+          label: "Скидка клиенту",
+          amount: -50_000,
+          comment: "Сезонная скидка",
+        },
+        {
+          id: "adj-2",
+          order_id: "ord-1",
+          kind: "cost",
+          category: "adjustments",
+          label: "Сложный занос на 9 этаж",
+          amount: 20_000,
+          comment: "Дополнительные грузчики",
+        },
+      ];
+
+      // 1. В режиме "quote" видны все корректировки (и скидки к цене, и затраты)
+      const quoteAdjustments = getVisibleAdjustments(adjustments, "quote");
+      expect(quoteAdjustments).toHaveLength(2);
+      expect(quoteAdjustments.map((a) => a.kind)).toEqual(["price", "cost"]);
+
+      // 2. В режиме "check_contract" ценовые скидки скрываются, остаются только корректировки себестоимости
+      const checkContractAdjustments = getVisibleAdjustments(adjustments, "check_contract");
+      expect(checkContractAdjustments).toHaveLength(1);
+      expect(checkContractAdjustments[0].id).toBe("adj-2");
+      expect(checkContractAdjustments[0].kind).toBe("cost");
+
+      // 3. Итоговая цена в режиме "check_contract" строго равна цене договора
+      const orderWithContract: Order = {
+        id: "ord-1",
+        name: "Кухня по договору",
+        client_label: "Алия",
+        status: "approved",
+        contract_price: 850_000,
+        settings: {},
+        note: null,
+        created_at: "2026-10-01T10:00:00Z",
+        updated_at: "2026-10-01T10:00:00Z",
+      };
+
+      const liveCheckContract: any = {
+        ok: true,
+        mode: "check_contract",
+        result: {
+          priceTotal: 850_000,
+          costTotal: 706_025,
+          margin: 143_975,
+          marginPct: 0.1694,
+          fixedCost: 200_000,
+          minPriceForTargetMargin: 861_000,
+          categoryTotals: {
+            materials: 100_000,
+            workshop: 50_000,
+            facades: 150_000,
+            hardware: 40_000,
+            transport: 25_000,
+            labor: 80_000,
+            other: 0,
+            adjustments: 20_000,
+          },
+          assembly: 124_845,
+          technolog: 34_440,
+          riskReserve: 14_000,
+          warnings: ["договор ниже минимальной цены 861 000"],
+          lineCalculations: [],
+        },
+      };
+
+      const displayContract = resolveOrderDisplayCalculation({
+        order: orderWithContract,
+        calculations: [],
+        liveOutcome: liveCheckContract,
+        mode: "check_contract",
+      });
+
+      expect(displayContract?.priceTotal).toBe(850_000);
+      expect(displayContract?.warnings).toContain("договор ниже минимальной цены 861 000");
     });
   });
 });

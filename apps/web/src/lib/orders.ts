@@ -61,6 +61,7 @@ export interface ResolveOrderDisplayOptions {
   order: Order;
   calculations: OrderCalculation[];
   liveOutcome: CalculationOutcome | null;
+  mode?: "quote" | "check_contract";
   showLivePreview?: boolean;
 }
 
@@ -84,6 +85,21 @@ export interface OrderDisplayCalculation {
 }
 
 /**
+ * В режиме "check_contract" ценовые скидки (kind = 'price') скрываются из интерфейса,
+ * так как итоговая цена берётся строго из поля договора (Step A7, Q7).
+ * Корректировки себестоимости (kind = 'cost') остаются доступными.
+ */
+export function getVisibleAdjustments(
+  adjustments: OrderAdjustment[],
+  mode: "quote" | "check_contract",
+): OrderAdjustment[] {
+  if (mode === "check_contract") {
+    return adjustments.filter((a) => a.kind === "cost");
+  }
+  return adjustments;
+}
+
+/**
  * Определяет расчёт для отображения в сводке заказа (Step A6, Q2):
  * - Если у заказа есть сохранённые версии и не включён предпросмотр (showLivePreview = false),
  *   возвращает данные опорной сохранённой версии (договорной или последней по номеру).
@@ -94,13 +110,19 @@ export interface OrderDisplayCalculation {
 export function resolveOrderDisplayCalculation(
   options: ResolveOrderDisplayOptions,
 ): OrderDisplayCalculation | null {
-  const { calculations, liveOutcome, showLivePreview } = options;
-  const activeSaved = getPlanCalculation(calculations);
+  const { calculations, liveOutcome, showLivePreview, mode } = options;
+  const candidateCalcs = mode ? calculations.filter((c) => c.mode === mode) : calculations;
+  const activeSaved = getPlanCalculation(candidateCalcs);
 
   if (activeSaved && !showLivePreview) {
     const res = (activeSaved.result || {}) as Record<string, unknown>;
     const catTotals = (res.categoryTotals || res.category_totals || {}) as Record<string, number>;
-    const priceTotal = Number(activeSaved.price_total ?? res.priceTotal ?? 0);
+    const rawPriceTotal = Number(activeSaved.price_total ?? res.priceTotal ?? 0);
+    const priceTotal =
+      (mode === "check_contract" || activeSaved.mode === "check_contract") &&
+      options.order.contract_price !== null
+        ? Number(options.order.contract_price)
+        : rawPriceTotal;
     const costTotal = Number(activeSaved.cost_total ?? res.costTotal ?? 0);
     const margin = typeof res.margin === "number" ? res.margin : priceTotal - costTotal;
     const marginPct =
@@ -138,8 +160,8 @@ export function resolveOrderDisplayCalculation(
         hardware: Number(catTotals.hardware ?? 0),
         transport: Number(catTotals.transport ?? 0),
         labor: Number(catTotals.labor ?? 0),
-        assembly: Number(catTotals.assembly ?? 0),
-        technolog: Number(catTotals.technolog ?? 0),
+        assembly: Number(catTotals.assembly ?? assembly),
+        technolog: Number(catTotals.technolog ?? technolog),
         other: Number(catTotals.other ?? 0),
         adjustments: Number(catTotals.adjustments ?? 0),
       },
@@ -152,12 +174,16 @@ export function resolveOrderDisplayCalculation(
 
   if (liveOutcome && liveOutcome.ok) {
     const res = liveOutcome.result;
+    const priceTotal =
+      mode === "check_contract" && options.order.contract_price !== null
+        ? Number(options.order.contract_price)
+        : res.priceTotal;
     return {
       source: "live",
       version: null,
       createdAt: null,
       isContractBaseline: false,
-      priceTotal: res.priceTotal,
+      priceTotal,
       costTotal: res.costTotal,
       margin: res.margin,
       marginPct: res.marginPct,
