@@ -274,6 +274,105 @@ describe("calculateLine", () => {
       total: 70_000,
     });
   });
+
+  it("avoids IEEE-754 precision bug giving extra unit for 50, 90, 100 with 10% waste and ceil_to_unit", () => {
+    const l50 = calculateLine({
+      category: "materials",
+      qty: 50,
+      unitPrice: 100,
+      wastePct: 0.1,
+      billableQtyRounding: "ceil_to_unit",
+    });
+    const l90 = calculateLine({
+      category: "materials",
+      qty: 90,
+      unitPrice: 100,
+      wastePct: 0.1,
+      billableQtyRounding: "ceil_to_unit",
+    });
+    const l100 = calculateLine({
+      category: "materials",
+      qty: 100,
+      unitPrice: 100,
+      wastePct: 0.1,
+      billableQtyRounding: "ceil_to_unit",
+    });
+
+    expect(l50.billableQty).toBe(55);
+    expect(l90.billableQty).toBe(99);
+    expect(l100.billableQty).toBe(110);
+  });
+});
+
+describe("calculate input validation", () => {
+  it("returns invalid_input when priceRounding <= 0 or not finite", () => {
+    const outcomeZero = calculate({
+      ...exampleInput,
+      parameters: { ...defaultParameters, priceRounding: 0 },
+    });
+    expect(outcomeZero.ok).toBe(false);
+    if (!outcomeZero.ok) {
+      expect(outcomeZero.error).toBe("invalid_input");
+      expect((outcomeZero as any).details).toBeDefined();
+    }
+
+    const outcomeNeg = calculate({
+      ...exampleInput,
+      parameters: { ...defaultParameters, priceRounding: -100 },
+    });
+    expect(outcomeNeg.ok).toBe(false);
+    if (!outcomeNeg.ok) {
+      expect(outcomeNeg.error).toBe("invalid_input");
+    }
+  });
+
+  it("returns invalid_input when negative quantities, negative prices, or NaN are passed", () => {
+    const outcomeNaN = calculate({
+      ...exampleInput,
+      lines: [
+        { category: "materials", qty: NaN, unitPrice: 100, wastePct: 0, billableQtyRounding: "none" },
+      ],
+    });
+    expect(outcomeNaN.ok).toBe(false);
+    if (!outcomeNaN.ok) {
+      expect(outcomeNaN.error).toBe("invalid_input");
+      expect((outcomeNaN as any).details?.length).toBeGreaterThan(0);
+    }
+
+    const outcomeNegQty = calculate({
+      ...exampleInput,
+      lines: [
+        { category: "materials", qty: -5, unitPrice: 100, wastePct: 0, billableQtyRounding: "none" },
+      ],
+    });
+    expect(outcomeNegQty.ok).toBe(false);
+    if (!outcomeNegQty.ok) {
+      expect(outcomeNegQty.error).toBe("invalid_input");
+    }
+
+    const outcomeNegPrice = calculate({
+      ...exampleInput,
+      lines: [
+        { category: "materials", qty: 5, unitPrice: -100, wastePct: 0, billableQtyRounding: "none" },
+      ],
+    });
+    expect(outcomeNegPrice.ok).toBe(false);
+    if (!outcomeNegPrice.ok) {
+      expect(outcomeNegPrice.error).toBe("invalid_input");
+    }
+  });
+
+  it("returns invalid_input when negative contractPrice is passed", () => {
+    const outcome = calculate({
+      ...exampleInput,
+      mode: "check_contract",
+      contractPrice: -500_000,
+    });
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.error).toBe("invalid_input");
+    }
+  });
 });
 
 describe("calculatePriceDenominator", () => {

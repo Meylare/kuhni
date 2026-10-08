@@ -79,6 +79,7 @@ export interface CalculationResult {
 
 export type CalculationOutcome =
   | { ok: true; result: CalculationResult }
+  | { ok: false; error: "invalid_input"; details: string[] }
   | { ok: false; error: "parameters_leave_no_share_for_fixed_costs" | "contract_price_required" };
 
 export interface CalculationSnapshotLine extends CalculationLine {
@@ -129,7 +130,7 @@ export interface CalculationVersion {
 
 export type CalculationVersionOutcome =
   | { ok: true; version: CalculationVersion }
-  | { ok: false; error: Extract<CalculationOutcome, { ok: false }>["error"] };
+  | Extract<CalculationOutcome, { ok: false }>;
 
 const categories: readonly CostCategory[] = [
   "materials",
@@ -164,7 +165,12 @@ function formatKzt(value: number): string {
 export function calculateLine(line: CalculationLine): LineCalculation {
   const qtyWithWaste = line.qty * (1 + line.wastePct);
   const billableQty =
-    line.billableQtyRounding === "ceil_to_unit" ? Math.ceil(qtyWithWaste) : qtyWithWaste;
+    line.billableQtyRounding === "ceil_to_unit"
+      ? (() => {
+          const rounded = Math.ceil(qtyWithWaste - floatingPointTolerance(qtyWithWaste));
+          return rounded === 0 ? 0 : rounded;
+        })()
+      : qtyWithWaste;
 
   return {
     ...(line.id === undefined ? {} : { id: line.id }),
@@ -209,9 +215,10 @@ function fixedTechnologCost(
 export function calculatePriceDenominator(parameters: CalculationParameters): number {
   const assemblyPct = parameters.assemblyMode === "percent" ? parameters.assemblyPct : 0;
   const technologPct = parameters.technologMode === "percent" ? parameters.technologPct : 0;
-  return (
-    1 - parameters.targetMarginPct - assemblyPct - technologPct - parameters.riskReservePct
-  );
+  const sumRates =
+    parameters.targetMarginPct + assemblyPct + technologPct + parameters.riskReservePct;
+  const denominator = 1 - sumRates;
+  return Math.abs(denominator) < floatingPointTolerance(1) && sumRates >= 1 ? 0 : denominator;
 }
 
 function minimumPrice(
@@ -224,11 +231,88 @@ function minimumPrice(
   return roundHalfUp(fixedCost / denominator, parameters.priceRounding);
 }
 
+export function validateCalculationInput(input: CalculationInput): string[] {
+  const details: string[] = [];
+
+  const params = input.parameters;
+  if (!params) {
+    details.push("parameters are required");
+    return details;
+  }
+
+  if (!Number.isFinite(params.priceRounding) || params.priceRounding <= 0) {
+    details.push("parameters.priceRounding must be a positive finite number");
+  }
+  if (!Number.isFinite(params.targetMarginPct)) {
+    details.push("parameters.targetMarginPct must be a finite number");
+  }
+  if (!Number.isFinite(params.assemblyPct)) {
+    details.push("parameters.assemblyPct must be a finite number");
+  }
+  if (!Number.isFinite(params.assemblyPerMeterKitchen) || params.assemblyPerMeterKitchen < 0) {
+    details.push("parameters.assemblyPerMeterKitchen must be a non-negative finite number");
+  }
+  if (!Number.isFinite(params.assemblyPerMeterWardrobe) || params.assemblyPerMeterWardrobe < 0) {
+    details.push("parameters.assemblyPerMeterWardrobe must be a non-negative finite number");
+  }
+  if (!Number.isFinite(params.technologPct)) {
+    details.push("parameters.technologPct must be a finite number");
+  }
+  if (!Number.isFinite(params.technologPerSheet) || params.technologPerSheet < 0) {
+    details.push("parameters.technologPerSheet must be a non-negative finite number");
+  }
+  if (!Number.isFinite(params.riskReservePct)) {
+    details.push("parameters.riskReservePct must be a finite number");
+  }
+
+  if (input.contractPrice !== undefined) {
+    if (!Number.isFinite(input.contractPrice)) {
+      details.push("contractPrice must be a finite number");
+    } else if (input.contractPrice < 0) {
+      details.push("contractPrice cannot be negative");
+    }
+  }
+
+  input.lines?.forEach((line, index) => {
+    if (!Number.isFinite(line.qty) || line.qty < 0) {
+      details.push(`lines[${index}].qty must be a non-negative finite number`);
+    }
+    if (!Number.isFinite(line.unitPrice) || line.unitPrice < 0) {
+      details.push(`lines[${index}].unitPrice must be a non-negative finite number`);
+    }
+    if (!Number.isFinite(line.wastePct) || line.wastePct < 0) {
+      details.push(`lines[${index}].wastePct must be a non-negative finite number`);
+    }
+  });
+
+  input.orderItems?.forEach((item, index) => {
+    if (
+      item.linearMeters !== undefined &&
+      (!Number.isFinite(item.linearMeters) || item.linearMeters < 0)
+    ) {
+      details.push(`orderItems[${index}].linearMeters must be a non-negative finite number`);
+    }
+  });
+
+  input.adjustments?.forEach((adjustment, index) => {
+    if (!Number.isFinite(adjustment.amount)) {
+      details.push(`adjustments[${index}].amount must be a finite number`);
+    }
+  });
+
+  return details;
+}
+
 /**
  * Calculates a quote or checks a contract using only the supplied snapshots.
  * It deliberately has no database, clock, or network dependency.
  */
 export function calculate(input: CalculationInput): CalculationOutcome {
+  const validationErrors = validateCalculationInput(input);
+  if (validationErrors.length > 0) {
+    return { ok: false, error: "invalid_input", details: validationErrors };
+  }
+
   const parameters = input.parameters;
   const categoryTotals = Object.fromEntries(
     [...categories, "adjustments"].map((category) => [category, 0]),
