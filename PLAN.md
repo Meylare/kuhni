@@ -139,3 +139,25 @@
   - Уточнено условие возврата `parameters_leave_no_share_for_fixed_costs` при сумме процентных ставок $\ge 100\%$ (знаменатель $\le 0$).
   - Все 19 тестов `@kuhni/calc` и 53 теста `@kuhni/web` (всего 72 теста) проходят успешно.
 
+### Шаг A3. Категории «Сборка» и «Технолог» в БД и План/Факте
+* **Результат 2026-10-08 (коммит `f661ccf`):**
+  - Разработка по TDD: в `apps/web/src/lib/actuals.test.ts` добавлен тест формирования 11 строк «План/Факт» и сверки суммы строк с `cost_total` (706 025 ₸).
+  - Создана миграция `supabase/migrations/20261008163000_007_add_assembly_and_technolog_to_actual_expenses.sql`, расширившая `CHECK (category IN (...))` для `actual_expenses` категориями `'assembly'` и `'technolog'`.
+  - В `apps/web/src/types/database.ts` добавлены категории `'assembly'` и `'technolog'` в `PriceCategory`, `CATEGORY_LABELS` и `ALL_CATEGORIES`.
+  - В `apps/web/src/lib/actuals.ts` реализована функция `buildPlanFactRows`, объединяющая все статьи плана (включая Сборку, Технолога, Резерв на риск и Корректировки).
+  - В `apps/web/src/components/FactTab.tsx` форма добавления расхода дополнена новыми категориями, а таблица «План/Факт» переведена на отображение всех 11 статей сметы, сумма которых строго равна `cost_total`.
+
+### Шаг A4. Единый расчёт прибыли и кассовых остатков
+* **Результат 2026-10-08 (коммит `9b1db72`):**
+  - Разработка по TDD: в `apps/web/src/lib/actuals.test.ts` добавлены тесты на частичную оплату (50% предоплата), нулевую оплату и переделки.
+  - В `apps/web/src/lib/actuals.ts` реализована чистая функция `computeOrderFinancialSummary` с интерфейсом `OrderFinancialSummary`:
+    - `actualProfit = contractPrice - totalExpenses` (где `totalExpenses` включает переделки).
+    - `profitMarginPct = actualProfit / contractPrice`.
+    - `cashBalance = paymentsTotal - totalExpenses` (касса).
+    - `paymentRemaining = contractPrice - paymentsTotal`.
+  - В `apps/web/src/components/FactTab.tsx`:
+    - Карточки переведены на использование `financialSummary`: «Договор», «Оплачено клиентом», «Остаток долга», «Фактическая прибыль», «Кассовый баланс».
+    - Под таблицей выводится информационная плашка *«из них переделки: X ₸»*.
+  - Создана миграция `supabase/migrations/20261008164000_008_update_v_accounting_export.sql`, обновляющая представление `v_accounting_export` категориями сборки и технолога, и приводящая расчёт прибыли к прозрачной формуле `contract_price - actual_expenses_total`.
+  - Все 77 тестов проходят успешно (`npm test`), проект собирается без ошибок (`npm run build`).
+
