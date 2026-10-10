@@ -18,6 +18,7 @@ export interface LinesSectionProps {
   onOpenAddManualLine: () => void;
   onOpenEditLine: (line: OrderLine) => void;
   onDeleteLine: (id: string) => void;
+  onStepLineQty?: (lineId: string, delta: number) => void;
 }
 
 export function LinesSection({
@@ -31,6 +32,7 @@ export function LinesSection({
   onOpenAddManualLine,
   onOpenEditLine,
   onDeleteLine,
+  onStepLineQty,
 }: LinesSectionProps) {
   return (
     <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
@@ -136,12 +138,37 @@ export function LinesSection({
                             )}
                           </div>
 
-                          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
-                            <span>
-                              {line.qty} {line.unit} × {formatKzt(line.unit_price)} ₸
-                            </span>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
+                            {!locked && onStepLineQty ? (
+                              <div className="flex items-center gap-1 rounded-lg border border-stone-200 bg-white p-0.5 shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() => onStepLineQty(line.id, -1)}
+                                  className="flex min-h-7 min-w-7 sm:min-h-6 sm:min-w-6 items-center justify-center rounded-md bg-stone-100 text-xs font-bold text-stone-800 hover:bg-stone-200 active:scale-95"
+                                  title="Уменьшить"
+                                >
+                                  −
+                                </button>
+                                <span className="font-bold text-stone-900 px-1 text-xs">
+                                  {line.qty} {line.unit}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => onStepLineQty(line.id, 1)}
+                                  className="flex min-h-7 min-w-7 sm:min-h-6 sm:min-w-6 items-center justify-center rounded-md bg-emerald-900 text-xs font-bold text-white hover:bg-emerald-950 active:scale-95"
+                                  title="Увеличить"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <span>
+                                {line.qty} {line.unit}
+                              </span>
+                            )}
+                            <span>× {formatKzt(line.unit_price)} ₸</span>
                             {line.billable_qty_rounding === "ceil_to_unit" && (
-                              <span>(округление до целого: {billableQty} {line.unit})</span>
+                              <span>(округление: {billableQty} {line.unit})</span>
                             )}
                             {line.comment && (
                               <span className="italic text-stone-400 truncate max-w-[200px]">
@@ -167,7 +194,7 @@ export function LinesSection({
                               <button
                                 type="button"
                                 onClick={() => onOpenEditLine(line)}
-                                className="p-1 text-stone-400 hover:text-stone-700"
+                                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-1 text-stone-400 hover:text-stone-700 hover:bg-stone-200/50"
                                 title="Редактировать"
                               >
                                 ✎
@@ -175,7 +202,7 @@ export function LinesSection({
                               <button
                                 type="button"
                                 onClick={() => onDeleteLine(line.id)}
-                                className="p-1 text-rose-400 hover:text-rose-700"
+                                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-1 text-rose-400 hover:text-rose-700 hover:bg-rose-50"
                                 title="Удалить"
                               >
                                 🗑

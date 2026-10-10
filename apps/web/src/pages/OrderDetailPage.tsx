@@ -224,6 +224,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             onOpenAddManualLine={orderLines.handleOpenAddManualLine}
             onOpenEditLine={orderLines.handleOpenEditLine}
             onDeleteLine={(id) => void orderLines.handleDeleteLine(id)}
+            onStepLineQty={orderLines.handleStepLineQty}
           />
 
           <AdjustmentsSection

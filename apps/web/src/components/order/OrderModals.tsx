@@ -70,21 +70,25 @@ export function OrderModals({
       <PricePickerModal
         isOpen={orderLines.isPricePickerOpen}
         onClose={() => orderLines.setIsPricePickerOpen(false)}
-        selectedPriceItem={orderLines.selectedPriceItem}
-        setSelectedPriceItem={orderLines.setSelectedPriceItem}
         pickerSearch={orderLines.pickerSearch}
         setPickerSearch={orderLines.setPickerSearch}
         pickerCategory={orderLines.pickerCategory}
         setPickerCategory={orderLines.setPickerCategory}
         filteredCatalogItems={orderLines.filteredCatalogItems}
+        recentPriceItems={orderLines.recentPriceItems}
+        lines={orderData.lines}
+        items={orderData.items}
+        pickerItemId={orderLines.pickerItemId}
+        setPickerItemId={orderLines.setPickerItemId}
+        onStepPriceItem={orderLines.handleStepPriceItem}
+        addedItemsCount={orderLines.addedItemsCount}
+        selectedPriceItem={orderLines.selectedPriceItem}
+        setSelectedPriceItem={orderLines.setSelectedPriceItem}
         handleSelectPriceItem={orderLines.handleSelectPriceItem}
         pickerQty={orderLines.pickerQty}
         setPickerQty={orderLines.setPickerQty}
         pickerWaste={orderLines.pickerWaste}
         setPickerWaste={orderLines.setPickerWaste}
-        pickerItemId={orderLines.pickerItemId}
-        setPickerItemId={orderLines.setPickerItemId}
-        items={orderData.items}
         pickerComment={orderLines.pickerComment}
         setPickerComment={orderLines.setPickerComment}
         pickerSaving={orderLines.pickerSaving}
