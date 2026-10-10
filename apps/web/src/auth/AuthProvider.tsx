@@ -10,6 +10,7 @@ import type { Session } from "@supabase/supabase-js";
 
 import { getPublicSupabaseConfig } from "../lib/config";
 import { getSupabase } from "../lib/supabase";
+import { clearAllCaches } from "../lib/cache";
 
 type AuthContextValue = {
   session: Session | null;
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       signOut: async () => {
         await getSupabase().auth.signOut();
+        await clearAllCaches();
       },
     }),
     [config, loading, session],

@@ -99,9 +99,37 @@ function Gate() {
 }
 
 export default function App() {
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+
+  useEffect(() => {
+    function handleOnline() {
+      setIsOnline(true);
+    }
+    function handleOffline() {
+      setIsOnline(false);
+    }
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   return (
     <ErrorBoundary>
       <AuthProvider>
+        {!isOnline && (
+          <div
+            role="status"
+            className="bg-amber-600 text-white text-xs sm:text-sm font-medium py-1.5 px-4 text-center sticky top-0 z-50 shadow-sm flex items-center justify-center gap-2"
+          >
+            <span>⚠️</span>
+            <span>Нет подключения к сети. Работа в автономном режиме.</span>
+          </div>
+        )}
         <Gate />
       </AuthProvider>
     </ErrorBoundary>
