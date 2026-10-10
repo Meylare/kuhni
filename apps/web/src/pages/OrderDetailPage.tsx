@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import { FactTab } from "../components/FactTab";
 import { useDialog } from "../components/DialogProvider";
+import {
+  AdjustmentModal,
+  ItemModal,
+  ManualLineModal,
+  PriceDiffModal,
+  PricePickerModal,
+  UnlockModal,
+} from "../components/order/modals";
 
 import { MAX_PRICE_SHARES_SUM } from "@kuhni/calc";
 import { formatErrorMessage } from "../lib/errors";
@@ -39,11 +47,9 @@ import {
   ALL_CATEGORIES,
   CATEGORY_LABELS,
   ORDER_ITEM_KIND_LABELS,
-  ORDER_ITEM_KINDS,
   ORDER_STATUS_COLORS,
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
-  PRICE_UNITS,
   type ActualExpense,
   type BillableQtyRounding,
   type Order,
@@ -2477,777 +2483,111 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           </div>
         </div>
       )}
+      {/* МОДАЛКИ (U0) */}
+      <ItemModal
+        isOpen={isItemModalOpen}
+        onClose={() => setIsItemModalOpen(false)}
+        editingItem={editingItem}
+        itemKind={itemKind}
+        setItemKind={setItemKind}
+        itemTitle={itemTitle}
+        setItemTitle={setItemTitle}
+        itemMeters={itemMeters}
+        setItemMeters={setItemMeters}
+        itemDesc={itemDesc}
+        setItemDesc={setItemDesc}
+        itemError={itemError}
+        itemSaving={itemSaving}
+        onSave={handleSaveItem}
+      />
 
-      {/* МОДАЛКА 2: ИЗДЕЛИЕ (КУХНЯ, ШКАФ) */}
-      {isItemModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h3 className="text-base font-bold text-stone-900">
-                {editingItem ? "Редактировать изделие" : "Новое изделие"}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsItemModalOpen(false)}
-                className="text-stone-400 hover:text-stone-600 text-lg p-1"
-              >
-                ✕
-              </button>
-            </div>
+      <PricePickerModal
+        isOpen={isPricePickerOpen}
+        onClose={() => setIsPricePickerOpen(false)}
+        selectedPriceItem={selectedPriceItem}
+        setSelectedPriceItem={setSelectedPriceItem}
+        pickerSearch={pickerSearch}
+        setPickerSearch={setPickerSearch}
+        pickerCategory={pickerCategory}
+        setPickerCategory={setPickerCategory}
+        filteredCatalogItems={filteredCatalogItems}
+        handleSelectPriceItem={handleSelectPriceItem}
+        pickerQty={pickerQty}
+        setPickerQty={setPickerQty}
+        pickerWaste={pickerWaste}
+        setPickerWaste={setPickerWaste}
+        items={items}
+        pickerItemId={pickerItemId}
+        setPickerItemId={setPickerItemId}
+        pickerComment={pickerComment}
+        setPickerComment={setPickerComment}
+        pickerError={pickerError}
+        pickerSaving={pickerSaving}
+        onAdd={handleAddPriceItemToOrder}
+      />
 
-            {itemError && (
-              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
-                {itemError}
-              </div>
-            )}
+      <ManualLineModal
+        isOpen={isManualLineModalOpen}
+        onClose={() => setIsManualLineModalOpen(false)}
+        editingLine={editingLine}
+        manualCategory={manualCategory}
+        setManualCategory={setManualCategory}
+        manualName={manualName}
+        setManualName={setManualName}
+        manualUnit={manualUnit}
+        setManualUnit={setManualUnit}
+        manualUnitPrice={manualUnitPrice}
+        setManualUnitPrice={setManualUnitPrice}
+        manualQty={manualQty}
+        setManualQty={setManualQty}
+        manualWaste={manualWaste}
+        setManualWaste={setManualWaste}
+        manualTechnolog={manualTechnolog}
+        setManualTechnolog={setManualTechnolog}
+        manualRounding={manualRounding}
+        setManualRounding={setManualRounding}
+        items={items}
+        manualItemId={manualItemId}
+        setManualItemId={setManualItemId}
+        manualComment={manualComment}
+        setManualComment={setManualComment}
+        manualError={manualError}
+        manualSaving={manualSaving}
+        onSave={handleSaveManualLine}
+      />
 
-            <form onSubmit={handleSaveItem} className="mt-3 flex flex-col gap-3 text-xs">
-              <div>
-                <label className="block font-semibold text-stone-700 mb-1">
-                  Тип изделия
-                </label>
-                <select
-                  value={itemKind}
-                  onChange={(e) => setItemKind(e.target.value as OrderItemKind)}
-                  className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                >
-                  {ORDER_ITEM_KINDS.map((k) => (
-                    <option key={k} value={k}>
-                      {ORDER_ITEM_KIND_LABELS[k]}
-                    </option>
-                  ))}
-                </select>
-              </div>
+      <AdjustmentModal
+        isOpen={isAdjustmentModalOpen}
+        onClose={() => setIsAdjustmentModalOpen(false)}
+        calcMode={calcMode}
+        adjKind={adjKind}
+        setAdjKind={setAdjKind}
+        adjLabel={adjLabel}
+        setAdjLabel={setAdjLabel}
+        adjAmount={adjAmount}
+        setAdjAmount={setAdjAmount}
+        adjComment={adjComment}
+        setAdjComment={setAdjComment}
+        adjError={adjError}
+        adjSaving={adjSaving}
+        onSave={handleSaveAdjustment}
+      />
 
-              <div>
-                <label className="block font-semibold text-stone-700 mb-1">
-                  Название изделия <span className="text-rose-600">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={itemTitle}
-                  onChange={(e) => setItemTitle(e.target.value)}
-                  placeholder="Например: Кухня угловая"
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                />
-              </div>
+      <PriceDiffModal
+        isOpen={isPriceDiffModalOpen}
+        onClose={() => setIsPriceDiffModalOpen(false)}
+        priceDiff={priceDiff}
+        isUpdating={isUpdatingPrices}
+        onConfirm={handleConfirmPriceUpdates}
+      />
 
-              {itemKind !== "other" && (
-                <div>
-                  <label className="block font-semibold text-stone-700 mb-1">
-                    Погонные метры (м)
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={itemMeters}
-                    onChange={(e) => setItemMeters(e.target.value)}
-                    placeholder="3.0"
-                    className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block font-semibold text-stone-700 mb-1">
-                  Описание / габариты
-                </label>
-                <input
-                  type="text"
-                  value={itemDesc}
-                  onChange={(e) => setItemDesc(e.target.value)}
-                  placeholder="2400 × 600 × 850"
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                />
-              </div>
-
-              <div className="mt-2 flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsItemModalOpen(false)}
-                  disabled={itemSaving}
-                  className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={itemSaving}
-                  className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
-                >
-                  {itemSaving ? "Сохранение…" : "Сохранить"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* МОДАЛКА 3: ВЫБОР ПОЗИЦИИ ИЗ СПРАВОЧНИКА ЦЕН (ПОЛНОЭКРАННАЯ НА МОБИЛЬНЫХ) */}
-      {isPricePickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-xs p-0 sm:p-4">
-          <div className="flex h-full w-full sm:h-auto sm:max-h-[85vh] sm:max-w-2xl flex-col rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-4 sm:p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <div>
-                <h3 className="text-base font-bold text-stone-900">
-                  Выбор из справочника цен
-                </h3>
-                <p className="text-xs text-stone-500">
-                  {selectedPriceItem
-                    ? `Выбрано: ${selectedPriceItem.name}`
-                    : "Выберите позицию для добавления в заказ"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPricePickerOpen(false)}
-                className="text-stone-400 hover:text-stone-600 text-lg p-2"
-              >
-                ✕
-              </button>
-            </div>
-
-            {pickerError && (
-              <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
-                {pickerError}
-              </div>
-            )}
-
-            {!selectedPriceItem ? (
-              // Шаг 1: Поиск и выбор позиции из прайса
-              <div className="mt-3 flex flex-1 flex-col overflow-hidden">
-                <input
-                  type="text"
-                  value={pickerSearch}
-                  onChange={(e) => setPickerSearch(e.target.value)}
-                  placeholder="Поиск позиции по названию…"
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                />
-
-                {/* Категории */}
-                <div className="mt-2 flex items-center gap-1 overflow-x-auto pb-1 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setPickerCategory("all")}
-                    className={`min-h-8 whitespace-nowrap rounded-lg px-2.5 py-1 ${
-                      pickerCategory === "all"
-                        ? "bg-stone-900 text-white"
-                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                    }`}
-                  >
-                    Все
-                  </button>
-                  {ALL_CATEGORIES.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setPickerCategory(cat)}
-                      className={`min-h-8 whitespace-nowrap rounded-lg px-2.5 py-1 ${
-                        pickerCategory === cat
-                          ? "bg-stone-900 text-white"
-                          : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                      }`}
-                    >
-                      {CATEGORY_LABELS[cat]}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Список активных позиций */}
-                <div className="mt-2 flex-1 overflow-y-auto divide-y divide-stone-100">
-                  {filteredCatalogItems.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-stone-500">
-                      Позиций не найдено
-                    </div>
-                  ) : (
-                    filteredCatalogItems.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handleSelectPriceItem(p)}
-                        className="flex w-full items-center justify-between p-2.5 text-left text-xs hover:bg-stone-50 rounded-xl transition-colors active:bg-emerald-50"
-                      >
-                        <div>
-                          <div className="font-semibold text-stone-900">{p.name}</div>
-                          <div className="text-[11px] text-stone-500">
-                            {CATEGORY_LABELS[p.category]} • {p.unit}
-                          </div>
-                        </div>
-                        <div className="font-bold text-emerald-900 text-sm">
-                          {formatKzt(p.price)} ₸
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            ) : (
-              // Шаг 2: Ввод количества и параметров для выбранной позиции
-              <form onSubmit={handleAddPriceItemToOrder} className="mt-4 flex flex-col gap-3 text-xs">
-                <div className="rounded-xl bg-stone-50 p-3 border border-stone-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-stone-900 text-sm">
-                        {selectedPriceItem.name}
-                      </span>
-                      <span className="block text-stone-500 text-[11px]">
-                        {CATEGORY_LABELS[selectedPriceItem.category]} • {selectedPriceItem.unit}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPriceItem(null)}
-                      className="text-xs text-emerald-900 font-semibold underline"
-                    >
-                      Сменить
-                    </button>
-                  </div>
-                  <div className="mt-2 font-bold text-base text-stone-900">
-                    {formatKzt(selectedPriceItem.price)} ₸ / {selectedPriceItem.unit}
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block font-semibold text-stone-700 mb-1">
-                      Количество ({selectedPriceItem.unit}) <span className="text-rose-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      required
-                      value={pickerQty}
-                      onChange={(e) => setPickerQty(e.target.value)}
-                      className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-stone-700 mb-1">
-                      Отход (%)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={pickerWaste}
-                      onChange={(e) => setPickerWaste(e.target.value)}
-                      placeholder="0"
-                      className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                    />
-                  </div>
-                </div>
-
-                {items.length > 0 && (
-                  <div>
-                    <label className="block font-semibold text-stone-700 mb-1">
-                      Привязать к изделию
-                    </label>
-                    <select
-                      value={pickerItemId}
-                      onChange={(e) => setPickerItemId(e.target.value)}
-                      className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                    >
-                      <option value="">Без привязки (общий заказ)</option>
-                      {items.map((i) => (
-                        <option key={i.id} value={i.id}>
-                          {i.title} ({ORDER_ITEM_KIND_LABELS[i.kind]})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block font-semibold text-stone-700 mb-1">
-                    Комментарий (необязательно)
-                  </label>
-                  <input
-                    type="text"
-                    value={pickerComment}
-                    onChange={(e) => setPickerComment(e.target.value)}
-                    placeholder="Например: на верхние шкафы"
-                    className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                  />
-                </div>
-
-                <div className="mt-2 flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPriceItem(null)}
-                    className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                  >
-                    Назад к списку
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={pickerSaving}
-                    className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
-                  >
-                    {pickerSaving ? "Добавление…" : "Добавить в заказ"}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* МОДАЛКА 4: РУЧНАЯ ПОЗИЦИЯ / РЕДАКТИРОВАНИЕ ПОЗИЦИИ */}
-      {isManualLineModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
-          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h3 className="text-base font-bold text-stone-900">
-                {editingLine
-                  ? editingLine.is_manual
-                    ? "Редактировать ручную позицию"
-                    : "Редактировать позицию из прайса"
-                  : "Добавить ручную позицию"}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsManualLineModalOpen(false)}
-                className="text-stone-400 hover:text-stone-600 text-lg p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            {manualError && (
-              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
-                {manualError}
-              </div>
-            )}
-
-            <form onSubmit={handleSaveManualLine} className="mt-3 flex flex-col gap-3 text-xs">
-              {/* Поля названия и категории (редактируются для ручной позиции) */}
-              {(!editingLine || editingLine.is_manual) && (
-                <>
-                  <div>
-                    <label className="block font-semibold text-stone-700 mb-1">
-                      Категория <span className="text-rose-600">*</span>
-                    </label>
-                    <select
-                      value={manualCategory}
-                      onChange={(e) => setManualCategory(e.target.value as PriceCategory)}
-                      className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                    >
-                      {ALL_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {CATEGORY_LABELS[c]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-stone-700 mb-1">
-                      Название <span className="text-rose-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={manualName}
-                      onChange={(e) => setManualName(e.target.value)}
-                      placeholder="Например: Транспорт (ГАЗель)"
-                      className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-semibold text-stone-700 mb-1">
-                        Единица измерения
-                      </label>
-                      <select
-                        value={manualUnit}
-                        onChange={(e) => setManualUnit(e.target.value as PriceUnit)}
-                        className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                      >
-                        {PRICE_UNITS.map((u) => (
-                          <option key={u} value={u}>
-                            {u}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold text-stone-700 mb-1">
-                        Цена за ед. (₸) <span className="text-rose-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        required
-                        value={manualUnitPrice}
-                        onChange={(e) => setManualUnitPrice(e.target.value)}
-                        placeholder="20 000"
-                        className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Количество и отход */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-stone-700 mb-1">
-                    Количество <span className="text-rose-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    required
-                    value={manualQty}
-                    onChange={(e) => setManualQty(e.target.value)}
-                    className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-stone-700 mb-1">
-                    Отход (%)
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={manualWaste}
-                    onChange={(e) => setManualWaste(e.target.value)}
-                    placeholder="0"
-                    className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                  />
-                </div>
-              </div>
-
-              {/* Чекбоксы: технолог и округление */}
-              {(!editingLine || editingLine.is_manual) && (
-                <div className="flex flex-col gap-2 pt-1">
-                  <label className="flex items-center gap-2 text-stone-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={manualTechnolog}
-                      onChange={(e) => setManualTechnolog(e.target.checked)}
-                      className="h-4 w-4 rounded-sm border-stone-300 text-emerald-900 focus:ring-emerald-800"
-                    />
-                    <span>Учитывать для технолога (как лист ЛДСП)</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 text-stone-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={manualRounding === "ceil_to_unit"}
-                      onChange={(e) =>
-                        setManualRounding(e.target.checked ? "ceil_to_unit" : "none")
-                      }
-                      className="h-4 w-4 rounded-sm border-stone-300 text-emerald-900 focus:ring-emerald-800"
-                    />
-                    <span>Округлять оплачиваемое количество вверх до целого</span>
-                  </label>
-                </div>
-              )}
-
-              {items.length > 0 && (
-                <div>
-                  <label className="block font-semibold text-stone-700 mb-1">
-                    Привязать к изделию
-                  </label>
-                  <select
-                    value={manualItemId}
-                    onChange={(e) => setManualItemId(e.target.value)}
-                    className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                  >
-                    <option value="">Без привязки (общий заказ)</option>
-                    {items.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.title} ({ORDER_ITEM_KIND_LABELS[i.kind]})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="block font-semibold text-stone-700 mb-1">
-                  Комментарий
-                </label>
-                <input
-                  type="text"
-                  value={manualComment}
-                  onChange={(e) => setManualComment(e.target.value)}
-                  placeholder="Примечание к позиции…"
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                />
-              </div>
-
-              <div className="mt-2 flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsManualLineModalOpen(false)}
-                  disabled={manualSaving}
-                  className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={manualSaving}
-                  className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
-                >
-                  {manualSaving ? "Сохранение…" : "Сохранить"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* МОДАЛКА 5: ДОБАВЛЕНИЕ КОРРЕКТИРОВКИ */}
-      {isAdjustmentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h3 className="text-base font-bold text-stone-900">
-                Новая корректировка
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsAdjustmentModalOpen(false)}
-                className="text-stone-400 hover:text-stone-600 text-lg p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            {adjError && (
-              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
-                {adjError}
-              </div>
-            )}
-
-            <form onSubmit={handleSaveAdjustment} className="mt-3 flex flex-col gap-3 text-xs">
-              {calcMode === "check_contract" ? (
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs text-stone-700">
-                  <div className="font-semibold text-stone-900">Тип: К затратам (себестоимость)</div>
-                  <div className="text-stone-500 text-[11px] mt-0.5">
-                    В режиме «Проверить договор» цена зафиксирована договором, поэтому доступны только корректировки себестоимости.
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label className="block font-semibold text-stone-700 mb-1">
-                    Тип корректировки
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAdjKind("price")}
-                      className={`min-h-10 rounded-xl font-semibold border ${
-                        adjKind === "price"
-                          ? "bg-emerald-900 text-white border-emerald-900"
-                          : "bg-white text-stone-700 border-stone-300"
-                      }`}
-                    >
-                      К цене (скидка/наценка)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAdjKind("cost")}
-                      className={`min-h-10 rounded-xl font-semibold border ${
-                        adjKind === "cost"
-                          ? "bg-emerald-900 text-white border-emerald-900"
-                          : "bg-white text-stone-700 border-stone-300"
-                      }`}
-                    >
-                      К затратам (себестоимость)
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block font-semibold text-stone-700 mb-1">
-                  Название корректировки <span className="text-rose-600">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={adjLabel}
-                  onChange={(e) => setAdjLabel(e.target.value)}
-                  placeholder={
-                    calcMode === "check_contract"
-                      ? "Например: Дополнительный монтаж"
-                      : "Например: Скидка постоянному клиенту"
-                  }
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-stone-700 mb-1">
-                  Сумма (₸) <span className="text-rose-600">*</span>
-                  {calcMode !== "check_contract" && (
-                    <span className="text-stone-400 font-normal"> (для скидки введите минус: -11000)</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={adjAmount}
-                  onChange={(e) => setAdjAmount(e.target.value)}
-                  placeholder={calcMode === "check_contract" ? "25 000" : "-10 000 или 25 000"}
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-stone-700 mb-1">
-                  Комментарий
-                </label>
-                <input
-                  type="text"
-                  value={adjComment}
-                  onChange={(e) => setAdjComment(e.target.value)}
-                  placeholder="Причина применения…"
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
-                />
-              </div>
-
-              <div className="mt-2 flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAdjustmentModalOpen(false)}
-                  disabled={adjSaving}
-                  className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={adjSaving}
-                  className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
-                >
-                  {adjSaving ? "Добавление…" : "Добавить"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* МОДАЛКА 5: ОБНОВЛЕНИЕ ЦЕН ИЗ СПРАВОЧНИКА С РАСЧЁТОМ РАЗНИЦЫ (U5) */}
-      {isPriceDiffModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
-          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h3 className="text-base font-bold text-stone-900">Обновление цен из справочника</h3>
-              <button
-                type="button"
-                onClick={() => setIsPriceDiffModalOpen(false)}
-                className="text-stone-400 hover:text-stone-600 text-lg p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="mt-2 text-xs text-stone-600 leading-relaxed">
-              В актуальном справочнике цен изменились цены для {priceDiff.lines.length} поз. из этого заказа.
-              Ознакомьтесь с изменениями перед подтверждением:
-            </p>
-
-            <div className="mt-3 max-h-56 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 divide-y divide-stone-200 text-xs">
-              {priceDiff.lines.map((item) => (
-                <div key={item.lineId} className="p-3">
-                  <div className="font-bold text-stone-900">{item.name}</div>
-                  <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[11px] text-stone-600">
-                    <span>
-                      {item.qty} шт: {formatKzt(item.oldUnitPrice)} ₸ ➔ <strong className="text-emerald-900">{formatKzt(item.newUnitPrice)} ₸</strong>
-                    </span>
-                    <span className={item.diff > 0 ? "text-rose-700 font-bold" : "text-emerald-700 font-bold"}>
-                      {item.diff > 0 ? "+" : ""}{formatKzt(item.diff)} ₸
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Сводка разницы */}
-            <div className="mt-3 rounded-xl border border-stone-200 bg-stone-100 p-3 text-xs flex justify-between items-center">
-              <span className="font-medium text-stone-700">Разница общей стоимости:</span>
-              <span className={`text-sm font-extrabold ${priceDiff.totalDiff > 0 ? "text-rose-800" : "text-emerald-800"}`}>
-                {priceDiff.totalDiff > 0 ? "+" : ""}{formatKzt(priceDiff.totalDiff)} ₸
-              </span>
-            </div>
-
-            <div className="mt-4 flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsPriceDiffModalOpen(false)}
-                disabled={isUpdatingPrices}
-                className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
-              >
-                Отмена
-              </button>
-              <button
-                type="button"
-                disabled={isUpdatingPrices}
-                onClick={() => void handleConfirmPriceUpdates()}
-                className="min-h-11 rounded-xl bg-amber-800 px-5 text-sm font-semibold text-white shadow-xs hover:bg-amber-900 disabled:opacity-50"
-              >
-                {isUpdatingPrices ? "Обновление…" : "Подтвердить обновление цен"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* МОДАЛКА 6: СОЗДАНИЕ НОВОЙ ВЕРСИИ ДЛЯ ЗАБЛОКИРОВАННОГО ЗАКАЗА (U5) */}
-      {isUnlockModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h3 className="text-base font-bold text-stone-900">Создать новую версию расчёта</h3>
-              <button
-                type="button"
-                onClick={() => setIsUnlockModalOpen(false)}
-                className="text-stone-400 hover:text-stone-600 text-lg p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-3 text-xs text-stone-600 leading-relaxed">
-              <p>
-                Заказ сейчас находится в статусе «<strong>{statusLabel}</strong>».
-              </p>
-              <p className="mt-2">
-                Чтобы внести изменения в позиции или параметры, текущий расчёт будет зафиксирован в истории версий, а статус заказа переведён в «<strong>Оценён</strong>» (quoted) для редактирования.
-              </p>
-            </div>
-
-            <div className="mt-5 flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsUnlockModalOpen(false)}
-                disabled={unlockSaving}
-                className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
-              >
-                Отмена
-              </button>
-              <button
-                type="button"
-                disabled={unlockSaving}
-                onClick={() => void handleConfirmCreateNewVersion()}
-                className="min-h-11 rounded-xl bg-amber-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-amber-950 disabled:opacity-50"
-              >
-                {unlockSaving ? "Обработка…" : "Разблокировать для правок"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <UnlockModal
+        isOpen={isUnlockModalOpen}
+        onClose={() => setIsUnlockModalOpen(false)}
+        statusLabel={statusLabel}
+        isSaving={unlockSaving}
+        onConfirm={handleConfirmCreateNewVersion}
+      />
     </div>
   );
 }
