@@ -33,6 +33,7 @@ export interface CalculationAdjustment {
 }
 
 export interface CalculationParameters {
+  [key: string]: unknown;
   targetMarginPct: number;
   assemblyMode: AssemblyMode;
   assemblyPct: number;

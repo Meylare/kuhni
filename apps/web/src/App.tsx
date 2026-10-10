@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { AccessDeniedPage } from "./auth/AccessDeniedPage";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { LoginPage } from "./auth/LoginPage";
 import { DialogProvider } from "./components/DialogProvider";
@@ -78,13 +79,13 @@ function MainApp() {
 }
 
 function Gate() {
-  const { loading, session, configError } = useAuth();
+  const { loading, session, isOwner, checkingRole, configError } = useAuth();
 
   if (configError && !session) {
     return <LoginPage />;
   }
 
-  if (loading) {
+  if (loading || (session && checkingRole && isOwner === null)) {
     return (
       <main className="flex min-h-svh items-center justify-center px-4 text-stone-600">
         Загрузка…
@@ -94,6 +95,10 @@ function Gate() {
 
   if (!session) {
     return <LoginPage />;
+  }
+
+  if (isOwner === false) {
+    return <AccessDeniedPage />;
   }
 
   return <MainApp />;

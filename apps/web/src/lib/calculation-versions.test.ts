@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { Order, OrderCalculation, OrderLine } from "../types/database";
 import {
   DEFAULT_PARAMETERS,
-  parametersArrayToMap,
 } from "./parameters";
 import {
   DEFAULT_SNAPSHOT_PARAMS,

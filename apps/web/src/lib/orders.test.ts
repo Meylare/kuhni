@@ -11,7 +11,6 @@ import type {
 } from "../types/database";
 import { DEFAULT_PARAMETERS } from "./parameters";
 import {
-  buildCalculationInput,
   calculateOrderLive,
   computePriceUpdatesDiff,
   DEFAULT_SNAPSHOT_PARAMS,
@@ -1419,7 +1418,7 @@ describe("orders helpers", () => {
           marginPct: 0.25,
           fixedCost: 200_000,
           minPriceForTargetMargin: 980_000,
-          categoryTotals: { ...savedCalc.result.categoryTotals },
+          categoryTotals: { ...((savedCalc.result as Record<string, unknown>).categoryTotals as Record<string, unknown>) },
           assembly: 124_845,
           technolog: 34_440,
           riskReserve: 14_000,

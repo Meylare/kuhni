@@ -9,9 +9,11 @@
     "dev": "npm run dev -w @kuhni/web",
     "build": "npm run build -w @kuhni/web",
     "preview": "npm run preview -w @kuhni/web",
-    "test": "npm test -w @kuhni/calc && npm test -w @kuhni/web"
+    "test": "npm test -w @kuhni/calc && npm test -w @kuhni/web",
+    "lint": "oxlint apps/web packages/calc"
   },
   "devDependencies": {
+    "oxlint": "^1.87.0",
     "supabase": "^2.119.0"
   }
 }

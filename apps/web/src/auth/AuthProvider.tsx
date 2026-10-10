@@ -12,9 +12,11 @@ import { getPublicSupabaseConfig } from "../lib/config";
 import { getSupabase } from "../lib/supabase";
 import { clearAllCaches } from "../lib/cache";
 
-type AuthContextValue = {
+export type AuthContextValue = {
   session: Session | null;
   loading: boolean;
+  isOwner: boolean | null;
+  checkingRole: boolean;
   configError: string | null;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -37,6 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const config = getPublicSupabaseConfig();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(config.ok);
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+  const [checkingRole, setCheckingRole] = useState(false);
 
   useEffect(() => {
     if (!config.ok) {
@@ -45,14 +49,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const supabase = getSupabase();
 
+    async function checkRole(activeSession: Session | null) {
+      if (!activeSession) {
+        setIsOwner(null);
+        setCheckingRole(false);
+        return;
+      }
+      setCheckingRole(true);
+      try {
+        const { data, error } = await supabase.rpc("is_owner");
+        if (error) {
+          console.error("Ошибка проверки роли is_owner:", error);
+          setIsOwner(false);
+        } else {
+          setIsOwner(Boolean(data));
+        }
+      } catch (err) {
+        console.error("Исключение при проверке is_owner:", err);
+        setIsOwner(false);
+      } finally {
+        setCheckingRole(false);
+      }
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
+      void checkRole(data.session);
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setLoading(false);
+      void checkRole(nextSession);
     });
 
     return () => {
@@ -64,6 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       loading,
+      isOwner,
+      checkingRole,
       configError: config.ok ? null : config.reason,
       signIn: async (email, password) => {
         const { error } = await getSupabase().auth.signInWithPassword({
@@ -74,10 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       signOut: async () => {
         await getSupabase().auth.signOut();
+        setIsOwner(null);
         await clearAllCaches();
       },
     }),
-    [config, loading, session],
+    [config, loading, session, isOwner, checkingRole],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
