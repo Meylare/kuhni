@@ -34,6 +34,17 @@ describe("formatErrorMessage", () => {
     );
   });
 
+  it("formats order locked errors into friendly Russian text", () => {
+    expect(formatErrorMessage("order_locked: Заказ утверждён и заблокирован для правок")).toBe(
+      "Заказ утверждён и заблокирован для правок.",
+    );
+    expect(
+      formatErrorMessage(
+        new Error("order_locked: Заказ утверждён и заблокирован для правок: редактирование состава запрещено")
+      )
+    ).toBe("Заказ утверждён и заблокирован для правок.");
+  });
+
   it("uses fallback on empty input", () => {
     expect(formatErrorMessage(null, "Что-то пошло не так")).toBe("Что-то пошло не так");
   });

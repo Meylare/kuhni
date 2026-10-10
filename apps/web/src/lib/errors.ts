@@ -42,5 +42,13 @@ export function formatErrorMessage(err: unknown, fallback = "Произошла 
     return "Срок действия сессии истёк. Пожалуйста, выполните повторный вход.";
   }
 
+  // Ошибка блокировки заказа
+  if (
+    lower.includes("order_locked") ||
+    lower.includes("заказ утверждён и заблокирован")
+  ) {
+    return "Заказ утверждён и заблокирован для правок.";
+  }
+
   return rawMessage;
 }
