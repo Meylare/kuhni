@@ -1,4 +1,4 @@
-import { calculatePriceDenominator } from "@kuhni/calc";
+import { calculatePriceDenominator, MAX_PRICE_SHARES_SUM } from "@kuhni/calc";
 
 import type { ParameterItem } from "../types/database";
 
@@ -305,13 +305,15 @@ export function evaluateDenominator(params: ParametersMap): {
   const sumPercentShares = Math.round(rawSum * 10000) / 10000;
   const denominator = Math.round((1 - sumPercentShares) * 10000) / 10000;
 
-  if (denominator <= 0) {
+  if (denominator <= 0 || sumPercentShares > MAX_PRICE_SHARES_SUM) {
     return {
       denominator,
       sumPercentShares,
       status: "error",
       message:
-        "Критическая ошибка: сумма процентных ставок и маржи ≥ 100% (знаменатель ≤ 0). При таких параметрах расчёт цены невозможен.",
+        sumPercentShares > MAX_PRICE_SHARES_SUM
+          ? `Критическая ошибка: сумма процентных ставок и маржи ${(sumPercentShares * 100).toFixed(1)}% превышает максимально допустимые ${(MAX_PRICE_SHARES_SUM * 100).toFixed(0)}%. При таких параметрах расчёт цены невозможен.`
+          : "Критическая ошибка: сумма процентных ставок и маржи ≥ 100% (знаменатель ≤ 0). При таких параметрах расчёт цены невозможен.",
     };
   }
 

@@ -57,7 +57,7 @@ begin
     raise exception 'Expected margin to be updated to 0.20, got %', v_margin;
   end if;
 
-  -- 2. Проверка блокировки при сумме ставок >= 100%
+  -- 2. Проверка блокировки при сумме ставок > 80% (MAX_PRICE_SHARES_SUM)
   v_err_caught := false;
   begin
     perform public.save_parameters(test_invalid_sum);
@@ -66,7 +66,46 @@ begin
   end;
 
   if not v_err_caught then
-    raise exception 'save_parameters should reject sum of shares >= 100%%';
+    raise exception 'save_parameters should reject sum of shares > 80%%';
+  end if;
+
+  -- 2b. Граничное значение: ровно 80% (0.50 + 0.15 + 0.05 + 0.10 = 0.80) разрешено
+  perform public.save_parameters('{
+    "target_margin_pct": 0.50,
+    "price_rounding": 1000,
+    "assembly_mode": "percent",
+    "assembly_pct": 0.15,
+    "assembly_per_meter_kitchen": 35000,
+    "assembly_per_meter_wardrobe": 25000,
+    "technolog_mode": "percent",
+    "technolog_pct": 0.05,
+    "technolog_per_sheet": 4000,
+    "waste_edge_pct": 0.10,
+    "risk_reserve_pct": 0.10
+  }'::jsonb);
+
+  -- 2c. Граничное значение: чуть больше 80% (0.501 + 0.15 + 0.05 + 0.10 = 0.801) запрещено
+  v_err_caught := false;
+  begin
+    perform public.save_parameters('{
+      "target_margin_pct": 0.501,
+      "price_rounding": 1000,
+      "assembly_mode": "percent",
+      "assembly_pct": 0.15,
+      "assembly_per_meter_kitchen": 35000,
+      "assembly_per_meter_wardrobe": 25000,
+      "technolog_mode": "percent",
+      "technolog_pct": 0.05,
+      "technolog_per_sheet": 4000,
+      "waste_edge_pct": 0.10,
+      "risk_reserve_pct": 0.10
+    }'::jsonb);
+  exception when others then
+    v_err_caught := true;
+  end;
+
+  if not v_err_caught then
+    raise exception 'save_parameters should reject sum of shares = 0.801 (> 80%%)';
   end if;
 
   -- 3. Проверка блокировки при невалидном округлении (<= 0)

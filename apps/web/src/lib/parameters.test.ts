@@ -96,15 +96,24 @@ describe("evaluateDenominator", () => {
     expect(res.message).toContain("70%");
   });
 
-  it("выдаёт предупреждение, когда знаменатель ≤ 0.05", () => {
-    const res = evaluateDenominator({
+  it("выдаёт предупреждение на границе суммы долей ровно 80% и ошибку при превышении 80%", () => {
+    const resBoundary = evaluateDenominator({
       ...DEFAULT_PARAMETERS,
       target_margin_pct: 0.5,
-      assembly_pct: 0.3,
-      technolog_pct: 0.16, // sum = 0.96 => denominator = 0.04
+      assembly_pct: 0.2,
+      technolog_pct: 0.1, // sum = 0.80
     });
-    expect(res.status).toBe("warning");
-    expect(res.message).toContain("знаменатель формулы");
+    expect(resBoundary.status).toBe("warning");
+    expect(resBoundary.message).toContain("70%");
+
+    const resOver = evaluateDenominator({
+      ...DEFAULT_PARAMETERS,
+      target_margin_pct: 0.501,
+      assembly_pct: 0.2,
+      technolog_pct: 0.1, // sum = 0.801 > 0.80
+    });
+    expect(resOver.status).toBe("error");
+    expect(resOver.message).toContain("превышает максимально допустимые 80%");
   });
 
   it("выдаёт критическую ошибку, когда знаменатель ≤ 0 (сумма ставок >= 100%)", () => {

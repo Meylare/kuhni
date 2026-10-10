@@ -2,6 +2,7 @@ import {
   calculate,
   calculateLine,
   createCalculationVersion,
+  MAX_PRICE_SHARES_SUM,
   type CalculationAdjustment,
   type CalculationInput,
   type CalculationLine,
@@ -1062,26 +1063,37 @@ export function checkOrderLoadCriticalErrors(results: OrderLoadQueryResults): {
 }
 
 /**
- * Защита от сохранения пустого расчёта: требует явного подтверждения,
- * если в заказе 0 позиций или итоговая цена равна 0 (Step B4).
+ * Защита от сохранения подозрительного расчёта: требует явного подтверждения,
+ * если в заказе 0 позиций, итоговая цена равна 0 или маржа отрицательная (Step B4, A3).
  */
 export function shouldConfirmCalculationSave(options: {
   linesCount: number;
   priceTotal: number;
+  margin?: number;
 }): {
   needsConfirmation: boolean;
   reason: string | null;
 } {
   const hasZeroLines = options.linesCount === 0;
   const hasZeroPrice = options.priceTotal === 0;
+  const hasNegativeMargin = options.margin !== undefined && options.margin < 0;
 
-  if (hasZeroLines || hasZeroPrice) {
-    const reason =
-      hasZeroLines && hasZeroPrice
-        ? "В заказе нет позиций и итоговая цена равна 0."
-        : hasZeroLines
-        ? "В заказе нет позиций."
-        : "Итоговая цена заказа равна 0.";
+  if (hasZeroLines || hasZeroPrice || hasNegativeMargin) {
+    let reason: string;
+    if (hasZeroLines && hasZeroPrice) {
+      reason = "В заказе нет позиций и итоговая цена равна 0.";
+    } else if (hasZeroLines) {
+      reason = "В заказе нет позиций.";
+    } else if (hasZeroPrice) {
+      reason = "Итоговая цена заказа равна 0.";
+    } else {
+      reason = "Маржа заказа отрицательная (убыточный расчёт).";
+    }
+
+    if (hasNegativeMargin && (hasZeroLines || hasZeroPrice)) {
+      reason += " Маржа заказа отрицательная.";
+    }
+
     return {
       needsConfirmation: true,
       reason,
@@ -1093,4 +1105,29 @@ export function shouldConfirmCalculationSave(options: {
     reason: null,
   };
 }
+
+/**
+ * Преобразует код ошибки расчёта в понятный текст для пользователя с проверкой на исчерпанность (Step A3).
+ */
+export function formatCalculationOutcomeError(
+  error: Exclude<CalculationOutcome, { ok: true }>["error"],
+): string {
+  switch (error) {
+    case "invalid_input":
+      return "Некорректные входные данные расчёта. Проверьте позиции заказа.";
+    case "parameters_leave_no_share_for_fixed_costs":
+      return "Сумма процентных ставок превышает 100%. Измените параметры расчёта.";
+    case "parameters_share_too_high":
+      return `Сумма процентных ставок превышает максимально допустимые ${(MAX_PRICE_SHARES_SUM * 100).toFixed(0)}%. Уменьшите ставки в параметрах.`;
+    case "contract_price_required":
+      return "Необходимо указать цену по договору в шапке заказа.";
+    case "price_not_positive":
+      return "Расчётная цена заказа меньше или равна нулю. Уменьшите скидку или проверьте позиции.";
+    default: {
+      const _exhaustiveCheck: never = error;
+      return `Неизвестная ошибка расчёта (${String(_exhaustiveCheck)}).`;
+    }
+  }
+}
+
 

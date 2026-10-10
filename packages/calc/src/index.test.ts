@@ -5,6 +5,7 @@ import {
   calculateLine,
   calculatePriceDenominator,
   createCalculationVersion,
+  MAX_PRICE_SHARES_SUM,
   type CalculationInput,
   type CalculationParameters,
   type CalculationVersionInput,
@@ -182,20 +183,78 @@ describe("calculate", () => {
   it("keeps a zero-quantity line at zero", () => {
     const result = successful({
       ...exampleInput,
-      lines: [{ category: "other", qty: 0, unitPrice: 99_999, wastePct: 0.1, billableQtyRounding: "none" }],
+      lines: [
+        { category: "materials", qty: 10, unitPrice: 14_000, wastePct: 0, billableQtyRounding: "none" },
+        { category: "other", qty: 0, unitPrice: 99_999, wastePct: 0.1, billableQtyRounding: "none" },
+      ],
     });
 
-    expect(result.lineCalculations[0]).toMatchObject({ billableQty: 0, total: 0 });
+    expect(result.lineCalculations[1]).toMatchObject({ billableQty: 0, total: 0 });
     expect(result.categoryTotals.other).toBe(0);
   });
 
-  it("returns an error when parameters leave no share for fixed costs", () => {
+  it("enforces MAX_PRICE_SHARES_SUM boundary: exactly 0.80 succeeds, >0.80 returns parameters_share_too_high", () => {
+    expect(MAX_PRICE_SHARES_SUM).toBe(0.8);
+
+    // 0.615 + 0.145 + 0.04 + 0 = 0.80
+    const exactMaxOutcome = calculate({
+      ...exampleInput,
+      parameters: { ...defaultParameters, targetMarginPct: 0.615 },
+    });
+    expect(exactMaxOutcome.ok).toBe(true);
+
+    // 0.6151 + 0.145 + 0.04 + 0 = 0.8001 > 0.80
+    const tooHighOutcome = calculate({
+      ...exampleInput,
+      parameters: { ...defaultParameters, targetMarginPct: 0.6151 },
+    });
+    expect(tooHighOutcome).toEqual({ ok: false, error: "parameters_share_too_high" });
+  });
+
+  it("returns price_not_positive error in quote mode when discount makes price <= 0", () => {
+    const negativeOutcome = calculate({
+      ...exampleInput,
+      adjustments: [{ kind: "price", amount: -1_000_000 }],
+    });
+    expect(negativeOutcome).toEqual({ ok: false, error: "price_not_positive" });
+
+    const zeroOutcome = calculate({
+      ...exampleInput,
+      adjustments: [{ kind: "price", amount: -862_000 }],
+    });
+    expect(zeroOutcome).toEqual({ ok: false, error: "price_not_positive" });
+  });
+
+  it("adds warning when cost adjustments make fixed costs negative", () => {
+    const outcome = calculate({
+      ...exampleInput,
+      mode: "check_contract",
+      contractPrice: 850_000,
+      adjustments: [{ kind: "cost", amount: -600_000 }],
+    });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.result.warnings).toContain("корректировки сделали затраты отрицательными");
+  });
+
+  it("adds warning when contract price is zero in check_contract mode", () => {
+    const outcome = calculate({
+      ...exampleInput,
+      mode: "check_contract",
+      contractPrice: 0,
+    });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.result.warnings).toContain("цена договора равна 0");
+  });
+
+  it("returns an error when parameters leave no share for fixed costs (fallback when > 100%)", () => {
     expect(
       calculate({
         ...exampleInput,
         parameters: { ...defaultParameters, targetMarginPct: 0.82 },
       }),
-    ).toEqual({ ok: false, error: "parameters_leave_no_share_for_fixed_costs" });
+    ).toEqual({ ok: false, error: "parameters_share_too_high" });
   });
 
   it("applies negative price adjustments as a discount after base price rounding", () => {

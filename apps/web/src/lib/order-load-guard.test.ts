@@ -92,10 +92,22 @@ describe("Step B4: Order loading error guard and zero-line save protection", () 
       expect(check.reason).toContain("В заказе нет позиций и итоговая цена равна 0");
     });
 
-    it("allows save without confirmation when lines > 0 and price > 0", () => {
+    it("requires confirmation when order has negative margin (unprofitable)", () => {
       const check = shouldConfirmCalculationSave({
         linesCount: 3,
-        priceTotal: 861_000,
+        priceTotal: 500_000,
+        margin: -50_000,
+      });
+
+      expect(check.needsConfirmation).toBe(true);
+      expect(check.reason).toContain("Маржа заказа отрицательная");
+    });
+
+    it("allows save without confirmation when lines > 0, price > 0, and margin >= 0", () => {
+      const check = shouldConfirmCalculationSave({
+        linesCount: 3,
+        priceTotal: 862_000,
+        margin: 155_790,
       });
 
       expect(check.needsConfirmation).toBe(false);

@@ -77,10 +77,24 @@ export interface CalculationResult {
   warnings: string[];
 }
 
+/**
+ * Максимальная допустимая сумма процентных долей (маржа + сборка % + технолог % + резерв).
+ * Ограничивает расчётную цену максимум 5-кратным размером постоянных затрат (1 / (1 - 0.8) = 5).
+ * ВАЖНО: держать в синхроне с валидацией в public.save_parameters (миграция 013).
+ */
+export const MAX_PRICE_SHARES_SUM = 0.8;
+
 export type CalculationOutcome =
   | { ok: true; result: CalculationResult }
   | { ok: false; error: "invalid_input"; details: string[] }
-  | { ok: false; error: "parameters_leave_no_share_for_fixed_costs" | "contract_price_required" };
+  | {
+      ok: false;
+      error:
+        | "parameters_leave_no_share_for_fixed_costs"
+        | "parameters_share_too_high"
+        | "contract_price_required"
+        | "price_not_positive";
+    };
 
 export interface CalculationSnapshotLine extends CalculationLine {
   id: string;
@@ -322,6 +336,14 @@ export function calculate(input: CalculationInput): CalculationOutcome {
   }
 
   const parameters = input.parameters;
+  const assemblyPct = parameters.assemblyMode === "percent" ? parameters.assemblyPct : 0;
+  const technologPct = parameters.technologMode === "percent" ? parameters.technologPct : 0;
+  const sumShares =
+    parameters.targetMarginPct + assemblyPct + technologPct + parameters.riskReservePct;
+  if (sumShares > MAX_PRICE_SHARES_SUM + floatingPointTolerance(sumShares)) {
+    return { ok: false, error: "parameters_share_too_high" };
+  }
+
   const categoryTotals = Object.fromEntries(
     [...categories, "adjustments"].map((category) => [category, 0]),
   ) as CalculationResult["categoryTotals"];
@@ -363,6 +385,11 @@ export function calculate(input: CalculationInput): CalculationOutcome {
     input.mode === "quote"
       ? minPriceForTargetMargin + priceAdjustments
       : input.contractPrice!;
+
+  if (input.mode === "quote" && priceTotal <= 0) {
+    return { ok: false, error: "price_not_positive" };
+  }
+
   const assembly =
     parameters.assemblyMode === "percent" ? roundKztUp(parameters.assemblyPct * priceTotal) : 0;
   const technolog =
@@ -371,6 +398,14 @@ export function calculate(input: CalculationInput): CalculationOutcome {
   const costTotal = fixedCost + assembly + technolog + riskReserve;
   const margin = priceTotal - costTotal;
   const warnings: string[] = [];
+
+  if (fixedCost < 0) {
+    warnings.push("корректировки сделали затраты отрицательными");
+  }
+
+  if (input.mode === "check_contract" && priceTotal === 0) {
+    warnings.push("цена договора равна 0");
+  }
 
   if (input.mode === "check_contract" && priceTotal < minPriceForTargetMargin) {
     warnings.push(`договор ниже минимальной цены ${formatKzt(minPriceForTargetMargin)}`);

@@ -3,17 +3,20 @@ import { useEffect, useMemo, useState } from "react";
 import { FactTab } from "../components/FactTab";
 import { useDialog } from "../components/DialogProvider";
 
+import { MAX_PRICE_SHARES_SUM } from "@kuhni/calc";
 import { formatErrorMessage } from "../lib/errors";
 import { formatKzt } from "../lib/money";
 import {
   calculateOrderLive,
   checkOrderLoadCriticalErrors,
   computePriceUpdatesDiff,
+  formatCalculationOutcomeError,
   getLineCalculationsMap,
   getOrderLineCalculation,
   getPlanCalculation,
   getVisibleAdjustments,
   isOrderLocked,
+  mergeOrderParameters,
   normalizeOrderCalculation,
   prepareCalculationSnapshot,
   resolveOrderDisplayCalculation,
@@ -450,6 +453,24 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       const riskParsed = parsePercent(customRiskReservePct);
       if (riskParsed !== null) newSettings.risk_reserve_pct = riskParsed;
 
+      // Валидация суммарной доли MAX_PRICE_SHARES_SUM (Step A3)
+      const mergedParams = mergeOrderParameters(globalParams, newSettings);
+      const assemblyShare =
+        mergedParams.assemblyMode === "percent" ? mergedParams.assemblyPct : 0;
+      const technologShare =
+        mergedParams.technologMode === "percent" ? mergedParams.technologPct : 0;
+      const sumShares =
+        mergedParams.targetMarginPct + assemblyShare + technologShare + mergedParams.riskReservePct;
+
+      if (sumShares > MAX_PRICE_SHARES_SUM) {
+        await dialog.alert({
+          title: "Ошибка",
+          message: `Сумма процентных ставок (${(sumShares * 100).toFixed(1)}%) превышает максимально допустимые ${(MAX_PRICE_SHARES_SUM * 100).toFixed(0)}%. Уменьшите маржу или другие ставки.`,
+          variant: "error",
+        });
+        return;
+      }
+
       const supabase = getSupabase();
       const res = await supabase
         .from("orders")
@@ -868,10 +889,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   async function handleSaveCalculation() {
     if (!order || !calcOutcome || !calcOutcome.ok || Boolean(networkError)) return;
 
-    // Запретить сохранение расчёта, если в заказе 0 позиций или итоговая цена равна 0, без явного подтверждения (Step B4)
+    // Запретить сохранение расчёта, если в заказе 0 позиций, итоговая цена равна 0 или маржа отрицательная, без явного подтверждения (Step B4, A3)
     const saveCheck = shouldConfirmCalculationSave({
       linesCount: lines.length,
       priceTotal: calcOutcome.result.priceTotal,
+      margin: calcOutcome.result.margin,
     });
 
     if (saveCheck.needsConfirmation) {
@@ -2128,9 +2150,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               calcOutcome && !calcOutcome.ok ? (
                 <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-800">
                   <strong>Ошибка расчёта:</strong>{" "}
-                  {calcOutcome.error === "parameters_leave_no_share_for_fixed_costs"
-                    ? "Сумма процентных ставок превышает 100%. Измените параметры расчёта."
-                    : "Необходимо указать цену по договору в шапке заказа."}
+                  {formatCalculationOutcomeError(calcOutcome.error)}
                 </div>
               ) : null
             ) : (

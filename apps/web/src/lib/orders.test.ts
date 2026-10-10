@@ -15,6 +15,7 @@ import {
   calculateOrderLive,
   computePriceUpdatesDiff,
   filterOrders,
+  formatCalculationOutcomeError,
   getLatestCalculation,
   getPlanCalculation,
   getVisibleAdjustments,
@@ -1734,6 +1735,16 @@ describe("orders helpers", () => {
         expect(display?.source).toBe("live");
         expect(display?.priceTotal).toBe(777_000);
         expect(display?.contractPriceMismatch).toBeNull();
+      });
+    });
+
+    describe("Step A3: formatCalculationOutcomeError provides readable user messages for all error codes", () => {
+      it("formats all known calculation errors correctly", () => {
+        expect(formatCalculationOutcomeError("invalid_input")).toContain("Некорректные входные данные");
+        expect(formatCalculationOutcomeError("parameters_leave_no_share_for_fixed_costs")).toContain("100%");
+        expect(formatCalculationOutcomeError("parameters_share_too_high")).toContain("80%");
+        expect(formatCalculationOutcomeError("contract_price_required")).toContain("цену по договору");
+        expect(formatCalculationOutcomeError("price_not_positive")).toContain("меньше или равна нулю");
       });
     });
   });
