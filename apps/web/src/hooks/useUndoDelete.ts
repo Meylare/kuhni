@@ -11,7 +11,10 @@ export function useUndoDelete() {
   const [pendingAction, setPendingAction] = useState<PendingDeleteAction | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingActionRef = useRef<PendingDeleteAction | null>(null);
-  pendingActionRef.current = pendingAction;
+
+  useEffect(() => {
+    pendingActionRef.current = pendingAction;
+  }, [pendingAction]);
 
   const flushPending = useCallback(() => {
     if (timerRef.current) {

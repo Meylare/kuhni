@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getMarginColor } from "../../lib/margin-colors";
 import { formatKzt } from "../../lib/money";
+import { formatCurrencyInput } from "../../lib/number-inputs";
 import type { OrderDisplayCalculation } from "../../lib/orders";
 import { formatPercent } from "../../lib/parameters";
 import type { Order } from "../../types/database";
@@ -28,7 +29,7 @@ export function ContractStageCard({
 }: ContractStageCardProps) {
   const [editingPrice, setEditingPrice] = useState(
     order.contract_price !== null && order.contract_price !== undefined
-      ? String(order.contract_price)
+      ? formatCurrencyInput(String(order.contract_price))
       : ""
   );
   const [isSavingPrice, setIsSavingPrice] = useState(false);
@@ -86,7 +87,7 @@ export function ContractStageCard({
               enterKeyHint="done"
               disabled={locked || isSavingPrice}
               value={editingPrice}
-              onChange={(e) => setEditingPrice(e.target.value)}
+              onChange={(e) => setEditingPrice(formatCurrencyInput(e.target.value))}
               placeholder="Например: 850 000"
               className="min-h-12 flex-1 rounded-xl border border-stone-300 bg-white px-3.5 text-base font-bold text-stone-900 shadow-2xs focus:border-emerald-800"
             />
