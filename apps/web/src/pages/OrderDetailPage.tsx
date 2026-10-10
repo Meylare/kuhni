@@ -1,5 +1,5 @@
 import { useState } from "react";
-
+import { useDialog } from "../components/DialogProvider";
 import { FactTab } from "../components/FactTab";
 import {
   AdjustmentsSection,
@@ -32,6 +32,17 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
   // Раскрытие подробной сводки затрат
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // Шаблоны изделий (U2)
+  const dialog = useDialog();
+  const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
+  const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
+  const [applyTemplateDefaultItemId, setApplyTemplateDefaultItemId] = useState<string | undefined>(undefined);
+
+  function handleOpenApplyTemplate(itemId?: string) {
+    setApplyTemplateDefaultItemId(itemId);
+    setIsApplyTemplateOpen(true);
+  }
 
   // 1. Загрузка и состояние заказа, шапки и настроек
   const orderData = useOrderData(orderId);
@@ -211,6 +222,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             onOpenAddItem={orderItems.handleOpenAddItem}
             onOpenEditItem={orderItems.handleOpenEditItem}
             onDeleteItem={(id) => void orderItems.handleDeleteItem(id)}
+            onOpenSaveAsTemplate={() => setIsSaveTemplateOpen(true)}
+            onOpenApplyTemplate={handleOpenApplyTemplate}
           />
 
           <LinesSection
@@ -225,6 +238,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             onOpenEditLine={orderLines.handleOpenEditLine}
             onDeleteLine={(id) => void orderLines.handleDeleteLine(id)}
             onStepLineQty={orderLines.handleStepLineQty}
+            onOpenApplyTemplate={() => handleOpenApplyTemplate()}
           />
 
           <AdjustmentsSection
@@ -282,6 +296,18 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         orderLines={orderLines}
         orderAdjustments={orderAdjustments}
         orderCalcs={orderCalcs}
+        isSaveTemplateOpen={isSaveTemplateOpen}
+        setIsSaveTemplateOpen={setIsSaveTemplateOpen}
+        isApplyTemplateOpen={isApplyTemplateOpen}
+        setIsApplyTemplateOpen={setIsApplyTemplateOpen}
+        applyTemplateDefaultItemId={applyTemplateDefaultItemId}
+        onTemplateSaved={(name) => {
+          void dialog.alert({
+            title: "Шаблон сохранён",
+            message: `Шаблон «${name}» успешно сохранён и готов к использованию.`,
+            variant: "info",
+          });
+        }}
       />
     </div>
   );

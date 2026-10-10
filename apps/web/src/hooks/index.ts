@@ -4,3 +4,4 @@ export { useOrderCalculations } from "./useOrderCalculations";
 export { useOrderItems } from "./useOrderItems";
 export { useOrderAdjustments } from "./useOrderAdjustments";
 export { useManualLine } from "./useManualLine";
+export { useProductTemplates } from "./useProductTemplates";

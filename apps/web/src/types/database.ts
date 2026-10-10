@@ -267,3 +267,21 @@ export interface Payment {
   amount: number;
   note: string | null;
 }
+
+export interface ProductTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface ProductTemplateLine {
+  template_id: string;
+  price_item_id: string;
+  qty: number;
+  note: string | null;
+}
+
+export interface ProductTemplateWithLines extends ProductTemplate {
+  lines?: (ProductTemplateLine & { price_item?: PriceItem })[];
+}
+

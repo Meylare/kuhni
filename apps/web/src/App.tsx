@@ -10,6 +10,7 @@ import { OrderDetailPage } from "./pages/OrderDetailPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { ParametersPage } from "./pages/ParametersPage";
 import { PriceListPage } from "./pages/PriceListPage";
+import { TemplatesPage } from "./pages/TemplatesPage";
 
 function parseHash(): { tab: ActiveTab; orderId: string | null } {
   if (typeof window === "undefined") return { tab: "orders", orderId: null };
@@ -18,7 +19,7 @@ function parseHash(): { tab: ActiveTab; orderId: string | null } {
     const id = raw.slice("order/".length);
     return { tab: "orders", orderId: id || null };
   }
-  if (raw === "prices" || raw === "parameters") {
+  if (raw === "prices" || raw === "parameters" || raw === "templates") {
     return { tab: raw, orderId: null };
   }
   return { tab: "orders", orderId: null };
@@ -72,6 +73,7 @@ function MainApp() {
           />
         )}
         {activeTab === "prices" && <PriceListPage />}
+        {activeTab === "templates" && <TemplatesPage onBack={handleBackToOrders} />}
         {activeTab === "parameters" && <ParametersPage />}
       </div>
     </div>

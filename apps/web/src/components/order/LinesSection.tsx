@@ -19,6 +19,7 @@ export interface LinesSectionProps {
   onOpenEditLine: (line: OrderLine) => void;
   onDeleteLine: (id: string) => void;
   onStepLineQty?: (lineId: string, delta: number) => void;
+  onOpenApplyTemplate?: () => void;
 }
 
 export function LinesSection({
@@ -33,6 +34,7 @@ export function LinesSection({
   onOpenEditLine,
   onDeleteLine,
   onStepLineQty,
+  onOpenApplyTemplate,
 }: LinesSectionProps) {
   return (
     <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
@@ -58,6 +60,18 @@ export function LinesSection({
               <span>+</span>
               <span>Из справочника</span>
             </button>
+            {onOpenApplyTemplate && (
+              <button
+                type="button"
+                disabled={Boolean(networkError)}
+                onClick={onOpenApplyTemplate}
+                className="flex min-h-11 flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3.5 text-xs font-semibold text-stone-800 hover:bg-stone-50 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Добавить типовой набор позиций из шаблона"
+              >
+                <span>➕</span>
+                <span>Из шаблона</span>
+              </button>
+            )}
             <button
               type="button"
               disabled={Boolean(networkError)}

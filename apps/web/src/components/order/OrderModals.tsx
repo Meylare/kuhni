@@ -1,10 +1,12 @@
 import {
   AdjustmentModal,
+  ApplyTemplateModal,
   ItemModal,
   ManualLineModal,
   OrderHeaderModal,
   PriceDiffModal,
   PricePickerModal,
+  SaveAsTemplateModal,
   UnlockModal,
 } from "./modals";
 import {
@@ -21,6 +23,12 @@ interface OrderModalsProps {
   orderLines: ReturnType<typeof useOrderLines>;
   orderAdjustments: ReturnType<typeof useOrderAdjustments>;
   orderCalcs: ReturnType<typeof useOrderCalculations>;
+  isSaveTemplateOpen: boolean;
+  setIsSaveTemplateOpen: (open: boolean) => void;
+  isApplyTemplateOpen: boolean;
+  setIsApplyTemplateOpen: (open: boolean) => void;
+  applyTemplateDefaultItemId?: string;
+  onTemplateSaved?: (name: string) => void;
 }
 
 export function OrderModals({
@@ -29,6 +37,12 @@ export function OrderModals({
   orderLines,
   orderAdjustments,
   orderCalcs,
+  isSaveTemplateOpen,
+  setIsSaveTemplateOpen,
+  isApplyTemplateOpen,
+  setIsApplyTemplateOpen,
+  applyTemplateDefaultItemId,
+  onTemplateSaved,
 }: OrderModalsProps) {
   return (
     <>
@@ -157,6 +171,26 @@ export function OrderModals({
         statusLabel={orderData.statusLabel}
         isSaving={orderCalcs.unlockSaving}
         onConfirm={orderCalcs.handleConfirmCreateNewVersion}
+      />
+
+      <SaveAsTemplateModal
+        isOpen={isSaveTemplateOpen}
+        onClose={() => setIsSaveTemplateOpen(false)}
+        lines={orderData.lines}
+        onSuccess={(name) => onTemplateSaved?.(name)}
+      />
+
+      <ApplyTemplateModal
+        isOpen={isApplyTemplateOpen}
+        onClose={() => setIsApplyTemplateOpen(false)}
+        order={orderData.order}
+        items={orderData.items}
+        lines={orderData.lines}
+        setLines={orderData.setLines}
+        priceItemsById={orderLines.priceItemsById}
+        globalParams={orderData.globalParams}
+        locked={orderData.locked}
+        defaultItemId={applyTemplateDefaultItemId}
       />
     </>
   );

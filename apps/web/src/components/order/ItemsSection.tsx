@@ -12,6 +12,8 @@ export interface ItemsSectionProps {
   onOpenAddItem: () => void;
   onOpenEditItem: (item: OrderItem) => void;
   onDeleteItem: (id: string) => void;
+  onOpenSaveAsTemplate?: () => void;
+  onOpenApplyTemplate?: (itemId?: string) => void;
 }
 
 export function ItemsSection({
@@ -22,10 +24,12 @@ export function ItemsSection({
   onOpenAddItem,
   onOpenEditItem,
   onDeleteItem,
+  onOpenSaveAsTemplate,
+  onOpenApplyTemplate,
 }: ItemsSectionProps) {
   return (
     <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-bold text-stone-900">
             Изделия заказа
@@ -36,16 +40,41 @@ export function ItemsSection({
         </div>
 
         {!locked && (
-          <button
-            type="button"
-            disabled={Boolean(networkError)}
-            onClick={onOpenAddItem}
-            className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={networkError ? "Действие заблокировано из-за сетевой ошибки" : undefined}
-          >
-            <span>+</span>
-            <span>Добавить изделие</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenApplyTemplate && (
+              <button
+                type="button"
+                disabled={Boolean(networkError)}
+                onClick={() => onOpenApplyTemplate()}
+                className="flex min-h-11 items-center gap-1 rounded-xl border border-stone-300 bg-white px-3.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 active:scale-98 disabled:opacity-50"
+                title="Добавить типовой набор позиций из шаблона"
+              >
+                <span>➕</span>
+                <span>Из шаблона</span>
+              </button>
+            )}
+            {onOpenSaveAsTemplate && lines.length > 0 && (
+              <button
+                type="button"
+                disabled={Boolean(networkError)}
+                onClick={onOpenSaveAsTemplate}
+                className="flex min-h-11 items-center gap-1 rounded-xl border border-stone-300 bg-white px-3.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 active:scale-98 disabled:opacity-50"
+                title="Сохранить текущие позиции заказа как шаблон"
+              >
+                <span>📋</span>
+                <span>В шаблон</span>
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={Boolean(networkError)}
+              onClick={onOpenAddItem}
+              className="flex min-h-11 items-center gap-1 rounded-xl bg-stone-100 px-3.5 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98 disabled:opacity-50"
+            >
+              <span>+</span>
+              <span>Добавить изделие</span>
+            </button>
+          </div>
         )}
       </div>
 

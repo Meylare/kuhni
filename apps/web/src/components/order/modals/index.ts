@@ -5,3 +5,5 @@ export { ItemModal } from "./ItemModal";
 export { ManualLineModal } from "./ManualLineModal";
 export { PricePickerModal } from "./PricePickerModal";
 export { OrderHeaderModal } from "./OrderHeaderModal";
+export { SaveAsTemplateModal } from "./SaveAsTemplateModal";
+export { ApplyTemplateModal } from "./ApplyTemplateModal";

@@ -1,6 +1,6 @@
 import { useAuth } from "../auth/AuthProvider";
 
-export type ActiveTab = "orders" | "prices" | "parameters";
+export type ActiveTab = "orders" | "prices" | "parameters" | "templates";
 
 interface NavigationProps {
   activeTab: ActiveTab;
@@ -51,6 +51,17 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               }`}
             >
               Справочник цен
+            </button>
+            <button
+              type="button"
+              onClick={() => onTabChange("templates")}
+              className={`min-h-9 rounded-lg px-3 py-1.5 transition-all ${
+                activeTab === "templates"
+                  ? "bg-white text-stone-900 shadow-xs"
+                  : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              Шаблоны
             </button>
             <button
               type="button"
