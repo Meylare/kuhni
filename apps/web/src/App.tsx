@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 
 import { AccessDeniedPage } from "./auth/AccessDeniedPage";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
@@ -6,11 +6,40 @@ import { LoginPage } from "./auth/LoginPage";
 import { DialogProvider } from "./components/DialogProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Navigation, type ActiveTab } from "./components/Navigation";
-import { OrderDetailPage } from "./pages/OrderDetailPage";
-import { OrdersPage } from "./pages/OrdersPage";
-import { ParametersPage } from "./pages/ParametersPage";
-import { PriceListPage } from "./pages/PriceListPage";
-import { TemplatesPage } from "./pages/TemplatesPage";
+import { UpdateBanner } from "./components/UpdateBanner";
+
+const OrdersPage = lazy(() =>
+  import("./pages/OrdersPage").then((m) => ({ default: m.OrdersPage })),
+);
+const OrderDetailPage = lazy(() =>
+  import("./pages/OrderDetailPage").then((m) => ({ default: m.OrderDetailPage })),
+);
+const PriceListPage = lazy(() =>
+  import("./pages/PriceListPage").then((m) => ({ default: m.PriceListPage })),
+);
+const ParametersPage = lazy(() =>
+  import("./pages/ParametersPage").then((m) => ({ default: m.ParametersPage })),
+);
+const TemplatesPage = lazy(() =>
+  import("./pages/TemplatesPage").then((m) => ({ default: m.TemplatesPage })),
+);
+
+function PageSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Загрузка страницы"
+      className="mx-auto flex w-full max-w-4xl flex-col px-4 py-6 animate-pulse"
+    >
+      <div className="h-8 w-44 rounded-xl bg-stone-300/70 mb-6" />
+      <div className="space-y-3">
+        <div className="h-24 w-full rounded-2xl bg-stone-200/80" />
+        <div className="h-24 w-full rounded-2xl bg-stone-200/80" />
+        <div className="h-24 w-full rounded-2xl bg-stone-200/80" />
+      </div>
+    </div>
+  );
+}
 
 function parseHash(): { tab: ActiveTab; orderId: string | null } {
   if (typeof window === "undefined") return { tab: "orders", orderId: null };
@@ -67,19 +96,22 @@ function MainApp() {
         hideMobileNav={activeTab === "orders" && Boolean(selectedOrderId)}
       />
       <div className="flex-1">
-        {activeTab === "orders" && !selectedOrderId && (
-          <OrdersPage onSelectOrder={handleSelectOrder} />
-        )}
-        {activeTab === "orders" && selectedOrderId && (
-          <OrderDetailPage
-            orderId={selectedOrderId}
-            onBack={handleBackToOrders}
-          />
-        )}
-        {activeTab === "prices" && <PriceListPage />}
-        {activeTab === "templates" && <TemplatesPage onBack={handleBackToOrders} />}
-        {activeTab === "parameters" && <ParametersPage />}
+        <Suspense fallback={<PageSkeleton />}>
+          {activeTab === "orders" && !selectedOrderId && (
+            <OrdersPage onSelectOrder={handleSelectOrder} />
+          )}
+          {activeTab === "orders" && selectedOrderId && (
+            <OrderDetailPage
+              orderId={selectedOrderId}
+              onBack={handleBackToOrders}
+            />
+          )}
+          {activeTab === "prices" && <PriceListPage />}
+          {activeTab === "templates" && <TemplatesPage onBack={handleBackToOrders} />}
+          {activeTab === "parameters" && <ParametersPage />}
+        </Suspense>
       </div>
+      <UpdateBanner />
     </div>
   );
 }
