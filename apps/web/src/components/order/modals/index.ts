@@ -4,3 +4,4 @@ export { AdjustmentModal } from "./AdjustmentModal";
 export { ItemModal } from "./ItemModal";
 export { ManualLineModal } from "./ManualLineModal";
 export { PricePickerModal } from "./PricePickerModal";
+export { OrderHeaderModal } from "./OrderHeaderModal";
