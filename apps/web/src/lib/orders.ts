@@ -87,6 +87,7 @@ export interface OrderDisplayCalculation {
   technolog: number;
   riskReserve: number;
   lineCalculations: LineCalculation[];
+  contractPriceMismatch: { snapshot: number; current: number } | null;
 }
 
 /**
@@ -428,12 +429,7 @@ export function resolveOrderDisplayCalculation(
 
   if (activeSaved && !showLivePreview) {
     const normalized = normalizeOrderCalculation(activeSaved);
-    const rawPriceTotal = normalized.priceTotal;
-    const priceTotal =
-      (mode === "check_contract" || normalized.mode === "check_contract") &&
-      options.order.contract_price !== null
-        ? Number(options.order.contract_price)
-        : rawPriceTotal;
+    const priceTotal = normalized.priceTotal;
     const costTotal = normalized.costTotal;
     const margin =
       typeof normalized.result.margin === "number"
@@ -445,6 +441,23 @@ export function resolveOrderDisplayCalculation(
         : priceTotal === 0
         ? null
         : margin / priceTotal;
+
+    const currentContractPrice =
+      options.order.contract_price !== null && options.order.contract_price !== undefined
+        ? Number(options.order.contract_price)
+        : null;
+
+    let contractPriceMismatch: { snapshot: number; current: number } | null = null;
+    if (
+      normalized.mode === "check_contract" &&
+      currentContractPrice !== null &&
+      currentContractPrice !== priceTotal
+    ) {
+      contractPriceMismatch = {
+        snapshot: priceTotal,
+        current: currentContractPrice,
+      };
+    }
 
     return {
       source: "saved",
@@ -463,15 +476,13 @@ export function resolveOrderDisplayCalculation(
       technolog: normalized.result.technolog,
       riskReserve: normalized.result.riskReserve,
       lineCalculations: normalized.result.lineCalculations,
+      contractPriceMismatch,
     };
   }
 
   if (liveOutcome && liveOutcome.ok) {
     const res = liveOutcome.result;
-    const priceTotal =
-      mode === "check_contract" && options.order.contract_price !== null
-        ? Number(options.order.contract_price)
-        : res.priceTotal;
+    const priceTotal = res.priceTotal;
     return {
       source: "live",
       version: null,
@@ -500,6 +511,7 @@ export function resolveOrderDisplayCalculation(
       technolog: res.technolog,
       riskReserve: res.riskReserve,
       lineCalculations: res.lineCalculations,
+      contractPriceMismatch: null,
     };
   }
 

@@ -1552,6 +1552,190 @@ describe("orders helpers", () => {
       expect(displayContract?.priceTotal).toBe(850_000);
       expect(displayContract?.warnings).toContain("договор ниже минимальной цены 861 000");
     });
+
+    describe("Step A1: resolveOrderDisplayCalculation preserves saved contract calculation without overriding price", () => {
+      const contractCalc: OrderCalculation = {
+        id: "calc-contract-1",
+        order_id: "ord-contract-test",
+        version: 1,
+        mode: "check_contract",
+        params_snapshot: { target_margin_pct: 0.18 },
+        input_snapshot: { contractPrice: 850_000 },
+        result: {
+          priceTotal: 850_000,
+          costTotal: 700_000,
+          margin: 150_000,
+          marginPct: 150_000 / 850_000,
+          fixedCost: 200_000,
+          minPriceForTargetMargin: 861_000,
+          categoryTotals: {},
+          assembly: 100_000,
+          technolog: 30_000,
+          riskReserve: 10_000,
+          warnings: [],
+          lineCalculations: [],
+        },
+        cost_total: 700_000,
+        price_total: 850_000,
+        margin_pct: 150_000 / 850_000,
+        is_contract_baseline: true,
+        created_at: "2026-10-01T10:30:00Z",
+      };
+
+      it("displays saved 850 000 and fills contractPriceMismatch when order.contract_price is 900 000", () => {
+        const order: Order = {
+          id: "ord-contract-test",
+          name: "Кухня",
+          client_label: "Клиент",
+          status: "quoted",
+          contract_price: 900_000,
+          settings: {},
+          note: null,
+          created_at: "2026-10-01T10:00:00Z",
+          updated_at: "2026-10-01T10:00:00Z",
+        };
+
+        const display = resolveOrderDisplayCalculation({
+          order,
+          calculations: [contractCalc],
+          liveOutcome: null,
+          mode: "check_contract",
+          showLivePreview: false,
+        });
+
+        expect(display).not.toBeNull();
+        expect(display?.source).toBe("saved");
+        expect(display?.priceTotal).toBe(850_000);
+        expect(display?.margin).toBe(150_000);
+        expect(display?.marginPct).toBeCloseTo(150_000 / 850_000, 4);
+        expect(display?.contractPriceMismatch).toEqual({
+          snapshot: 850_000,
+          current: 900_000,
+        });
+      });
+
+      it("sets contractPriceMismatch to null when prices match", () => {
+        const order: Order = {
+          id: "ord-contract-test",
+          name: "Кухня",
+          client_label: "Клиент",
+          status: "quoted",
+          contract_price: 850_000,
+          settings: {},
+          note: null,
+          created_at: "2026-10-01T10:00:00Z",
+          updated_at: "2026-10-01T10:00:00Z",
+        };
+
+        const display = resolveOrderDisplayCalculation({
+          order,
+          calculations: [contractCalc],
+          liveOutcome: null,
+          mode: "check_contract",
+          showLivePreview: false,
+        });
+
+        expect(display?.priceTotal).toBe(850_000);
+        expect(display?.contractPriceMismatch).toBeNull();
+      });
+
+      it("does not affect quote mode", () => {
+        const quoteCalc: OrderCalculation = {
+          id: "calc-quote-1",
+          order_id: "ord-quote-test",
+          version: 1,
+          mode: "quote",
+          params_snapshot: {},
+          input_snapshot: {},
+          result: {
+            priceTotal: 861_000,
+            costTotal: 700_000,
+            margin: 161_000,
+            marginPct: 161_000 / 861_000,
+            fixedCost: 200_000,
+            minPriceForTargetMargin: 861_000,
+            categoryTotals: {},
+            assembly: 100_000,
+            technolog: 30_000,
+            riskReserve: 10_000,
+            warnings: [],
+            lineCalculations: [],
+          },
+          cost_total: 700_000,
+          price_total: 861_000,
+          margin_pct: 161_000 / 861_000,
+          is_contract_baseline: false,
+          created_at: "2026-10-01T10:30:00Z",
+        };
+
+        const order: Order = {
+          id: "ord-quote-test",
+          name: "Кухня",
+          client_label: "Клиент",
+          status: "quoted",
+          contract_price: 900_000,
+          settings: {},
+          note: null,
+          created_at: "2026-10-01T10:00:00Z",
+          updated_at: "2026-10-01T10:00:00Z",
+        };
+
+        const display = resolveOrderDisplayCalculation({
+          order,
+          calculations: [quoteCalc],
+          liveOutcome: null,
+          mode: "quote",
+          showLivePreview: false,
+        });
+
+        expect(display?.priceTotal).toBe(861_000);
+        expect(display?.contractPriceMismatch).toBeNull();
+      });
+
+      it("returns price directly from calculate in live calculation without override", () => {
+        const order: Order = {
+          id: "ord-live-test",
+          name: "Кухня",
+          client_label: "Клиент",
+          status: "draft",
+          contract_price: 777_000,
+          settings: {},
+          note: null,
+          created_at: "2026-10-01T10:00:00Z",
+          updated_at: "2026-10-01T10:00:00Z",
+        };
+
+        const liveOutcome: any = {
+          ok: true,
+          mode: "check_contract",
+          result: {
+            priceTotal: 777_000,
+            costTotal: 600_000,
+            margin: 177_000,
+            marginPct: 177_000 / 777_000,
+            fixedCost: 200_000,
+            minPriceForTargetMargin: 800_000,
+            categoryTotals: {},
+            assembly: 50_000,
+            technolog: 20_000,
+            riskReserve: 0,
+            warnings: [],
+            lineCalculations: [],
+          },
+        };
+
+        const display = resolveOrderDisplayCalculation({
+          order,
+          calculations: [],
+          liveOutcome,
+          mode: "check_contract",
+        });
+
+        expect(display?.source).toBe("live");
+        expect(display?.priceTotal).toBe(777_000);
+        expect(display?.contractPriceMismatch).toBeNull();
+      });
+    });
   });
 });
 

@@ -2142,6 +2142,13 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                   </div>
                 )}
 
+                {/* Несоответствие цены договора в заказе и сохранённой версии (Step A1) */}
+                {displayCalc.contractPriceMismatch && (
+                  <div className="mb-2 rounded-lg border border-amber-400 bg-amber-50 p-2 text-xs font-semibold text-amber-950">
+                    ⚠️ Цена договора в заказе ({formatKzt(displayCalc.contractPriceMismatch.current)} ₸) отличается от версии №{displayCalc.version} ({formatKzt(displayCalc.contractPriceMismatch.snapshot)} ₸). Сохраните новую версию или пересчитайте по актуальным данным.
+                  </div>
+                )}
+
                 {/* Сообщение об успешном сохранении (U5) */}
                 {calcSaveSuccess && (
                   <div className="mb-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-900">
