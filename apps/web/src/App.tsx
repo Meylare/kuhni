@@ -61,7 +61,11 @@ function MainApp() {
 
   return (
     <div className="min-h-svh bg-[#f6f1ea] flex flex-col">
-      <Navigation activeTab={activeTab} onTabChange={handleTabChange} />
+      <Navigation
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        hideMobileNav={activeTab === "orders" && Boolean(selectedOrderId)}
+      />
       <div className="flex-1">
         {activeTab === "orders" && !selectedOrderId && (
           <OrdersPage onSelectOrder={handleSelectOrder} />

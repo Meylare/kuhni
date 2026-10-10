@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDialog } from "../components/DialogProvider";
 import { FactTab } from "../components/FactTab";
 import {
   AdjustmentsSection,
   CalcModeSwitch,
+  DesktopSummaryCard,
   HistoryTab,
   ItemsSection,
   LinesSection,
@@ -127,6 +128,28 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     locked,
   });
 
+  // Горячие клавиши на ПК (U3.4)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "/" && !orderLines.isPricePickerOpen) {
+        const target = e.target as HTMLElement | null;
+        const isInput =
+          target?.tagName === "INPUT" ||
+          target?.tagName === "TEXTAREA" ||
+          target?.tagName === "SELECT";
+        if (!isInput && !locked) {
+          e.preventDefault();
+          orderLines.handleOpenPricePicker();
+        }
+      }
+      if (e.key === "Escape") {
+        if (showBreakdown) setShowBreakdown(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [orderLines, locked, showBreakdown]);
+
   if (loading) {
     return (
       <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center py-20 text-stone-500">
@@ -155,7 +178,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-4 pb-48 md:pb-32">
+    <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-4 pb-48 md:pb-32 lg:pb-12">
       {/* Верхняя навигация, статус, ошибки и вкладки */}
       <OrderHeader
         order={order}
@@ -203,74 +226,92 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       )}
 
       {orderTab === "calc" && (
-        <>
-          <CalcModeSwitch
+        <div className="mt-4 flex flex-col lg:flex-row gap-6 items-start">
+          <div className="flex-1 min-w-0 w-full">
+            <CalcModeSwitch
+              calcMode={orderCalcs.calcMode}
+              onSelectCalcMode={orderCalcs.handleSelectCalcMode}
+              contractPrice={order.contract_price}
+              priceDiff={orderLines.priceDiff}
+              isUpdatingPrices={orderLines.isUpdatingPrices}
+              locked={locked}
+              onOpenPriceDiffModal={() => orderLines.setIsPriceDiffModalOpen(true)}
+            />
+
+            <ItemsSection
+              items={items}
+              lines={lines}
+              locked={locked}
+              networkError={networkError}
+              onOpenAddItem={orderItems.handleOpenAddItem}
+              onOpenEditItem={orderItems.handleOpenEditItem}
+              onDeleteItem={(id) => void orderItems.handleDeleteItem(id)}
+              onOpenSaveAsTemplate={() => setIsSaveTemplateOpen(true)}
+              onOpenApplyTemplate={handleOpenApplyTemplate}
+            />
+
+            <LinesSection
+              lines={lines}
+              categoryTotals={orderCalcs.categoryTotals}
+              lineCalculationsById={orderCalcs.lineCalculationsById}
+              priceItemsById={orderLines.priceItemsById}
+              locked={locked}
+              networkError={networkError}
+              onOpenPricePicker={orderLines.handleOpenPricePicker}
+              onOpenAddManualLine={orderLines.handleOpenAddManualLine}
+              onOpenEditLine={orderLines.handleOpenEditLine}
+              onDeleteLine={(id) => void orderLines.handleDeleteLine(id)}
+              onStepLineQty={orderLines.handleStepLineQty}
+              onOpenApplyTemplate={() => handleOpenApplyTemplate()}
+            />
+
+            <AdjustmentsSection
+              adjustments={adjustments}
+              calcMode={orderCalcs.calcMode}
+              locked={locked}
+              networkError={networkError}
+              onOpenAddAdjustment={() => orderAdjustments.handleOpenAddAdjustment(orderCalcs.calcMode)}
+              onDeleteAdjustment={(id) => void orderAdjustments.handleDeleteAdjustment(id)}
+            />
+
+            <OrderParametersAccordion
+              isOpen={isParamsAccordionOpen}
+              setIsOpen={setIsParamsAccordionOpen}
+              globalParams={globalParams}
+              customMargin={customMargin}
+              setCustomMargin={setCustomMargin}
+              customAssemblyMode={customAssemblyMode}
+              setCustomAssemblyMode={setCustomAssemblyMode}
+              customAssemblyPct={customAssemblyPct}
+              setCustomAssemblyPct={setCustomAssemblyPct}
+              customTechnologPct={customTechnologPct}
+              setCustomTechnologPct={setCustomTechnologPct}
+              customRiskReservePct={customRiskReservePct}
+              locked={locked}
+              paramsSaving={paramsSaving}
+              onSaveOrderSettings={handleSaveOrderSettings}
+            />
+          </div>
+
+          {/* Правая закрепленная колонка на ПК (U3: sticky top-20) */}
+          <DesktopSummaryCard
+            displayCalc={orderCalcs.displayCalc}
+            calcOutcome={orderCalcs.calcOutcome}
             calcMode={orderCalcs.calcMode}
-            onSelectCalcMode={orderCalcs.handleSelectCalcMode}
-            contractPrice={order.contract_price}
-            priceDiff={orderLines.priceDiff}
-            isUpdatingPrices={orderLines.isUpdatingPrices}
+            calcSaveSuccess={orderCalcs.calcSaveSuccess}
             locked={locked}
-            onOpenPriceDiffModal={() => orderLines.setIsPriceDiffModalOpen(true)}
-          />
-
-          <ItemsSection
-            items={items}
-            lines={lines}
-            locked={locked}
+            calcSaving={orderCalcs.calcSaving}
             networkError={networkError}
-            onOpenAddItem={orderItems.handleOpenAddItem}
-            onOpenEditItem={orderItems.handleOpenEditItem}
-            onDeleteItem={(id) => void orderItems.handleDeleteItem(id)}
-            onOpenSaveAsTemplate={() => setIsSaveTemplateOpen(true)}
-            onOpenApplyTemplate={handleOpenApplyTemplate}
+            calculations={calculations}
+            targetMarginPct={globalParams.target_margin_pct}
+            onSaveCalculation={orderCalcs.handleSaveCalculation}
+            onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
+            onSetShowLivePreview={orderCalcs.setShowLivePreview}
           />
-
-          <LinesSection
-            lines={lines}
-            categoryTotals={orderCalcs.categoryTotals}
-            lineCalculationsById={orderCalcs.lineCalculationsById}
-            priceItemsById={orderLines.priceItemsById}
-            locked={locked}
-            networkError={networkError}
-            onOpenPricePicker={orderLines.handleOpenPricePicker}
-            onOpenAddManualLine={orderLines.handleOpenAddManualLine}
-            onOpenEditLine={orderLines.handleOpenEditLine}
-            onDeleteLine={(id) => void orderLines.handleDeleteLine(id)}
-            onStepLineQty={orderLines.handleStepLineQty}
-            onOpenApplyTemplate={() => handleOpenApplyTemplate()}
-          />
-
-          <AdjustmentsSection
-            adjustments={adjustments}
-            calcMode={orderCalcs.calcMode}
-            locked={locked}
-            networkError={networkError}
-            onOpenAddAdjustment={() => orderAdjustments.handleOpenAddAdjustment(orderCalcs.calcMode)}
-            onDeleteAdjustment={(id) => void orderAdjustments.handleDeleteAdjustment(id)}
-          />
-
-          <OrderParametersAccordion
-            isOpen={isParamsAccordionOpen}
-            setIsOpen={setIsParamsAccordionOpen}
-            globalParams={globalParams}
-            customMargin={customMargin}
-            setCustomMargin={setCustomMargin}
-            customAssemblyMode={customAssemblyMode}
-            setCustomAssemblyMode={setCustomAssemblyMode}
-            customAssemblyPct={customAssemblyPct}
-            setCustomAssemblyPct={setCustomAssemblyPct}
-            customTechnologPct={customTechnologPct}
-            setCustomTechnologPct={setCustomTechnologPct}
-            customRiskReservePct={customRiskReservePct}
-            locked={locked}
-            paramsSaving={paramsSaving}
-            onSaveOrderSettings={handleSaveOrderSettings}
-          />
-        </>
+        </div>
       )}
 
-      {/* ЗАКРЕПЛЁННАЯ СВОДКА РАСЧЁТА (STICKY BOTTOM BAR) */}
+      {/* Мобильная сводка расчёта (lg:hidden) */}
       {orderTab === "calc" && (
         <SummaryBar
           displayCalc={orderCalcs.displayCalc}
@@ -283,6 +324,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           showBreakdown={showBreakdown}
           setShowBreakdown={setShowBreakdown}
           calculations={calculations}
+          targetMarginPct={globalParams.target_margin_pct}
           onSaveCalculation={orderCalcs.handleSaveCalculation}
           onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
           onSetShowLivePreview={orderCalcs.setShowLivePreview}

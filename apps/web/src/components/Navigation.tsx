@@ -5,9 +5,10 @@ export type ActiveTab = "orders" | "prices" | "parameters" | "templates";
 interface NavigationProps {
   activeTab: ActiveTab;
   onTabChange: (tab: ActiveTab) => void;
+  hideMobileNav?: boolean;
 }
 
-export function Navigation({ activeTab, onTabChange }: NavigationProps) {
+export function Navigation({ activeTab, onTabChange, hideMobileNav }: NavigationProps) {
   const { session, signOut } = useAuth();
   const email = session?.user?.email ?? "";
 
@@ -93,8 +94,9 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </div>
       </header>
 
-      {/* Нижняя панель навигации для мобильных устройств (mobile-first, min-h 44px) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-stone-200 bg-[#f6f1ea]/95 backdrop-blur-md safe-bottom">
+      {/* Нижняя панель навигации для мобильных устройств (скрыта на экране деталей заказа, U3.4, M4) */}
+      {!hideMobileNav && (
+        <nav className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-stone-200 bg-[#f6f1ea]/95 backdrop-blur-md safe-bottom">
         <button
           type="button"
           onClick={() => onTabChange("orders")}
@@ -132,6 +134,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           <span>Параметры</span>
         </button>
       </nav>
-    </>
-  );
+    )}
+  </>
+);
 }

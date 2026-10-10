@@ -1,4 +1,5 @@
 import { type CalculationOutcome } from "@kuhni/calc";
+import { getMarginColor } from "../../lib/margin-colors";
 import { formatKzt } from "../../lib/money";
 import {
   formatCalculationOutcomeError,
@@ -19,6 +20,7 @@ export interface SummaryBarProps {
   showBreakdown: boolean;
   setShowBreakdown: (fn: (prev: boolean) => boolean) => void;
   calculations: OrderCalculation[];
+  targetMarginPct?: number;
   onSaveCalculation: () => void;
   onOpenUnlockModal: () => void;
   onSetShowLivePreview: (show: boolean) => void;
@@ -35,198 +37,184 @@ export function SummaryBar({
   showBreakdown,
   setShowBreakdown,
   calculations,
+  targetMarginPct = 0.18,
   onSaveCalculation,
   onOpenUnlockModal,
   onSetShowLivePreview,
 }: SummaryBarProps) {
+  const marginStyle = getMarginColor(displayCalc?.marginPct, targetMarginPct);
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stone-300/80 bg-white/95 backdrop-blur-md shadow-2xl safe-bottom">
-      <div className="mx-auto max-w-4xl px-4 py-3">
-        {/* Результаты или Ошибка расчёта */}
-        {!displayCalc ? (
-          calcOutcome && !calcOutcome.ok ? (
-            <div className="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-800">
-              <strong>Ошибка расчёта:</strong>{" "}
-              {formatCalculationOutcomeError(calcOutcome.error)}
-            </div>
-          ) : null
-        ) : (
-          <div>
-            {/* Предупреждения расчёта */}
-            {displayCalc.warnings.length > 0 && (
-              <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-medium text-amber-900">
-                ⚠️ {displayCalc.warnings.join("; ")}
-              </div>
-            )}
+    <>
+      {/* Затемняющий оверлей для мобильной шторки (70% высоты) */}
+      {showBreakdown && (
+        <div
+          onClick={() => setShowBreakdown(() => false)}
+          className="fixed inset-0 z-40 bg-stone-900/40 backdrop-blur-xs lg:hidden"
+        />
+      )}
 
-            {/* Несоответствие цены договора в заказе и сохранённой версии (Step A1) */}
-            {displayCalc.contractPriceMismatch && (
-              <div className="mb-2 rounded-lg border border-amber-400 bg-amber-50 p-2 text-xs font-semibold text-amber-950">
-                ⚠️ Цена договора в заказе ({formatKzt(displayCalc.contractPriceMismatch.current)} ₸) отличается от версии №{displayCalc.version} ({formatKzt(displayCalc.contractPriceMismatch.snapshot)} ₸). Сохраните новую версию или пересчитайте по актуальным данным.
-              </div>
-            )}
+      {/* Мобильная нижняя шторка и панель (U3.1, U3.2: lg:hidden) */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex flex-col safe-bottom">
+        {/* Предупреждения и ошибки над свёрнутой панелью (U3.3) */}
+        {!displayCalc && calcOutcome && !calcOutcome.ok && (
+          <div className="mx-2 mb-1 rounded-xl border border-rose-300 bg-rose-50 p-2 text-xs text-rose-800 shadow-md">
+            ⚠️ {formatCalculationOutcomeError(calcOutcome.error)}
+          </div>
+        )}
 
-            {/* Сообщение об успешном сохранении (U5) */}
-            {calcSaveSuccess && (
-              <div className="mb-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-900">
-                ✓ {calcSaveSuccess}
-              </div>
-            )}
+        {displayCalc && displayCalc.warnings.length > 0 && (
+          <div className="mx-2 mb-1 rounded-xl border border-amber-300 bg-amber-50 p-2 text-xs font-semibold text-amber-900 shadow-md">
+            ⚠️ {displayCalc.warnings.join("; ")}
+          </div>
+        )}
 
-            {/* Основные цифры (крупно) */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex flex-1 items-baseline gap-2 sm:gap-4">
-                <div>
-                  <span className="block text-[10px] text-stone-500 uppercase tracking-wide">
-                    Цена ({calcMode === "quote" ? "расчёт" : "договор"})
-                  </span>
-                  <span className="text-lg sm:text-2xl font-extrabold text-stone-900">
-                    {formatKzt(displayCalc.priceTotal)} ₸
-                  </span>
-                </div>
+        {displayCalc?.contractPriceMismatch && (
+          <div className="mx-2 mb-1 rounded-xl border border-amber-400 bg-amber-50 p-2 text-xs font-semibold text-amber-950 shadow-md">
+            ⚠️ Цена договора в заказе отличается от версии №{displayCalc.version}.
+          </div>
+        )}
 
-                <div className="border-l border-stone-200 pl-2 sm:pl-4">
-                  <span className="block text-[10px] text-stone-500 uppercase tracking-wide">
-                    Себестоимость
-                  </span>
-                  <span className="text-sm sm:text-base font-bold text-stone-700">
-                    {formatKzt(displayCalc.costTotal)} ₸
-                  </span>
-                </div>
+        {calcSaveSuccess && (
+          <div className="mx-2 mb-1 rounded-xl border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-900 shadow-md">
+            ✓ {calcSaveSuccess}
+          </div>
+        )}
 
-                <div className="border-l border-stone-200 pl-2 sm:pl-4">
-                  <span className="block text-[10px] text-stone-500 uppercase tracking-wide">
-                    Маржа
-                  </span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-sm sm:text-base font-bold text-emerald-900">
-                      {formatKzt(displayCalc.margin)} ₸
-                    </span>
-                    {displayCalc.marginPct !== null && (
-                      <span className="text-xs font-semibold text-emerald-700">
-                        ({formatPercent(displayCalc.marginPct)})
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Кнопки действий: Сохранить расчёт и Сводка */}
-              <div className="flex items-center gap-1.5">
-                {!locked ? (
-                  <button
-                    type="button"
-                    disabled={calcSaving || Boolean(networkError)}
-                    onClick={onSaveCalculation}
-                    className="min-h-11 rounded-xl bg-emerald-900 px-3.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-950 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={networkError ? "Сохранение заблокировано из-за сетевой ошибки" : "Зафиксировать версию расчёта в базе"}
-                  >
-                    {calcSaving ? "Сохранение…" : "💾 Сохранить"}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onOpenUnlockModal}
-                    className="min-h-11 rounded-xl bg-amber-900 px-3 text-xs font-bold text-white shadow-xs hover:bg-amber-950 active:scale-95"
-                    title="Создать новую версию расчёта"
-                  >
-                    🔒 Новая версия
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setShowBreakdown((prev) => !prev)}
-                  className="min-h-11 rounded-xl border border-stone-300 bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-95"
-                >
-                  {showBreakdown ? "Скрыть ▲" : "Сводка ▼"}
-                </button>
-              </div>
+        {/* Раскрытая шторка (70% высоты экрана) */}
+        {showBreakdown && displayCalc && (
+          <div className="max-h-[70vh] flex flex-col rounded-t-3xl border-t border-stone-200 bg-white p-4 shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <span className="font-bold text-stone-900 text-sm">Подробная сводка расчёта</span>
+              <button
+                type="button"
+                onClick={() => setShowBreakdown(() => false)}
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-stone-500 hover:bg-stone-100 text-sm font-semibold"
+              >
+                ▼ Скрыть
+              </button>
             </div>
 
-            {/* Плашка источника расчёта (Step A6, Q2) */}
-            {calculations.length > 0 && (
-              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 bg-stone-50/90 px-3 py-1.5 text-xs text-stone-700">
-                <div className="flex items-center gap-1.5">
-                  {displayCalc.source === "saved" ? (
-                    <>
-                      <span>📌</span>
-                      <span>
-                        Отображается расчёт из версии №{displayCalc.version} от{" "}
-                        {displayCalc.createdAt
-                          ? new Date(displayCalc.createdAt).toLocaleDateString("ru-RU", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                            })
-                          : "—"}
-                        {displayCalc.isContractBaseline && " (договорная)"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span>⚡</span>
-                      <span className="font-semibold text-amber-900">
-                        Превью расчёта по актуальным параметрам (не сохранено в истории)
-                      </span>
-                    </>
-                  )}
-                </div>
+            <div className="mt-3 flex flex-col gap-2 text-xs">
+              <div className="flex justify-between py-1.5 border-b border-stone-100">
+                <span className="text-stone-600">Себестоимость:</span>
+                <span className="font-bold text-stone-900">{formatKzt(displayCalc.costTotal)} ₸</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-stone-100">
+                <span className="text-stone-600">Маржа:</span>
+                <span className={`font-bold ${marginStyle.text}`}>
+                  {formatKzt(displayCalc.margin)} ₸{" "}
+                  {displayCalc.marginPct !== null && `(${formatPercent(displayCalc.marginPct)})`}
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-stone-100">
+                <span className="text-stone-600">Прямые материалы и работы:</span>
+                <span className="font-semibold text-stone-800">{formatKzt(displayCalc.fixedCost)} ₸</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-stone-100">
+                <span className="text-stone-600">Сборка:</span>
+                <span className="font-semibold text-stone-800">{formatKzt(displayCalc.assembly)} ₸</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-stone-100">
+                <span className="text-stone-600">Технолог:</span>
+                <span className="font-semibold text-stone-800">{formatKzt(displayCalc.technolog)} ₸</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-stone-100">
+                <span className="text-stone-600">Резерв на риск:</span>
+                <span className="font-semibold text-stone-800">{formatKzt(displayCalc.riskReserve)} ₸</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-stone-100">
+                <span className="text-stone-600">Мин. цена для целевой маржи:</span>
+                <span className="font-bold text-stone-900">{formatKzt(displayCalc.minPriceForTargetMargin)} ₸</span>
+              </div>
 
-                <div>
+              {calculations.length > 0 && (
+                <div className="mt-2 flex items-center justify-between rounded-xl bg-stone-50 p-2.5 border border-stone-200">
+                  <span className="text-[11px] text-stone-700">
+                    {displayCalc.source === "saved"
+                      ? `Версия №${displayCalc.version}`
+                      : "⚡ Актуальное превью"}
+                  </span>
                   {displayCalc.source === "saved" ? (
                     <button
                       type="button"
                       onClick={() => onSetShowLivePreview(true)}
-                      className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-900 shadow-2xs hover:bg-emerald-50 active:scale-95 transition-all"
+                      className="text-emerald-900 font-semibold underline text-[11px]"
                     >
-                      🔄 Пересчитать по актуальным параметрам
+                      Пересчитать
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={() => onSetShowLivePreview(false)}
-                      className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 hover:bg-stone-100 active:scale-95 transition-all"
+                      className="text-stone-600 underline text-[11px]"
                     >
-                      Вернуться к версии №{getPlanCalculation(calculations)?.version}
+                      К версии №{getPlanCalculation(calculations)?.version}
                     </button>
                   )}
                 </div>
-              </div>
-            )}
-
-            {/* Раскрывающаяся подробная сводка */}
-            {showBreakdown && (
-              <div className="mt-3 max-h-60 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs divide-y divide-stone-200">
-                <div className="pb-2">
-                  <span className="font-bold text-stone-800">
-                    Фиксированные расходы: {formatKzt(displayCalc.fixedCost)} ₸
-                  </span>
-                  <div className="mt-1 grid grid-cols-2 sm:grid-cols-4 gap-1 text-[11px] text-stone-600">
-                    <span>Материалы: {formatKzt(displayCalc.categoryTotals.materials)} ₸</span>
-                    <span>Фасады: {formatKzt(displayCalc.categoryTotals.facades)} ₸</span>
-                    <span>Цех: {formatKzt(displayCalc.categoryTotals.workshop)} ₸</span>
-                    <span>Фурнитура: {formatKzt(displayCalc.categoryTotals.hardware)} ₸</span>
-                    <span>Транспорт: {formatKzt(displayCalc.categoryTotals.transport)} ₸</span>
-                    <span>Работа: {formatKzt(displayCalc.categoryTotals.labor)} ₸</span>
-                    <span>Остальное: {formatKzt(displayCalc.categoryTotals.other)} ₸</span>
-                    <span>Корректировки: {formatKzt(displayCalc.categoryTotals.adjustments)} ₸</span>
-                  </div>
-                </div>
-
-                <div className="py-2 text-[11px] text-stone-700 flex flex-wrap gap-x-4 gap-y-1">
-                  <span>Сборка: {formatKzt(displayCalc.assembly)} ₸</span>
-                  <span>Технолог: {formatKzt(displayCalc.technolog)} ₸</span>
-                  <span>Резерв на риск: {formatKzt(displayCalc.riskReserve)} ₸</span>
-                  <span className="font-semibold">
-                    Мин. цена для целевой маржи: {formatKzt(displayCalc.minPriceForTargetMargin)} ₸
-                  </span>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
+
+        {/* Свёрнутая нижняя панель (U3.1: высота <= 64px) */}
+        <div className="h-16 border-t border-stone-300 bg-white px-3 flex items-center justify-between shadow-2xl">
+          {displayCalc ? (
+            <div className="flex items-center gap-2.5">
+              <div>
+                <span className="block text-[10px] uppercase font-semibold text-stone-500 leading-tight">
+                  {calcMode === "quote" ? "Цена" : "Договор"}
+                </span>
+                <span className="text-lg font-black text-stone-900 leading-none">
+                  {formatKzt(displayCalc.priceTotal)} ₸
+                </span>
+              </div>
+
+              <div className="border-l border-stone-200 pl-2">
+                <span className="block text-[10px] uppercase font-semibold text-stone-500 leading-tight">
+                  Маржа
+                </span>
+                <span className={`text-xs font-black ${marginStyle.text} leading-none`}>
+                  {displayCalc.marginPct !== null ? formatPercent(displayCalc.marginPct) : "—"}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <span className="text-xs text-stone-500 font-medium">Расчёт обновляется…</span>
+          )}
+
+          <div className="flex items-center gap-1.5">
+            {!locked ? (
+              <button
+                type="button"
+                disabled={calcSaving || Boolean(networkError)}
+                onClick={onSaveCalculation}
+                className="flex min-h-11 items-center justify-center rounded-xl bg-emerald-900 px-3.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-950 active:scale-95 disabled:opacity-50"
+              >
+                {calcSaving ? "…" : "Зафиксировать"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpenUnlockModal}
+                className="flex min-h-11 items-center justify-center rounded-xl bg-amber-900 px-3 text-xs font-bold text-white shadow-xs hover:bg-amber-950 active:scale-95"
+              >
+                🔒 Открыть
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowBreakdown((prev) => !prev)}
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-stone-200 bg-stone-100 text-stone-700 hover:bg-stone-200 active:scale-95 text-xs font-bold"
+              title="Раскрыть подробности"
+            >
+              {showBreakdown ? "▼" : "▲"}
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

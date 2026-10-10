@@ -4,6 +4,7 @@ export * from "./LinesSection";
 export * from "./AdjustmentsSection";
 export * from "./OrderParametersAccordion";
 export * from "./SummaryBar";
+export * from "./DesktopSummaryCard";
 export * from "./HistoryTab";
 export * from "./OrderModals";
 export * from "./CalcModeSwitch";
