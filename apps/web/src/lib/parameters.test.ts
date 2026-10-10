@@ -17,6 +17,15 @@ describe("formatPercent", () => {
     expect(formatPercent(null)).toBe("0 %");
     expect(formatPercent(undefined)).toBe("0 %");
   });
+
+  it("форматирует отрицательные и экстремально отрицательные значения маржи", () => {
+    expect(formatPercent(-0.18)).toBe("-18 %");
+    expect(formatPercent(-0.5)).toBe("-50 %");
+    expect(formatPercent(-8.27)).toBe("-827 %");
+    expect(formatPercent(-9.99)).toBe("-999 %");
+    expect(formatPercent(-9.99185)).toBe("< −999 %");
+    expect(formatPercent(-100)).toBe("< −999 %");
+  });
 });
 
 describe("formatPercentInput", () => {

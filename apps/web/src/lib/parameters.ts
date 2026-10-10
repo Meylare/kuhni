@@ -143,6 +143,9 @@ export function formatPercent(fraction: number | null | undefined): string {
     return "0 %";
   }
   const pct = Math.round(fraction * 100 * 1000) / 1000;
+  if (pct < -999) {
+    return "< −999 %";
+  }
   // Округляем до 3 знаков после запятой максимум, убирая лишние хвостовые нули
   const formatted = pct
     .toLocaleString("ru-RU", { maximumFractionDigits: 3 })
