@@ -1,0 +1,159 @@
+import {
+  AdjustmentModal,
+  ItemModal,
+  ManualLineModal,
+  OrderHeaderModal,
+  PriceDiffModal,
+  PricePickerModal,
+  UnlockModal,
+} from "./modals";
+import {
+  useOrderAdjustments,
+  useOrderCalculations,
+  useOrderData,
+  useOrderItems,
+  useOrderLines,
+} from "../../hooks";
+
+interface OrderModalsProps {
+  orderData: ReturnType<typeof useOrderData>;
+  orderItems: ReturnType<typeof useOrderItems>;
+  orderLines: ReturnType<typeof useOrderLines>;
+  orderAdjustments: ReturnType<typeof useOrderAdjustments>;
+  orderCalcs: ReturnType<typeof useOrderCalculations>;
+}
+
+export function OrderModals({
+  orderData,
+  orderItems,
+  orderLines,
+  orderAdjustments,
+  orderCalcs,
+}: OrderModalsProps) {
+  return (
+    <>
+      <OrderHeaderModal
+        isOpen={orderData.isEditingHeader}
+        onClose={() => orderData.setIsEditingHeader(false)}
+        headerName={orderData.headerName}
+        setHeaderName={orderData.setHeaderName}
+        headerClient={orderData.headerClient}
+        setHeaderClient={orderData.setHeaderClient}
+        headerStatus={orderData.headerStatus}
+        setHeaderStatus={orderData.setHeaderStatus}
+        headerContractPrice={orderData.headerContractPrice}
+        setHeaderContractPrice={orderData.setHeaderContractPrice}
+        headerNote={orderData.headerNote}
+        setHeaderNote={orderData.setHeaderNote}
+        headerSaving={orderData.headerSaving}
+        headerError={orderData.headerError}
+        onSave={orderData.handleSaveHeader}
+      />
+
+      <ItemModal
+        isOpen={orderItems.isItemModalOpen}
+        onClose={() => orderItems.setIsItemModalOpen(false)}
+        editingItem={orderItems.editingItem}
+        itemKind={orderItems.itemKind}
+        setItemKind={orderItems.setItemKind}
+        itemTitle={orderItems.itemTitle}
+        setItemTitle={orderItems.setItemTitle}
+        itemMeters={orderItems.itemMeters}
+        setItemMeters={orderItems.setItemMeters}
+        itemDesc={orderItems.itemDesc}
+        setItemDesc={orderItems.setItemDesc}
+        itemSaving={orderItems.itemSaving}
+        itemError={orderItems.itemError}
+        onSave={orderItems.handleSaveItem}
+      />
+
+      <PricePickerModal
+        isOpen={orderLines.isPricePickerOpen}
+        onClose={() => orderLines.setIsPricePickerOpen(false)}
+        selectedPriceItem={orderLines.selectedPriceItem}
+        setSelectedPriceItem={orderLines.setSelectedPriceItem}
+        pickerSearch={orderLines.pickerSearch}
+        setPickerSearch={orderLines.setPickerSearch}
+        pickerCategory={orderLines.pickerCategory}
+        setPickerCategory={orderLines.setPickerCategory}
+        filteredCatalogItems={orderLines.filteredCatalogItems}
+        handleSelectPriceItem={orderLines.handleSelectPriceItem}
+        pickerQty={orderLines.pickerQty}
+        setPickerQty={orderLines.setPickerQty}
+        pickerWaste={orderLines.pickerWaste}
+        setPickerWaste={orderLines.setPickerWaste}
+        pickerItemId={orderLines.pickerItemId}
+        setPickerItemId={orderLines.setPickerItemId}
+        items={orderData.items}
+        pickerComment={orderLines.pickerComment}
+        setPickerComment={orderLines.setPickerComment}
+        pickerSaving={orderLines.pickerSaving}
+        pickerError={orderLines.pickerError}
+        onAdd={orderLines.handleAddPriceItemToOrder}
+      />
+
+      <ManualLineModal
+        isOpen={orderLines.isManualLineModalOpen}
+        onClose={() => orderLines.setIsManualLineModalOpen(false)}
+        editingLine={orderLines.editingLine}
+        manualCategory={orderLines.manualCategory}
+        setManualCategory={orderLines.setManualCategory}
+        manualName={orderLines.manualName}
+        setManualName={orderLines.setManualName}
+        manualUnit={orderLines.manualUnit}
+        setManualUnit={orderLines.setManualUnit}
+        manualQty={orderLines.manualQty}
+        setManualQty={orderLines.setManualQty}
+        manualUnitPrice={orderLines.manualUnitPrice}
+        setManualUnitPrice={orderLines.setManualUnitPrice}
+        manualWaste={orderLines.manualWaste}
+        setManualWaste={orderLines.setManualWaste}
+        manualRounding={orderLines.manualRounding}
+        setManualRounding={orderLines.setManualRounding}
+        manualTechnolog={orderLines.manualTechnolog}
+        setManualTechnolog={orderLines.setManualTechnolog}
+        manualItemId={orderLines.manualItemId}
+        setManualItemId={orderLines.setManualItemId}
+        items={orderData.items}
+        manualComment={orderLines.manualComment}
+        setManualComment={orderLines.setManualComment}
+        manualSaving={orderLines.manualSaving}
+        manualError={orderLines.manualError}
+        onSave={orderLines.handleSaveManualLine}
+      />
+
+      <AdjustmentModal
+        isOpen={orderAdjustments.isAdjustmentModalOpen}
+        onClose={() => orderAdjustments.setIsAdjustmentModalOpen(false)}
+        calcMode={orderCalcs.calcMode}
+        adjKind={orderAdjustments.adjKind}
+        setAdjKind={orderAdjustments.setAdjKind}
+        adjLabel={orderAdjustments.adjLabel}
+        setAdjLabel={orderAdjustments.setAdjLabel}
+        adjAmount={orderAdjustments.adjAmount}
+        setAdjAmount={orderAdjustments.setAdjAmount}
+        adjComment={orderAdjustments.adjComment}
+        setAdjComment={orderAdjustments.setAdjComment}
+        adjSaving={orderAdjustments.adjSaving}
+        adjError={orderAdjustments.adjError}
+        onSave={(e) => orderAdjustments.handleSaveAdjustment(e, orderCalcs.calcMode)}
+      />
+
+      <PriceDiffModal
+        isOpen={orderLines.isPriceDiffModalOpen}
+        onClose={() => orderLines.setIsPriceDiffModalOpen(false)}
+        priceDiff={orderLines.priceDiff}
+        isUpdating={orderLines.isUpdatingPrices}
+        onConfirm={orderLines.handleConfirmPriceUpdates}
+      />
+
+      <UnlockModal
+        isOpen={orderCalcs.isUnlockModalOpen}
+        onClose={() => orderCalcs.setIsUnlockModalOpen(false)}
+        statusLabel={orderData.statusLabel}
+        isSaving={orderCalcs.unlockSaving}
+        onConfirm={orderCalcs.handleConfirmCreateNewVersion}
+      />
+    </>
+  );
+}

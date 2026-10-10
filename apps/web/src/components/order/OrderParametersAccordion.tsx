@@ -12,6 +12,7 @@ export interface OrderParametersAccordionProps {
   setCustomAssemblyPct: (v: string) => void;
   customTechnologPct: string;
   setCustomTechnologPct: (v: string) => void;
+  customRiskReservePct?: string;
   locked: boolean;
   paramsSaving: boolean;
   onSaveOrderSettings: () => void;

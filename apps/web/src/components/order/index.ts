@@ -5,4 +5,6 @@ export * from "./AdjustmentsSection";
 export * from "./OrderParametersAccordion";
 export * from "./SummaryBar";
 export * from "./HistoryTab";
+export * from "./OrderModals";
+export * from "./CalcModeSwitch";
 export * from "./modals";
