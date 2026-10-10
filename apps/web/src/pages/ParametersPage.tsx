@@ -4,6 +4,7 @@ import { formatErrorMessage } from "../lib/errors";
 import {
   evaluateDenominator,
   formatPercent,
+  formatPercentInput,
   PARAMETER_DEFINITIONS,
   PARAMETER_GROUPS,
   parametersArrayToMap,
@@ -60,17 +61,17 @@ export function ParametersPage() {
         const rows = data as ParameterItem[];
         const map = parametersArrayToMap(rows);
         setForm({
-          target_margin_pct: (map.target_margin_pct * 100).toString().replace(".", ","),
+          target_margin_pct: formatPercentInput(map.target_margin_pct),
           price_rounding: String(map.price_rounding),
           assembly_mode: map.assembly_mode,
-          assembly_pct: (map.assembly_pct * 100).toString().replace(".", ","),
+          assembly_pct: formatPercentInput(map.assembly_pct),
           assembly_per_meter_kitchen: String(map.assembly_per_meter_kitchen),
           assembly_per_meter_wardrobe: String(map.assembly_per_meter_wardrobe),
           technolog_mode: map.technolog_mode,
-          technolog_pct: (map.technolog_pct * 100).toString().replace(".", ","),
+          technolog_pct: formatPercentInput(map.technolog_pct),
           technolog_per_sheet: String(map.technolog_per_sheet),
-          waste_edge_pct: (map.waste_edge_pct * 100).toString().replace(".", ","),
-          risk_reserve_pct: (map.risk_reserve_pct * 100).toString().replace(".", ","),
+          waste_edge_pct: formatPercentInput(map.waste_edge_pct),
+          risk_reserve_pct: formatPercentInput(map.risk_reserve_pct),
         });
       }
     } catch (err: unknown) {

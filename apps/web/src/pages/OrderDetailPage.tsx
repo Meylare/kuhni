@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { FactTab } from "../components/FactTab";
+import { useDialog } from "../components/DialogProvider";
 
 import { formatErrorMessage } from "../lib/errors";
 import { formatKzt } from "../lib/money";
@@ -61,6 +62,7 @@ interface OrderDetailPageProps {
 }
 
 export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
+  const dialog = useDialog();
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [lines, setLines] = useState<OrderLine[]>([]);
@@ -461,7 +463,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       const updatedOrder = assertSingleRowAffected<Order>(res);
       setOrder(updatedOrder);
     } catch (err) {
-      alert("Ошибка сохранения параметров: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка",
+        message: "Ошибка сохранения параметров: " + formatErrorMessage(err),
+        variant: "error",
+      });
     } finally {
       setParamsSaving(false);
     }
@@ -559,7 +565,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   }
 
   async function handleDeleteItem(itemId: string) {
-    if (locked || !confirm("Удалить это изделие и все привязанные к нему позиции?")) return;
+    if (locked) return;
+    const confirmed = await dialog.confirm({
+      title: "Удаление изделия",
+      message: "Удалить это изделие и все привязанные к нему позиции?",
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       const supabase = getSupabase();
       const res = await supabase
@@ -572,7 +585,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       setItems((prev) => prev.filter((i) => i.id !== itemId));
       setLines((prev) => prev.filter((l) => l.order_item_id !== itemId));
     } catch (err) {
-      alert("Ошибка удаления изделия: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка удаления",
+        message: "Ошибка удаления изделия: " + formatErrorMessage(err),
+        variant: "error",
+      });
     }
   }
 
@@ -778,7 +795,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   }
 
   async function handleDeleteLine(lineId: string) {
-    if (locked || !confirm("Удалить эту позицию из заказа?")) return;
+    if (locked) return;
+    const confirmed = await dialog.confirm({
+      title: "Удаление позиции",
+      message: "Удалить эту позицию из заказа?",
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       const supabase = getSupabase();
       const res = await supabase
@@ -790,7 +814,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       assertSingleRowAffected(res);
       setLines((prev) => prev.filter((l) => l.id !== lineId));
     } catch (err) {
-      alert("Ошибка удаления: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка удаления",
+        message: "Ошибка удаления: " + formatErrorMessage(err),
+        variant: "error",
+      });
     }
   }
 
@@ -826,7 +854,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       setIsPriceDiffModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert("Ошибка при обновлении цен: " + (err instanceof Error ? err.message : String(err)));
+      await dialog.alert({
+        title: "Ошибка обновления цен",
+        message: "Ошибка при обновлении цен: " + (err instanceof Error ? err.message : String(err)),
+        variant: "error",
+      });
     } finally {
       setIsUpdatingPrices(false);
     }
@@ -843,9 +875,12 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     });
 
     if (saveCheck.needsConfirmation) {
-      const confirmed = window.confirm(
-        `Внимание: ${saveCheck.reason} Вы действительно хотите сохранить этот расчёт в истории?`
-      );
+      const confirmed = await dialog.confirm({
+        title: "Внимание",
+        message: `${saveCheck.reason} Вы действительно хотите сохранить этот расчёт в истории?`,
+        confirmLabel: "Сохранить",
+        destructive: false,
+      });
       if (!confirmed) return;
     }
 
@@ -871,7 +906,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         .single();
 
       if (insertErr) {
-        alert("Ошибка сохранения расчёта: " + formatErrorMessage(insertErr));
+        await dialog.alert({
+          title: "Ошибка сохранения",
+          message: "Ошибка сохранения расчёта: " + formatErrorMessage(insertErr),
+          variant: "error",
+        });
       } else if (data) {
         const saved = data as OrderCalculation;
         setCalculations((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
@@ -879,10 +918,18 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         setShowLivePreview(false);
         setTimeout(() => setCalcSaveSuccess(null), 4000);
       } else {
-        alert("Не удалось сохранить расчёт: сервер не вернул созданную запись.");
+        await dialog.alert({
+          title: "Ошибка сохранения",
+          message: "Не удалось сохранить расчёт: сервер не вернул созданную запись.",
+          variant: "error",
+        });
       }
     } catch (err: unknown) {
-      alert("Ошибка при сохранении расчёта: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка сохранения",
+        message: "Ошибка при сохранении расчёта: " + formatErrorMessage(err),
+        variant: "error",
+      });
     } finally {
       setCalcSaving(false);
     }
@@ -899,7 +946,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       });
 
       if (rpcErr) {
-        alert("Ошибка назначения базового расчёта: " + formatErrorMessage(rpcErr));
+        await dialog.alert({
+          title: "Ошибка",
+          message: "Ошибка назначения базового расчёта: " + formatErrorMessage(rpcErr),
+          variant: "error",
+        });
         return;
       }
 
@@ -910,7 +961,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         }))
       );
     } catch (err) {
-      alert("Ошибка назначения базового расчёта: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка",
+        message: "Ошибка назначения базового расчёта: " + formatErrorMessage(err),
+        variant: "error",
+      });
     }
   }
 
@@ -941,14 +996,22 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
           if (insertErr) {
             console.error("Ошибка фиксации версии расчёта:", insertErr);
-            alert("Предупреждение: не удалось зафиксировать версию расчёта: " + formatErrorMessage(insertErr));
+            await dialog.alert({
+              title: "Предупреждение",
+              message: "Предупреждение: не удалось зафиксировать версию расчёта: " + formatErrorMessage(insertErr),
+              variant: "warning",
+            });
             return;
           } else if (savedCalc) {
             setCalculations((prev) => [savedCalc as OrderCalculation, ...prev]);
           }
         } catch (calcErr) {
           console.error("Ошибка при сохранении версии расчёта:", calcErr);
-          alert("Предупреждение: ошибка сохранения версии: " + formatErrorMessage(calcErr));
+          await dialog.alert({
+            title: "Предупреждение",
+            message: "Предупреждение: ошибка сохранения версии: " + formatErrorMessage(calcErr),
+            variant: "warning",
+          });
           return;
         }
       }
@@ -967,7 +1030,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       setOrder(updatedOrder);
       setIsUnlockModalOpen(false);
     } catch (err) {
-      alert("Ошибка смены статуса: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка",
+        message: "Ошибка смены статуса: " + formatErrorMessage(err),
+        variant: "error",
+      });
     } finally {
       setUnlockSaving(false);
     }
@@ -1032,7 +1099,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   }
 
   async function handleDeleteAdjustment(adjId: string) {
-    if (locked || !confirm("Удалить эту корректировку?")) return;
+    if (locked) return;
+    const confirmed = await dialog.confirm({
+      title: "Удаление корректировки",
+      message: "Удалить эту корректировку?",
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       const supabase = getSupabase();
       const res = await supabase
@@ -1044,7 +1118,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
       assertSingleRowAffected(res);
       setAdjustments((prev) => prev.filter((a) => a.id !== adjId));
     } catch (err) {
-      alert("Ошибка удаления: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка удаления",
+        message: "Ошибка удаления: " + formatErrorMessage(err),
+        variant: "error",
+      });
     }
   }
 

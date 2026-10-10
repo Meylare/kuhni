@@ -4,6 +4,7 @@ import {
   DEFAULT_PARAMETERS,
   evaluateDenominator,
   formatPercent,
+  formatPercentInput,
   parsePercent,
 } from "./parameters";
 
@@ -15,6 +16,19 @@ describe("formatPercent", () => {
     expect(formatPercent(0)).toBe("0 %");
     expect(formatPercent(null)).toBe("0 %");
     expect(formatPercent(undefined)).toBe("0 %");
+  });
+});
+
+describe("formatPercentInput", () => {
+  it("преобразует долю в чистое строковое значение поля ввода без мусора IEEE-754", () => {
+    // 0.145 * 100 в JS дает 14.499999999999998
+    expect(formatPercentInput(0.145)).toBe("14,5");
+    expect(formatPercentInput(0.18)).toBe("18");
+    expect(formatPercentInput(0.04)).toBe("4");
+    expect(formatPercentInput(0.10)).toBe("10");
+    expect(formatPercentInput(0)).toBe("0");
+    expect(formatPercentInput(null)).toBe("0");
+    expect(formatPercentInput(undefined)).toBe("0");
   });
 });
 

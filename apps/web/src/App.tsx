@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { LoginPage } from "./auth/LoginPage";
+import { DialogProvider } from "./components/DialogProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Navigation, type ActiveTab } from "./components/Navigation";
 import { OrderDetailPage } from "./pages/OrderDetailPage";
@@ -121,16 +122,18 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        {!isOnline && (
-          <div
-            role="status"
-            className="bg-amber-600 text-white text-xs sm:text-sm font-medium py-1.5 px-4 text-center sticky top-0 z-50 shadow-sm flex items-center justify-center gap-2"
-          >
-            <span>⚠️</span>
-            <span>Нет подключения к сети. Работа в автономном режиме.</span>
-          </div>
-        )}
-        <Gate />
+        <DialogProvider>
+          {!isOnline && (
+            <div
+              role="status"
+              className="bg-amber-600 text-white text-xs sm:text-sm font-medium py-1.5 px-4 text-center sticky top-0 z-50 shadow-sm flex items-center justify-center gap-2"
+            >
+              <span>⚠️</span>
+              <span>Нет подключения к сети. Работа в автономном режиме.</span>
+            </div>
+          )}
+          <Gate />
+        </DialogProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

@@ -142,12 +142,24 @@ export function formatPercent(fraction: number | null | undefined): string {
   if (fraction === null || fraction === undefined || !Number.isFinite(fraction)) {
     return "0 %";
   }
-  const pct = fraction * 100;
+  const pct = Math.round(fraction * 100 * 1000) / 1000;
   // Округляем до 3 знаков после запятой максимум, убирая лишние хвостовые нули
-  const formatted = Number(pct.toFixed(3))
+  const formatted = pct
     .toLocaleString("ru-RU", { maximumFractionDigits: 3 })
     .replace(/\u00A0/g, " ");
   return `${formatted} %`;
+}
+
+/**
+ * Преобразует десятичную долю (0.145) в чистое строковое значение для поля ввода ("14,5"),
+ * округляя до 3 знаков после запятой и устраняя артефакты IEEE-754 (например, 14.499999999999998).
+ */
+export function formatPercentInput(fraction: number | null | undefined): string {
+  if (fraction === null || fraction === undefined || !Number.isFinite(fraction)) {
+    return "0";
+  }
+  const pct = Math.round(fraction * 100 * 1000) / 1000;
+  return pct.toString().replace(".", ",");
 }
 
 /**

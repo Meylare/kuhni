@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { formatErrorMessage } from "../lib/errors";
 import { formatKzt } from "../lib/money";
 import { formatPercent } from "../lib/parameters";
+import { getLocalTodayDateString } from "../lib/date";
 import {
   buildPlanFactRows,
   computeOrderFinancialSummary,
@@ -11,6 +12,7 @@ import {
 } from "../lib/actuals";
 import { getPlanCalculation } from "../lib/orders";
 import { assertSingleRowAffected, getSupabase } from "../lib/supabase";
+import { useDialog } from "./DialogProvider";
 import {
   ALL_CATEGORIES,
   CATEGORY_LABELS,
@@ -38,9 +40,11 @@ export function FactTab({
   onExpensesChange,
   onPaymentsChange,
 }: FactTabProps) {
+  const dialog = useDialog();
+
   // --- Добавление расхода ---
   const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false);
-  const [expDate, setExpDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [expDate, setExpDate] = useState(() => getLocalTodayDateString());
   const [expCategory, setExpCategory] = useState<PriceCategory>("materials");
   const [expName, setExpName] = useState("");
   const [expAmount, setExpAmount] = useState("");
@@ -52,7 +56,7 @@ export function FactTab({
 
   // --- Добавление поступления ---
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
-  const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [payDate, setPayDate] = useState(() => getLocalTodayDateString());
   const [payAmount, setPayAmount] = useState("");
   const [payNote, setPayNote] = useState("");
   const [paySaving, setPaySaving] = useState(false);
@@ -82,7 +86,7 @@ export function FactTab({
 
   // --- Обработчики ---
   function resetExpenseForm() {
-    setExpDate(new Date().toISOString().slice(0, 10));
+    setExpDate(getLocalTodayDateString());
     setExpCategory("materials");
     setExpName("");
     setExpAmount("");
@@ -93,7 +97,7 @@ export function FactTab({
   }
 
   function resetPaymentForm() {
-    setPayDate(new Date().toISOString().slice(0, 10));
+    setPayDate(getLocalTodayDateString());
     setPayAmount("");
     setPayNote("");
     setPayError(null);
@@ -148,7 +152,13 @@ export function FactTab({
   }
 
   async function handleDeleteExpense(expId: string) {
-    if (!confirm("Удалить этот расход?")) return;
+    const confirmed = await dialog.confirm({
+      title: "Удаление расхода",
+      message: "Удалить этот расход?",
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       const supabase = getSupabase();
       const res = await supabase
@@ -159,7 +169,11 @@ export function FactTab({
       assertSingleRowAffected(res);
       onExpensesChange(expenses.filter((e) => e.id !== expId));
     } catch (err) {
-      alert("Ошибка удаления: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка удаления",
+        message: formatErrorMessage(err),
+        variant: "error",
+      });
     }
   }
 
@@ -202,7 +216,13 @@ export function FactTab({
   }
 
   async function handleDeletePayment(payId: string) {
-    if (!confirm("Удалить это поступление?")) return;
+    const confirmed = await dialog.confirm({
+      title: "Удаление поступления",
+      message: "Удалить это поступление?",
+      confirmLabel: "Удалить",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       const supabase = getSupabase();
       const res = await supabase
@@ -213,7 +233,11 @@ export function FactTab({
       assertSingleRowAffected(res);
       onPaymentsChange(payments.filter((p) => p.id !== payId));
     } catch (err) {
-      alert("Ошибка удаления: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка удаления",
+        message: formatErrorMessage(err),
+        variant: "error",
+      });
     }
   }
 

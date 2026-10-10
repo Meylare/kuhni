@@ -9,6 +9,7 @@ import {
   type PriceItemInput,
 } from "../lib/price-items";
 import { assertSingleRowAffected, getSupabase } from "../lib/supabase";
+import { useDialog } from "../components/DialogProvider";
 import {
   ALL_CATEGORIES,
   CATEGORY_LABELS,
@@ -21,6 +22,7 @@ import {
 } from "../types/database";
 
 export function PriceListPage() {
+  const dialog = useDialog();
   const [items, setItems] = useState<PriceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -213,7 +215,11 @@ export function PriceListPage() {
         setSelectedItem(updated);
       }
     } catch (err: unknown) {
-      alert("Ошибка: " + formatErrorMessage(err));
+      await dialog.alert({
+        title: "Ошибка",
+        message: formatErrorMessage(err),
+        variant: "error",
+      });
     }
   }
 
