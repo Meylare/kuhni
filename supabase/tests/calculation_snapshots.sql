@@ -184,9 +184,7 @@ begin
     raise exception 'A repeated fix must receive the next version number';
   end if;
 
-  delete from public.calculations where order_id = test_order_id;
+  -- Удаление заказа каскадно удаляет calculations
   delete from public.orders where id = test_order_id;
-  delete from public.price_history where price_item_id = test_price_item_id;
-  delete from public.price_items where id = test_price_item_id;
 end;
 $$;

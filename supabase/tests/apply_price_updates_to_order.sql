@@ -62,6 +62,23 @@ begin
     raise exception 'apply_price_updates_to_order should reject nonexistent line';
   end if;
 
+  -- 3. Step A8: проверка отклонения устаревших алиасов (lineId, newUnitPrice)
+  v_err_caught := false;
+  begin
+    perform public.apply_price_updates_to_order(
+      test_order_id,
+      jsonb_build_array(
+        jsonb_build_object('lineId', test_line_1_id, 'newUnitPrice', 99999)
+      )
+    );
+  exception when others then
+    v_err_caught := true;
+  end;
+
+  if not v_err_caught then
+    raise exception 'apply_price_updates_to_order must reject legacy keys (lineId/newUnitPrice)';
+  end if;
+
   -- Очистка тестовых данных
   delete from public.orders where id = test_order_id;
 end;

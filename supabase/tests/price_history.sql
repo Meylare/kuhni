@@ -54,7 +54,13 @@ begin
     raise exception 'Changed price should create one old/new history row';
   end if;
 
-  delete from public.price_history where price_item_id = test_price_item_id;
-  delete from public.price_items where id = test_price_item_id;
+  -- Step A8: удаление price_history запрещено
+  begin
+    delete from public.price_history where price_item_id = test_price_item_id;
+    raise exception 'price_history delete should have been blocked';
+  exception when others then
+    -- Ожидаемая ошибка блокировки удаления
+    null;
+  end;
 end;
 $$;
