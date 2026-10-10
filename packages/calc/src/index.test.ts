@@ -54,7 +54,7 @@ function successful(input: CalculationInput) {
 }
 
 describe("calculate", () => {
-  it("calculates example A: quote with percentage assembly and technolog", () => {
+  it("calculates example A: quote with percentage assembly and technolog (new benchmark: 862 000 ₸)", () => {
     const result = successful(exampleInput);
 
     expect(result.categoryTotals).toMatchObject({
@@ -66,23 +66,104 @@ describe("calculate", () => {
       labor: 15_000,
     });
     expect(result.fixedCost).toBe(546_740);
-    expect(result.priceTotal).toBe(861_000);
-    expect(result.assembly).toBe(124_845);
-    expect(result.technolog).toBe(34_440);
-    expect(result.costTotal).toBe(706_025);
-    expect(result.margin).toBe(154_975);
-    expect(result.marginPct).toBeCloseTo(0.18, 4);
+    expect(result.priceTotal).toBe(862_000);
+    expect(result.assembly).toBe(124_990);
+    expect(result.technolog).toBe(34_480);
+    expect(result.costTotal).toBe(706_210);
+    expect(result.margin).toBe(155_790);
+    expect(result.marginPct).toBeCloseTo(0.1807, 4);
   });
 
-  it("calculates example B: checks the contract and warns below minimum price", () => {
+  it("calculates example B: checks the contract and warns below minimum price 862 000", () => {
     const result = successful({ ...exampleInput, mode: "check_contract", contractPrice: 850_000 });
 
-    expect(result.minPriceForTargetMargin).toBe(861_000);
+    expect(result.minPriceForTargetMargin).toBe(862_000);
     expect(result.priceTotal).toBe(850_000);
     expect(result.costTotal).toBe(703_990);
     expect(result.margin).toBe(146_010);
     expect(result.marginPct).toBeCloseTo(0.171776, 5);
-    expect(result.warnings).toEqual(["договор ниже минимальной цены 861 000"]);
+    expect(result.warnings).toEqual(["договор ниже минимальной цены 862 000"]);
+  });
+
+  it("preserves exact multiple without adding an extra increment at boundary", () => {
+    // 400 000 / (1 - 0.5) = 800 000, which is an exact multiple of 1 000
+    const boundaryInput: CalculationInput = {
+      mode: "quote",
+      parameters: {
+        ...defaultParameters,
+        targetMarginPct: 0.5,
+        assemblyMode: "percent",
+        assemblyPct: 0,
+        technologMode: "percent",
+        technologPct: 0,
+        riskReservePct: 0,
+        priceRounding: 1_000,
+      },
+      lines: [
+        { category: "materials", qty: 400, unitPrice: 1_000, wastePct: 0, billableQtyRounding: "none" },
+      ],
+    };
+    const result = successful(boundaryInput);
+    expect(result.fixedCost).toBe(400_000);
+    expect(result.priceTotal).toBe(800_000);
+  });
+
+  it("satisfies minimumPrice invariant across 10 000 deterministic pseudo-random orders", () => {
+    let seed = 42;
+    const nextRandom = () => {
+      seed = (Math.imul(1664525, seed) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+
+    const roundings = [100, 500, 1000, 5000];
+
+    for (let i = 0; i < 10_000; i++) {
+      const fixedCost = Math.floor(nextRandom() * 4_000_000) + 50_000;
+      const targetMarginPct = 0.05 + nextRandom() * 0.35; // 5% to 40%
+      const assemblyPct = 0.05 + nextRandom() * 0.15; // 5% to 20%
+      const technologPct = 0.01 + nextRandom() * 0.08; // 1% to 9%
+      const riskReservePct = nextRandom() * 0.05; // 0% to 5%
+      const priceRounding = roundings[Math.floor(nextRandom() * roundings.length)];
+
+      const params: CalculationParameters = {
+        ...defaultParameters,
+        targetMarginPct,
+        assemblyPct,
+        technologPct,
+        riskReservePct,
+        priceRounding,
+      };
+
+      const denominator = calculatePriceDenominator(params);
+      if (denominator <= 0) continue;
+
+      const outcome = calculate({
+        mode: "quote",
+        parameters: params,
+        lines: [
+          { category: "materials", qty: fixedCost, unitPrice: 1, wastePct: 0, billableQtyRounding: "none" },
+        ],
+      });
+
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) throw new Error(outcome.error);
+
+      const priceTotal = outcome.result.priceTotal;
+      const rawPrice = fixedCost / denominator;
+
+      // Invariant 1: priceTotal >= fixedCost / denominator
+      expect(priceTotal).toBeGreaterThanOrEqual(rawPrice - 1e-6);
+
+      // Invariant 2: priceTotal - rawPrice < priceRounding
+      expect(priceTotal - rawPrice).toBeLessThan(priceRounding + 1e-6);
+
+      // Invariant 3: priceTotal is a multiple of priceRounding
+      expect(priceTotal % priceRounding).toBe(0);
+
+      // Invariant 4: actual margin is >= target margin (allowing up to 3 KZT variance for separate roundKztUp ceiling on shares)
+      const allowedVarianceMargin = 3 / priceTotal;
+      expect(outcome.result.marginPct).toBeGreaterThanOrEqual(targetMarginPct - allowedVarianceMargin);
+    }
   });
 
   it("calculates example C: adds per-meter assembly to fixed cost", () => {
@@ -120,7 +201,7 @@ describe("calculate", () => {
   it("applies negative price adjustments as a discount after base price rounding", () => {
     const result = successful({
       ...exampleInput,
-      adjustments: [{ kind: "price", amount: -11_000 }],
+      adjustments: [{ kind: "price", amount: -12_000 }],
     });
 
     expect(result.priceTotal).toBe(850_000);

@@ -151,6 +151,14 @@ export function roundKztUp(value: number): number {
   return rounded === 0 ? 0 : rounded;
 }
 
+/** Rounds positive or negative values upward to the nearest increment, ignoring float noise. */
+export function roundUpToIncrement(value: number, increment: number): number {
+  const units = value / increment;
+  const roundedUnits = Math.ceil(units - floatingPointTolerance(units));
+  const rounded = (roundedUnits === 0 ? 0 : roundedUnits) * increment;
+  return rounded === 0 ? 0 : rounded;
+}
+
 /** Rounds positive or negative values to the nearest increment, with .5 rounded up. */
 export function roundHalfUp(value: number, increment: number): number {
   return (
@@ -228,7 +236,7 @@ function minimumPrice(
   const denominator = calculatePriceDenominator(parameters);
 
   if (denominator <= 0) return "parameters_leave_no_share_for_fixed_costs";
-  return roundHalfUp(fixedCost / denominator, parameters.priceRounding);
+  return roundUpToIncrement(fixedCost / denominator, parameters.priceRounding);
 }
 
 export function validateCalculationInput(input: CalculationInput): string[] {

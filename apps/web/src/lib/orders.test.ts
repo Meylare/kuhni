@@ -431,10 +431,10 @@ describe("orders helpers", () => {
     if (!outcome.ok) throw new Error(outcome.error);
 
     expect(outcome.result.fixedCost).toBe(546_740);
-    expect(outcome.result.priceTotal).toBe(861_000);
-    expect(outcome.result.costTotal).toBe(706_025);
-    expect(outcome.result.margin).toBe(154_975);
-    expect(outcome.result.marginPct).toBeCloseTo(0.18, 4);
+    expect(outcome.result.priceTotal).toBe(862_000);
+    expect(outcome.result.costTotal).toBe(706_210);
+    expect(outcome.result.margin).toBe(155_790);
+    expect(outcome.result.marginPct).toBeCloseTo(155_790 / 862_000, 4);
 
     // Now test contract check mode with 850 000
     const contractOutcome = calculateOrderLive({
@@ -454,7 +454,7 @@ describe("orders helpers", () => {
     expect(contractOutcome.result.margin).toBe(146_010);
     expect(contractOutcome.result.marginPct).toBeCloseTo(0.1718, 3);
     expect(contractOutcome.result.warnings).toEqual([
-      "договор ниже минимальной цены 861 000",
+      "договор ниже минимальной цены 862 000",
     ]);
   });
 
