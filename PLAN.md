@@ -250,5 +250,25 @@
   - В `apps/web/src/pages/OrderDetailPage.tsx` детальный просмотр снимков в истории версий переведён на `normalizeOrderCalculation`.
   - Все 109 тестов (`@kuhni/calc` и `@kuhni/web`) проходят успешно (`npm test`), сборка проекта `npm run build` завершается чисто без ошибок.
 
+### Шаг A8. Исправление Service Worker и кэширования (п. 2.3)
+* **Результат 2026-10-10 (коммит `97ee298`):**
+  - В `apps/web/src/lib/cache.ts` реализованы утилиты `isCacheableAssetUrl` (проверка статических ассетов собственного домена) и `clearAllCaches` (очистка Cache Storage), покрытые unit-тестами в `cache.test.ts`.
+  - В `apps/web/public/sw.js`:
+    - Исключен перехват и кэширование любых запросов к сторонним доменам (включая `*.supabase.co`) и к API (`/api/*`, `/rest/*`).
+    - Кэшируются только статические ассеты собственного домена при условии `response.ok` и `response.type === 'basic'`.
+    - SPA навигация отдаёт кэшированный `index.html` только при сбое сети.
+  - В `apps/web/src/auth/AuthProvider.tsx`: метод `signOut` дополнен вызовом `clearAllCaches()` для полной очистки кэша при логауте.
+  - В `apps/web/src/App.tsx`: добавлен глобальный индикатор отсутствия сети на основе событий `online` и `offline`.
+
+### Шаг C1. Полировка интерфейса и актуализация документации (п. 2.17)
+* **Результат 2026-10-10 (коммит `51fd648`):**
+  - В `apps/web/src/lib/parameters.ts` добавлена функция `formatPercentInput` с устранением артефактов float (IEEE-754: `14.499999999999998` -> `14,5`), использована при загрузке формы в `ParametersPage.tsx`. Добавлены тесты в `parameters.test.ts`.
+  - В `apps/web/src/lib/money.ts`: функция `formatKzt` при получении `NaN`, `null`, `undefined` или `Infinity` возвращает аккуратный символ `—` вместо строки `"NaN"`. Добавлены unit-тесты в `money.test.ts`.
+  - В `apps/web/src/lib/date.ts`: реализована функция `getLocalTodayDateString` с часовым поясом `Asia/Almaty` (Казахстан, GMT+5), предотвращающая баг со вчерашней датой ночью при использовании UTC. Добавлены unit-тесты в `date.test.ts`, применены в `FactTab.tsx`.
+  - Создан компонент `DialogProvider` (`apps/web/src/components/DialogProvider.tsx`) с хуком `useDialog`: все нативные блокирующие `window.alert()` и `window.confirm()` в `OrderDetailPage.tsx`, `PriceListPage.tsx` и `FactTab.tsx` заменены на аккуратные модальные окна в едином Tailwind-стиле.
+  - Синхронизированы контрольные эталонные показатели в `UI_spec.md` и создан `README.md` с точными цифрами: расчётная цена **861 000 ₸**, себестоимость **706 025 ₸**, маржа **18,00%**.
+  - Все 123 теста (19 в `@kuhni/calc` и 104 в `@kuhni/web`) проходят успешно (`npm test`), сборка `npm run build` завершается чисто без ошибок.
+
+
 
 
