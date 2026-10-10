@@ -35,14 +35,14 @@ export function validatePaymentInput(input: {
 }
 
 /**
- * Расходы по категории, без учёта переделок.
+ * Расходы по категории, включая переделки (сумма категорий = итог = экспорт).
  */
 export function sumExpensesByCategory(
   expenses: ActualExpense[],
   category: PriceCategory,
 ): number {
   return expenses
-    .filter((e) => e.category === category && !e.is_rework)
+    .filter((e) => e.category === category)
     .reduce((sum, e) => sum + Number(e.amount), 0);
 }
 
@@ -60,31 +60,6 @@ export function sumReworks(expenses: ActualExpense[]): number {
  */
 export function sumPayments(payments: Payment[]): number {
   return payments.reduce((sum, p) => sum + Number(p.amount), 0);
-}
-
-/**
- * Общая сумма фактических расходов (без переделок).
- */
-export function sumAllExpenses(expenses: ActualExpense[]): number {
-  return expenses
-    .filter((e) => !e.is_rework)
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-}
-
-/**
- * Фактическая маржа: поступления минус все расходы (включая переделки).
- * Если нет поступлений, возвращает null.
- */
-export function computeActualMargin(
-  expenses: ActualExpense[],
-  payments: Payment[],
-): { margin: number; marginPct: number | null } | null {
-  const totalPayments = sumPayments(payments);
-  if (totalPayments === 0) return null;
-  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const margin = totalPayments - totalExpenses;
-  const marginPct = totalPayments > 0 ? margin / totalPayments : null;
-  return { margin, marginPct };
 }
 
 export interface OrderFinancialSummary {
@@ -138,8 +113,8 @@ export interface PlanFactRow {
   key: string;
   label: string;
   plan: number;
-  fact: number;
-  diff: number;
+  fact: number | null;
+  diff: number | null;
 }
 
 export interface CalculationResultLike {
@@ -153,9 +128,30 @@ export interface CalculationResultLike {
 }
 
 /**
+ * Безопасное приведение неизвестного результата расчёта к CalculationResultLike без as any.
+ */
+export function toCalculationResultLike(result: unknown): CalculationResultLike | null {
+  if (!result || typeof result !== "object") return null;
+  const obj = result as Record<string, unknown>;
+  return {
+    categoryTotals:
+      obj.categoryTotals && typeof obj.categoryTotals === "object"
+        ? (obj.categoryTotals as Record<string, number>)
+        : undefined,
+    assembly: typeof obj.assembly === "number" ? obj.assembly : undefined,
+    fixedAssembly: typeof obj.fixedAssembly === "number" ? obj.fixedAssembly : undefined,
+    technolog: typeof obj.technolog === "number" ? obj.technolog : undefined,
+    fixedTechnolog: typeof obj.fixedTechnolog === "number" ? obj.fixedTechnolog : undefined,
+    riskReserve: typeof obj.riskReserve === "number" ? obj.riskReserve : undefined,
+    costTotal: typeof obj.costTotal === "number" ? obj.costTotal : undefined,
+  };
+}
+
+/**
  * Формирует строки таблицы «План / Факт».
- * Сумма строк плана строго равна cost_total, так как включает
- * сборку, технолога, резерв на риск и корректировки.
+ * Сумма строк плана строго равна cost_total.
+ * Для строк «Резерв на риск» и «Корректировки» факт и разница равны null (отображаются как «—»).
+ * Сумма строк факта по категориям строго равна totalExpenses.
  */
 export function buildPlanFactRows(
   result: CalculationResultLike | null | undefined,
@@ -171,7 +167,7 @@ export function buildPlanFactRows(
   const riskReservePlan = result ? Number(result.riskReserve || 0) : 0;
   const adjustmentsPlan = result ? Number(catTotals.adjustments || 0) : 0;
 
-  const rawRows: { key: string; label: string; plan: number; fact: number }[] = [
+  const rawRows: { key: string; label: string; plan: number; fact: number | null }[] = [
     {
       key: "materials",
       label: "Материалы",
@@ -224,13 +220,13 @@ export function buildPlanFactRows(
       key: "risk_reserve",
       label: "Резерв на риск",
       plan: riskReservePlan,
-      fact: 0,
+      fact: null,
     },
     {
       key: "adjustments",
       label: "Корректировки",
       plan: adjustmentsPlan,
-      fact: 0,
+      fact: null,
     },
     {
       key: "other",
@@ -242,6 +238,6 @@ export function buildPlanFactRows(
 
   return rawRows.map((r) => ({
     ...r,
-    diff: r.fact - r.plan,
+    diff: r.fact !== null ? r.fact - r.plan : null,
   }));
 }

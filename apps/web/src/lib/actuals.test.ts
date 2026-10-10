@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildPlanFactRows,
-  computeActualMargin,
   computeOrderFinancialSummary,
-  sumAllExpenses,
   sumExpensesByCategory,
   sumPayments,
   sumReworks,
+  toCalculationResultLike,
   validateExpenseInput,
   validatePaymentInput,
 } from "./actuals";
@@ -121,14 +120,15 @@ describe("validatePaymentInput", () => {
 });
 
 describe("sumExpensesByCategory", () => {
-  it("sums only matching category, excluding reworks", () => {
+  it("sums matching category including reworks (Step A6: сумма строк = итог = экспорт)", () => {
     const expenses: ActualExpense[] = [
       makeExpense({ id: "1", category: "materials", amount: 10000 }),
       makeExpense({ id: "2", category: "materials", amount: 5000 }),
       makeExpense({ id: "3", category: "hardware", amount: 3000 }),
       makeExpense({ id: "4", category: "materials", amount: 2000, is_rework: true }),
     ];
-    expect(sumExpensesByCategory(expenses, "materials")).toBe(15000);
+    // Материалы включают переделку 2000: 10000 + 5000 + 2000 = 17000
+    expect(sumExpensesByCategory(expenses, "materials")).toBe(17000);
     expect(sumExpensesByCategory(expenses, "hardware")).toBe(3000);
     expect(sumExpensesByCategory(expenses, "transport")).toBe(0);
   });
@@ -149,17 +149,6 @@ describe("sumReworks", () => {
   });
 });
 
-describe("sumAllExpenses", () => {
-  it("sums expenses excluding reworks", () => {
-    const expenses: ActualExpense[] = [
-      makeExpense({ id: "1", amount: 10000, is_rework: false }),
-      makeExpense({ id: "2", amount: 5000, is_rework: true }),
-      makeExpense({ id: "3", amount: 3000, is_rework: false }),
-    ];
-    expect(sumAllExpenses(expenses)).toBe(13000);
-  });
-});
-
 describe("sumPayments", () => {
   it("sums all payments", () => {
     const payments: Payment[] = [
@@ -174,50 +163,18 @@ describe("sumPayments", () => {
   });
 });
 
-describe("computeActualMargin", () => {
-  it("returns null when no payments", () => {
-    const expenses = [makeExpense({ amount: 10000 })];
-    expect(computeActualMargin(expenses, [])).toBeNull();
-  });
-
-  it("computes positive margin", () => {
-    const expenses: ActualExpense[] = [
-      makeExpense({ id: "1", amount: 100000 }),
-      makeExpense({ id: "2", amount: 50000 }),
-    ];
-    const payments: Payment[] = [
-      makePayment({ id: "1", amount: 500000 }),
-    ];
-    const result = computeActualMargin(expenses, payments);
-    expect(result).not.toBeNull();
-    expect(result!.margin).toBe(350000); // 500000 - 150000
-    expect(result!.marginPct).toBeCloseTo(0.7, 2); // 350000/500000
-  });
-
-  it("includes reworks in total expenses for margin calculation", () => {
-    const expenses: ActualExpense[] = [
-      makeExpense({ id: "1", amount: 100000, is_rework: false }),
-      makeExpense({ id: "2", amount: 20000, is_rework: true }),
-    ];
-    const payments: Payment[] = [
-      makePayment({ id: "1", amount: 200000 }),
-    ];
-    const result = computeActualMargin(expenses, payments);
-    expect(result).not.toBeNull();
-    // margin = 200000 - 120000 = 80000
-    expect(result!.margin).toBe(80000);
-  });
-
-  it("computes negative margin (loss)", () => {
-    const expenses: ActualExpense[] = [
-      makeExpense({ id: "1", amount: 600000 }),
-    ];
-    const payments: Payment[] = [
-      makePayment({ id: "1", amount: 500000 }),
-    ];
-    const result = computeActualMargin(expenses, payments);
-    expect(result).not.toBeNull();
-    expect(result!.margin).toBe(-100000);
+describe("toCalculationResultLike", () => {
+  it("safely coerces unknown calculation result", () => {
+    expect(toCalculationResultLike(null)).toBeNull();
+    expect(toCalculationResultLike("not an object")).toBeNull();
+    const parsed = toCalculationResultLike({
+      categoryTotals: { materials: 100000 },
+      assembly: 20000,
+      costTotal: 120000,
+    });
+    expect(parsed?.categoryTotals?.materials).toBe(100000);
+    expect(parsed?.assembly).toBe(20000);
+    expect(parsed?.costTotal).toBe(120000);
   });
 });
 
@@ -268,6 +225,56 @@ describe("Step A3: Plan/Fact rows and categories (assembly & technolog)", () => 
     const technologRow = rows.find((r) => r.key === "technolog");
     expect(technologRow).toBeDefined();
     expect(technologRow!.plan).toBe(34_440);
+  });
+
+  it("Step A6: fact rows sum strictly equals totalExpenses, risk_reserve and adjustments have fact === null", () => {
+    const expenses: ActualExpense[] = [
+      makeExpense({ id: "1", category: "materials", amount: 100_000, is_rework: false }),
+      makeExpense({ id: "2", category: "materials", amount: 20_000, is_rework: true }), // rework included in materials
+      makeExpense({ id: "3", category: "workshop", amount: 50_000, is_rework: false }),
+      makeExpense({ id: "4", category: "hardware", amount: 30_000, is_rework: false }),
+      makeExpense({ id: "5", category: "assembly", amount: 40_000, is_rework: false }),
+      makeExpense({ id: "6", category: "technolog", amount: 15_000, is_rework: false }),
+    ];
+
+    const benchmarkResult = {
+      categoryTotals: {
+        materials: 120_000,
+        workshop: 50_000,
+        hardware: 30_000,
+        adjustments: -5_000,
+      },
+      assembly: 40_000,
+      technolog: 15_000,
+      riskReserve: 10_000,
+      costTotal: 260_000,
+    };
+
+    const rows = buildPlanFactRows(benchmarkResult, expenses);
+
+    // 1. Проверяем, что резерв и корректировки имеют fact === null и diff === null
+    const riskRow = rows.find((r) => r.key === "risk_reserve");
+    expect(riskRow).toBeDefined();
+    expect(riskRow!.plan).toBe(10_000);
+    expect(riskRow!.fact).toBeNull();
+    expect(riskRow!.diff).toBeNull();
+
+    const adjRow = rows.find((r) => r.key === "adjustments");
+    expect(adjRow).toBeDefined();
+    expect(adjRow!.plan).toBe(-5_000);
+    expect(adjRow!.fact).toBeNull();
+    expect(adjRow!.diff).toBeNull();
+
+    // 2. Проверяем, что сумма всех ненулевых строк факта строго равна totalExpenses
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0); // 255 000
+    const factSum = rows.reduce((acc, row) => acc + (row.fact ?? 0), 0);
+    expect(factSum).toBe(totalExpenses);
+    expect(factSum).toBe(255_000);
+
+    // 3. Материалы включают переделку
+    const matRow = rows.find((r) => r.key === "materials");
+    expect(matRow!.fact).toBe(120_000); // 100 000 + 20 000
+    expect(matRow!.diff).toBe(0); // 120 000 - 120 000
   });
 });
 

@@ -7,6 +7,7 @@ import { getLocalTodayDateString } from "../lib/date";
 import {
   buildPlanFactRows,
   computeOrderFinancialSummary,
+  toCalculationResultLike,
   validateExpenseInput,
   validatePaymentInput,
 } from "../lib/actuals";
@@ -69,9 +70,13 @@ export function FactTab({
 
   const planFactRows = useMemo(() => {
     if (!planCalc) return [];
-    const res = planCalc.result as Record<string, unknown>;
-    return buildPlanFactRows(res as any, expenses);
+    return buildPlanFactRows(toCalculationResultLike(planCalc.result), expenses);
   }, [planCalc, expenses]);
+
+  const riskReservePlan = useMemo(() => {
+    const row = planFactRows.find((r) => r.key === "risk_reserve");
+    return row ? row.plan : 0;
+  }, [planFactRows]);
 
   const planCostTotal = planCalc ? Number(planCalc.cost_total) : 0;
 
@@ -286,16 +291,18 @@ export function FactTab({
                         {row.plan > 0 ? `${formatKzt(row.plan)} ₸` : "—"}
                       </td>
                       <td className="px-3 py-2 text-right font-semibold text-stone-900">
-                        {row.fact > 0 ? `${formatKzt(row.fact)} ₸` : "—"}
+                        {row.fact !== null && row.fact > 0 ? `${formatKzt(row.fact)} ₸` : "—"}
                       </td>
                       <td className={`px-3 py-2 text-right font-semibold ${
-                        row.diff > 0
-                          ? "text-rose-700"
-                          : row.diff < 0
-                          ? "text-emerald-700"
+                        row.diff !== null
+                          ? row.diff > 0
+                            ? "text-rose-700"
+                            : row.diff < 0
+                            ? "text-emerald-700"
+                            : "text-stone-400"
                           : "text-stone-400"
                       }`}>
-                        {row.fact > 0 || row.plan > 0
+                        {row.diff !== null && (row.fact! > 0 || row.plan > 0)
                           ? `${row.diff > 0 ? "+" : ""}${formatKzt(row.diff)} ₸`
                           : "—"}
                       </td>
@@ -304,7 +311,14 @@ export function FactTab({
                 </tbody>
                 <tfoot className="border-t-2 border-stone-300 bg-stone-50/80 text-xs font-bold">
                   <tr>
-                    <td className="px-3 py-2 text-stone-900">Итого расходы</td>
+                    <td className="px-3 py-2 text-stone-900">
+                      Итого расходы
+                      {riskReservePlan > 0 && (
+                        <span className="block text-[11px] font-normal text-stone-500">
+                          в плане учтён резерв {formatKzt(riskReservePlan)} ₸
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-right text-stone-700">
                       {formatKzt(planCostTotal)} ₸
                     </td>

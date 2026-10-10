@@ -36,6 +36,14 @@ begin
     raise exception 'Accounting export values are incorrect: %', row_to_json(export_row);
   end if;
 
+  -- Проверка инварианта (Step A6): сумма всех категорий расходов строго равна итогу расходов
+  if (export_row.materials_expenses + export_row.workshop_expenses + export_row.facades_expenses +
+      export_row.hardware_expenses + export_row.transport_expenses + export_row.labor_expenses +
+      export_row.assembly_expenses + export_row.technolog_expenses + export_row.other_expenses)
+      <> export_row.actual_expenses_total then
+    raise exception 'Sum of category expenses does not match actual_expenses_total: %', row_to_json(export_row);
+  end if;
+
   delete from public.orders where id = test_order_id;
 end;
 $$;
