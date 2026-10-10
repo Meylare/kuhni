@@ -27,19 +27,20 @@ export class SnapshotCorruptedError extends Error {
   }
 }
 
-import type {
-  BillableQtyRounding,
-  Order,
-  OrderAdjustment,
-  OrderCalculation,
-  OrderCalculationSummary,
-  OrderItem,
-  OrderItemKind,
-  OrderLine,
-  OrderStatus,
-  OrderWithCalculations,
-  PriceCategory,
-  PriceItem,
+import {
+  ORDER_STATUS_LABELS,
+  type BillableQtyRounding,
+  type Order,
+  type OrderAdjustment,
+  type OrderCalculation,
+  type OrderCalculationSummary,
+  type OrderItem,
+  type OrderItemKind,
+  type OrderLine,
+  type OrderStatus,
+  type OrderWithCalculations,
+  type PriceCategory,
+  type PriceItem,
 } from "../types/database";
 import type { ParametersMap } from "./parameters";
 
@@ -609,12 +610,15 @@ export function filterOrders(
       return false;
     }
 
-    // Фильтр по поисковой строке (название или клиент)
+    // Фильтр по поисковой строке (название, клиент или статус)
     if (normalizedQuery.length > 0) {
       const matchName = order.name.toLowerCase().includes(normalizedQuery);
       const matchClient =
         order.client_label?.toLowerCase().includes(normalizedQuery) ?? false;
-      if (!matchName && !matchClient) {
+      const statusLabel =
+        ORDER_STATUS_LABELS[order.status]?.toLowerCase() ?? "";
+      const matchStatus = statusLabel.includes(normalizedQuery);
+      if (!matchName && !matchClient && !matchStatus) {
         return false;
       }
     }

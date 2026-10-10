@@ -1,3 +1,4 @@
+import { TrashIcon } from "../icons";
 import { formatKzt } from "../../lib/money";
 import { getVisibleAdjustments } from "../../lib/orders";
 import type { OrderAdjustment } from "../../types/database";
@@ -66,19 +67,19 @@ export function AdjustmentsSection({
             >
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-stone-900">{adj.label}</span>
-                  <span className="rounded-md bg-stone-200 px-1.5 py-0.5 text-[10px] text-stone-700">
+                  <span className="font-semibold text-stone-900 text-sm">{adj.label}</span>
+                  <span className="rounded-md bg-stone-200 px-2 py-0.5 text-xs text-stone-700">
                     {adj.kind === "price" ? "к цене" : "к затратам"}
                   </span>
                 </div>
                 {adj.comment && (
-                  <p className="text-[11px] text-stone-500 italic">{adj.comment}</p>
+                  <p className="text-xs text-stone-500 italic mt-0.5">{adj.comment}</p>
                 )}
               </div>
 
               <div className="flex items-center gap-2">
                 <span
-                  className={`font-bold text-sm ${
+                  className={`font-bold text-sm sm:text-base ${
                     adj.amount < 0 ? "text-emerald-700" : "text-stone-900"
                   }`}
                 >
@@ -88,9 +89,10 @@ export function AdjustmentsSection({
                   <button
                     type="button"
                     onClick={() => onDeleteAdjustment(adj.id)}
-                    className="p-1 text-rose-400 hover:text-rose-700"
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 text-rose-500 hover:text-rose-800 hover:bg-rose-50 transition-colors"
+                    title="Удалить корректировку"
                   >
-                    🗑
+                    <TrashIcon />
                   </button>
                 )}
               </div>

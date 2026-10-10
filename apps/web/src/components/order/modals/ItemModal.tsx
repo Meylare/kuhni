@@ -88,6 +88,7 @@ export function ItemModal({
             <input
               type="text"
               required
+              autoFocus
               value={itemTitle}
               onChange={(e) => setItemTitle(e.target.value)}
               placeholder="Например: Кухня угловая"
@@ -103,6 +104,7 @@ export function ItemModal({
               <input
                 type="text"
                 inputMode="decimal"
+                enterKeyHint="done"
                 value={itemMeters}
                 onChange={(e) => setItemMeters(e.target.value)}
                 placeholder="3.0"

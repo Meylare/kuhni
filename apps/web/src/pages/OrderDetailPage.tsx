@@ -17,9 +17,11 @@ import {
   useOrderAdjustments,
   useOrderCalculations,
   useOrderData,
+  useOrderDeletions,
   useOrderItems,
   useOrderLines,
 } from "../hooks";
+import { UndoToast } from "../components/UndoToast";
 import {
   getVersionSyncStatus,
   type CurrentCalculationSnapshotInput,
@@ -218,6 +220,21 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     }
   }
 
+  // 6. Отложенное удаление на 6 секунд с кнопкой отмены (U7)
+  const {
+    pendingAction,
+    undoDelete,
+    flushPending,
+    handleDeleteLineWithUndo,
+    handleDeleteItemWithUndo,
+  } = useOrderDeletions({
+    lines,
+    setLines,
+    items,
+    setItems,
+    locked,
+  });
+
   // Горячие клавиши на ПК (U3.4)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -330,7 +347,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               networkError={networkError}
               onOpenAddItem={orderItems.handleOpenAddItem}
               onOpenEditItem={orderItems.handleOpenEditItem}
-              onDeleteItem={(id) => void orderItems.handleDeleteItem(id)}
+              onDuplicateItem={(item) => void orderItems.handleDuplicateItem(item)}
+              onDeleteItem={handleDeleteItemWithUndo}
               onOpenSaveAsTemplate={() => setIsSaveTemplateOpen(true)}
               onOpenApplyTemplate={handleOpenApplyTemplate}
             />
@@ -345,7 +363,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               onOpenPricePicker={orderLines.handleOpenPricePicker}
               onOpenAddManualLine={orderLines.handleOpenAddManualLine}
               onOpenEditLine={orderLines.handleOpenEditLine}
-              onDeleteLine={(id) => void orderLines.handleDeleteLine(id)}
+              onDuplicateLine={(line) => void orderLines.handleDuplicateLine(line)}
+              onDeleteLine={handleDeleteLineWithUndo}
               onStepLineQty={orderLines.handleStepLineQty}
               onOpenApplyTemplate={() => handleOpenApplyTemplate()}
             />
@@ -442,6 +461,15 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           });
         }}
       />
+
+      {/* Тост отмены удаления позиции или изделия (U7: 6 сек) */}
+      {pendingAction && (
+        <UndoToast
+          message={`Удалено: ${pendingAction.label}`}
+          onUndo={undoDelete}
+          onDismiss={flushPending}
+        />
+      )}
     </div>
   );
 }

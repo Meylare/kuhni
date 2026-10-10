@@ -1,3 +1,4 @@
+import { formatCurrencyInput } from "../../../lib/number-inputs";
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
@@ -69,6 +70,7 @@ export function OrderHeaderModal({
             <input
               type="text"
               required
+              autoFocus
               value={headerName}
               onChange={(e) => setHeaderName(e.target.value)}
               className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
@@ -111,10 +113,11 @@ export function OrderHeaderModal({
             <input
               type="text"
               inputMode="numeric"
+              enterKeyHint="done"
               value={headerContractPrice}
-              onChange={(e) => setHeaderContractPrice(e.target.value)}
+              onChange={(e) => setHeaderContractPrice(formatCurrencyInput(e.target.value))}
               placeholder="850 000"
-              className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+              className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm font-semibold text-stone-900 focus:border-emerald-800"
             />
           </div>
 

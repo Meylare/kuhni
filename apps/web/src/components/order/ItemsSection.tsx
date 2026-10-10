@@ -1,3 +1,4 @@
+import { CopyIcon, EditIcon, TrashIcon } from "../icons";
 import {
   ORDER_ITEM_KIND_LABELS,
   type OrderItem,
@@ -11,6 +12,7 @@ export interface ItemsSectionProps {
   networkError: string | null;
   onOpenAddItem: () => void;
   onOpenEditItem: (item: OrderItem) => void;
+  onDuplicateItem?: (item: OrderItem) => void;
   onDeleteItem: (id: string) => void;
   onOpenSaveAsTemplate?: () => void;
   onOpenApplyTemplate?: (itemId?: string) => void;
@@ -23,6 +25,7 @@ export function ItemsSection({
   networkError,
   onOpenAddItem,
   onOpenEditItem,
+  onDuplicateItem,
   onDeleteItem,
   onOpenSaveAsTemplate,
   onOpenApplyTemplate,
@@ -98,7 +101,7 @@ export function ItemsSection({
                     <span className="font-bold text-stone-900 text-sm">
                       {item.title}
                     </span>
-                    <span className="rounded-md bg-stone-200 px-2 py-0.5 text-[11px] font-medium text-stone-700">
+                    <span className="rounded-md bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-700">
                       {kindLabel}
                     </span>
                   </div>
@@ -112,21 +115,31 @@ export function ItemsSection({
 
                 {!locked && (
                   <div className="flex items-center gap-1">
+                    {onDuplicateItem && (
+                      <button
+                        type="button"
+                        onClick={() => onDuplicateItem(item)}
+                        className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-200/60 transition-colors"
+                        title="Дублировать изделие"
+                      >
+                        <CopyIcon />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => onOpenEditItem(item)}
-                      className="p-1.5 text-xs text-stone-500 hover:text-stone-800"
+                      className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-200/60 transition-colors"
                       title="Редактировать"
                     >
-                      ✎
+                      <EditIcon />
                     </button>
                     <button
                       type="button"
                       onClick={() => onDeleteItem(item.id)}
-                      className="p-1.5 text-xs text-rose-500 hover:text-rose-800"
+                      className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 text-rose-500 hover:text-rose-800 hover:bg-rose-50 transition-colors"
                       title="Удалить"
                     >
-                      🗑
+                      <TrashIcon />
                     </button>
                   </div>
                 )}

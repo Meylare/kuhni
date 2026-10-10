@@ -13,6 +13,7 @@ import {
 interface UseOrderItemsProps {
   order: Order | null;
   items: OrderItem[];
+  lines?: OrderLine[];
   setItems: React.Dispatch<React.SetStateAction<OrderItem[]>>;
   setLines: React.Dispatch<React.SetStateAction<OrderLine[]>>;
   locked: boolean;
@@ -20,6 +21,8 @@ interface UseOrderItemsProps {
 
 export function useOrderItems({
   order,
+  items: _items,
+  lines = [],
   setItems,
   setLines,
   locked,
@@ -142,6 +145,63 @@ export function useOrderItems({
     }
   }
 
+  async function handleDuplicateItem(item: OrderItem) {
+    if (!order || locked) return;
+    try {
+      const supabase = getSupabase();
+      const { data: newItem, error: itemErr } = await supabase
+        .from("order_items")
+        .insert({
+          order_id: order.id,
+          title: `${item.title} (копия)`,
+          kind: item.kind,
+          linear_meters: item.linear_meters,
+          description: item.description,
+          dims: item.dims || {},
+        })
+        .select()
+        .single();
+      if (itemErr) throw itemErr;
+      if (!newItem) return;
+
+      const linkedLines = lines.filter((l) => l.order_item_id === item.id);
+      if (linkedLines.length > 0) {
+        const copies = linkedLines.map((l) => ({
+          order_id: order.id,
+          order_item_id: newItem.id,
+          price_item_id: l.price_item_id,
+          category: l.category,
+          name: l.name,
+          unit: l.unit,
+          qty: l.qty,
+          unit_price: l.unit_price,
+          waste_pct: l.waste_pct,
+          billable_qty_rounding: l.billable_qty_rounding,
+          counts_for_technolog: l.counts_for_technolog,
+          is_manual: l.is_manual,
+          comment: l.comment,
+        }));
+        const { data: newLines, error: linesErr } = await supabase
+          .from("order_lines")
+          .insert(copies)
+          .select();
+        if (linesErr) throw linesErr;
+        if (newLines) {
+          setLines((prev) => [...prev, ...(newLines as OrderLine[])]);
+        }
+      }
+
+      setItems((prev) => [...prev, newItem as OrderItem]);
+    } catch (err) {
+      console.error("Ошибка дублирования изделия:", err);
+      await dialog.alert({
+        title: "Ошибка",
+        message: "Не удалось продублировать изделие: " + formatErrorMessage(err),
+        variant: "error",
+      });
+    }
+  }
+
   return {
     isItemModalOpen,
     setIsItemModalOpen,
@@ -159,6 +219,7 @@ export function useOrderItems({
     handleOpenAddItem,
     handleOpenEditItem,
     handleSaveItem,
+    handleDuplicateItem,
     handleDeleteItem,
   };
 }

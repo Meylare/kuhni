@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { formatErrorMessage } from "../lib/errors";
+import { getMarginColor } from "../lib/margin-colors";
 import { formatKzt } from "../lib/money";
+import { formatCurrencyInput } from "../lib/number-inputs";
 import {
   filterOrders,
   getLatestCalculation,
@@ -28,8 +30,27 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Поиск, фильтры и сортировка
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatus | "all">(() => {
+    try {
+      const saved = localStorage.getItem("kuhni_orders_filter_status");
+      if (saved && (saved === "all" || ORDER_STATUSES.includes(saved as OrderStatus))) {
+        return saved as OrderStatus | "all";
+      }
+    } catch {
+      // ignore
+    }
+    return "all";
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("kuhni_orders_filter_status", selectedStatus);
+    } catch {
+      // ignore
+    }
+  }, [selectedStatus]);
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<OrderStatus | "all">("all");
   const [sortDirection, setSortDirection] = useState<"newest" | "oldest">("newest");
 
   // Модалка создания заказа
@@ -325,7 +346,7 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                   <div className="flex flex-wrap items-center gap-4 text-xs">
                     {/* Цена договора */}
                     <div>
-                      <span className="block text-[11px] text-stone-400">По договору</span>
+                      <span className="block text-xs text-stone-500 font-medium">По договору</span>
                       <span className="text-sm font-semibold text-stone-800">
                         {order.contract_price !== null
                           ? `${formatKzt(order.contract_price)} ₸`
@@ -335,19 +356,24 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
 
                     {/* Последний расчёт */}
                     <div>
-                      <span className="block text-[11px] text-stone-400">
+                      <span className="block text-xs text-stone-500 font-medium">
                         Расчёт {latestCalc ? `v${latestCalc.version}` : ""}
                       </span>
                       {latestCalc ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-emerald-900">
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-sm font-bold text-stone-900">
                             {formatKzt(latestCalc.price_total)} ₸
                           </span>
-                          {latestCalc.margin_pct !== null && (
-                            <span className="rounded-md bg-emerald-100/70 px-1.5 py-0.5 text-[11px] font-bold text-emerald-900">
-                              {formatPercent(latestCalc.margin_pct)}
-                            </span>
-                          )}
+                          {latestCalc.margin_pct !== null && (() => {
+                            const marginStyle = getMarginColor(latestCalc.margin_pct, 0.18);
+                            return (
+                              <span
+                                className={`rounded-md px-2 py-0.5 text-xs font-bold ${marginStyle.bg} ${marginStyle.text} border ${marginStyle.border}`}
+                              >
+                                {formatPercent(latestCalc.margin_pct)}
+                              </span>
+                            );
+                          })()}
                         </div>
                       ) : (
                         <span className="text-xs text-stone-400 italic">не зафиксирован</span>
@@ -397,6 +423,7 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                 <input
                   type="text"
                   required
+                  autoFocus
                   value={createName}
                   onChange={(e) => setCreateName(e.target.value)}
                   placeholder="Например: Кухня угловая, ЖК Асыл Арман"
@@ -426,10 +453,11 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                 <input
                   type="text"
                   inputMode="numeric"
+                  enterKeyHint="done"
                   value={createContractPrice}
-                  onChange={(e) => setCreateContractPrice(e.target.value)}
+                  onChange={(e) => setCreateContractPrice(formatCurrencyInput(e.target.value))}
                   placeholder="Например: 850 000"
-                  className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800 focus:outline-hidden"
+                  className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2 text-sm font-semibold text-stone-900 focus:border-emerald-800 focus:outline-hidden"
                 />
               </div>
 

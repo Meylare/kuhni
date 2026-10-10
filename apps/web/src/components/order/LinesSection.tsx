@@ -1,3 +1,4 @@
+import { CopyIcon, EditIcon, TrashIcon } from "../icons";
 import { formatKzt } from "../../lib/money";
 import { getOrderLineCalculation } from "../../lib/orders";
 import {
@@ -17,6 +18,7 @@ export interface LinesSectionProps {
   onOpenPricePicker: () => void;
   onOpenAddManualLine: () => void;
   onOpenEditLine: (line: OrderLine) => void;
+  onDuplicateLine?: (line: OrderLine) => void;
   onDeleteLine: (id: string) => void;
   onStepLineQty?: (lineId: string, delta: number) => void;
   onOpenApplyTemplate?: () => void;
@@ -32,6 +34,7 @@ export function LinesSection({
   onOpenPricePicker,
   onOpenAddManualLine,
   onOpenEditLine,
+  onDuplicateLine,
   onDeleteLine,
   onStepLineQty,
   onOpenApplyTemplate,
@@ -132,51 +135,51 @@ export function LinesSection({
                       >
                         <div className="flex-1 min-w-0 pr-2">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-semibold text-stone-900">
+                            <span className="font-semibold text-stone-900 text-sm">
                               {line.name}
                             </span>
                             {line.is_manual && (
-                              <span className="rounded-md bg-stone-200/80 px-1.5 py-0.2 text-[10px] font-medium text-stone-600">
+                              <span className="rounded-md bg-stone-200/80 px-2 py-0.5 text-xs font-medium text-stone-600">
                                 ручная
                               </span>
                             )}
                             {line.counts_for_technolog && (
-                              <span className="rounded-md bg-blue-100 px-1.5 py-0.2 text-[10px] font-medium text-blue-700">
+                              <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
                                 технолог
                               </span>
                             )}
                             {line.waste_pct > 0 && (
-                              <span className="rounded-md bg-amber-100 px-1.5 py-0.2 text-[10px] font-medium text-amber-800">
+                              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                                 +{(Number(line.waste_pct) * 100).toFixed(0)}% отход
                               </span>
                             )}
                           </div>
 
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-stone-600">
                             {!locked && onStepLineQty ? (
                               <div className="flex items-center gap-1 rounded-lg border border-stone-200 bg-white p-0.5 shadow-2xs">
                                 <button
                                   type="button"
                                   onClick={() => onStepLineQty(line.id, -1)}
-                                  className="flex min-h-7 min-w-7 sm:min-h-6 sm:min-w-6 items-center justify-center rounded-md bg-stone-100 text-xs font-bold text-stone-800 hover:bg-stone-200 active:scale-95"
+                                  className="flex min-h-8 min-w-8 items-center justify-center rounded-md bg-stone-100 text-sm font-bold text-stone-800 hover:bg-stone-200 active:scale-95"
                                   title="Уменьшить"
                                 >
                                   −
                                 </button>
-                                <span className="font-bold text-stone-900 px-1 text-xs">
+                                <span className="font-bold text-stone-900 px-1.5 text-sm">
                                   {line.qty} {line.unit}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => onStepLineQty(line.id, 1)}
-                                  className="flex min-h-7 min-w-7 sm:min-h-6 sm:min-w-6 items-center justify-center rounded-md bg-emerald-900 text-xs font-bold text-white hover:bg-emerald-950 active:scale-95"
+                                  className="flex min-h-8 min-w-8 items-center justify-center rounded-md bg-emerald-900 text-sm font-bold text-white hover:bg-emerald-950 active:scale-95"
                                   title="Увеличить"
                                 >
                                   +
                                 </button>
                               </div>
                             ) : (
-                              <span>
+                              <span className="font-semibold">
                                 {line.qty} {line.unit}
                               </span>
                             )}
@@ -192,34 +195,44 @@ export function LinesSection({
                           </div>
 
                           {hasPriceChange && (
-                            <div className="mt-1 text-[11px] font-semibold text-amber-700">
+                            <div className="mt-1 text-xs font-semibold text-amber-700">
                               ⚠️ В прайсе сейчас {formatKzt(currentCatItem.price)} ₸
                             </div>
                           )}
                         </div>
 
                         <div className="mt-2 flex items-center justify-between gap-3 border-t border-stone-200/40 pt-1.5 sm:mt-0 sm:border-0 sm:pt-0">
-                          <span className="font-bold text-stone-900 text-sm">
+                          <span className="font-bold text-stone-900 text-sm sm:text-base">
                             {formatKzt(lineTotal)} ₸
                           </span>
 
                           {!locked && (
                             <div className="flex items-center gap-1">
+                              {onDuplicateLine && (
+                                <button
+                                  type="button"
+                                  onClick={() => onDuplicateLine(line)}
+                                  className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-200/60 transition-colors"
+                                  title="Дублировать позицию"
+                                >
+                                  <CopyIcon />
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => onOpenEditLine(line)}
-                                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-1 text-stone-400 hover:text-stone-700 hover:bg-stone-200/50"
+                                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-200/60 transition-colors"
                                 title="Редактировать"
                               >
-                                ✎
+                                <EditIcon />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => onDeleteLine(line.id)}
-                                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-1 text-rose-400 hover:text-rose-700 hover:bg-rose-50"
+                                className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 text-rose-500 hover:text-rose-800 hover:bg-rose-50 transition-colors"
                                 title="Удалить"
                               >
-                                🗑
+                                <TrashIcon />
                               </button>
                             </div>
                           )}

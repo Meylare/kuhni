@@ -5,3 +5,5 @@ export { useOrderItems } from "./useOrderItems";
 export { useOrderAdjustments } from "./useOrderAdjustments";
 export { useManualLine } from "./useManualLine";
 export { useProductTemplates } from "./useProductTemplates";
+export { useUndoDelete } from "./useUndoDelete";
+export { useOrderDeletions } from "./useOrderDeletions";

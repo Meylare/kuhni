@@ -312,6 +312,42 @@ export function useOrderLines({
     }
   }
 
+  async function handleDuplicateLine(line: OrderLine) {
+    if (locked || !order) return;
+    try {
+      const { data, error: insertErr } = await getSupabase()
+        .from("order_lines")
+        .insert({
+          order_id: order.id,
+          order_item_id: line.order_item_id,
+          price_item_id: line.price_item_id,
+          category: line.category,
+          name: line.name,
+          unit: line.unit,
+          qty: line.qty,
+          unit_price: line.unit_price,
+          waste_pct: line.waste_pct,
+          billable_qty_rounding: line.billable_qty_rounding,
+          counts_for_technolog: line.counts_for_technolog,
+          is_manual: line.is_manual,
+          comment: line.comment,
+        })
+        .select()
+        .single();
+      if (insertErr) throw insertErr;
+      if (data) {
+        setLines((prev) => [...prev, data as OrderLine]);
+      }
+    } catch (err) {
+      console.error("Ошибка дублирования позиции:", err);
+      await dialog.alert({
+        title: "Ошибка",
+        message: "Не удалось продублировать позицию: " + formatErrorMessage(err),
+        variant: "error",
+      });
+    }
+  }
+
   async function handleDeleteLine(lineId: string) {
     if (locked) return;
     const confirmed = await dialog.confirm({
@@ -395,6 +431,7 @@ export function useOrderLines({
     handleStepLineQty,
     handleSetLineQty,
     handleAddPriceItemToOrder,
+    handleDuplicateLine,
     handleDeleteLine,
     // Price updates
     isPriceDiffModalOpen,
