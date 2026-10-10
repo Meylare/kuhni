@@ -41,9 +41,21 @@
 # Установка зависимостей
 npm install
 
+# Проверка линтером (oxlint)
+npm run lint
+
+# Проверка типов ядра расчёта
+npm run typecheck -w @kuhni/calc
+
 # Запуск тестов (calc + web)
 npm test
 
 # Сборка веб-приложения
 npm run build
 ```
+
+## CI / Автоматизация
+
+В проекте настроен GitHub Actions workflow (`.github/workflows/ci.yml`), который при каждом push и pull request в ветку `main`:
+1. Запускает проверку линтером (`npm run lint`), проверку типов, модульные тесты (`npm test`) и сборку приложения (`npm run build`).
+2. Поднимает тестовый локальный инстанс Supabase и прогоняет весь набор SQL-тестов из директории `supabase/tests/*.sql` через `psql` с флагом `ON_ERROR_STOP=1`.
