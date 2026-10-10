@@ -1,6 +1,8 @@
 import { formatKzt } from "../../lib/money";
 import type { Order } from "../../types/database";
 
+export type OrderStage = "quote" | "contract" | "fact";
+
 export interface OrderHeaderProps {
   order: Order;
   statusConfig: { bg: string; text: string; border: string; dot: string };
@@ -8,7 +10,8 @@ export interface OrderHeaderProps {
   locked: boolean;
   networkError: string | null;
   copySuccess: boolean;
-  orderTab: "calc" | "history" | "fact";
+  autoSaveToast?: string | null;
+  currentStage: OrderStage;
   linesCount: number;
   calculationsCount: number;
   factCount: number;
@@ -16,8 +19,9 @@ export interface OrderHeaderProps {
   onOpenEditHeader: () => void;
   onRetryLoad: () => void;
   onOpenUnlockModal: () => void;
+  onOpenVersionsModal: () => void;
   onCopySummary: () => void;
-  onSelectTab: (tab: "calc" | "history" | "fact") => void;
+  onSelectStage: (stage: OrderStage) => void;
 }
 
 export function OrderHeader({
@@ -27,7 +31,8 @@ export function OrderHeader({
   locked,
   networkError,
   copySuccess,
-  orderTab,
+  autoSaveToast,
+  currentStage,
   linesCount,
   calculationsCount,
   factCount,
@@ -35,35 +40,58 @@ export function OrderHeader({
   onOpenEditHeader,
   onRetryLoad,
   onOpenUnlockModal,
+  onOpenVersionsModal,
   onCopySummary,
-  onSelectTab,
+  onSelectStage,
 }: OrderHeaderProps) {
   return (
     <>
-      {/* Верхняя навигация и статус */}
-      <div className="flex items-center justify-between gap-2 border-b border-stone-200 pb-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white/80 px-3.5 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-white active:scale-98"
-        >
-          <span>←</span>
-          <span>Заказы</span>
-        </button>
-
+      {/* Верхняя навигация, статус и версии */}
+      <div className="flex items-center justify-between gap-2 border-b border-stone-200 pb-3 flex-wrap">
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white/80 px-3.5 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-white active:scale-98"
+          >
+            <span>←</span>
+            <span>Заказы</span>
+          </button>
+
+          {/* Кратковременное уведомление об автосохранении (U4: 2 сек) */}
+          {autoSaveToast && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800 transition-opacity">
+              <span>✓</span>
+              <span>{autoSaveToast}</span>
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Кнопка версий расчёта (U5.5) */}
+          <button
+            type="button"
+            onClick={onOpenVersionsModal}
+            className="flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50 active:scale-98"
+            title="История сохранённых версий"
+          >
+            <span>🕘</span>
+            <span>Версии ({calculationsCount})</span>
+          </button>
+
           <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot}`} />
             {statusLabel}
           </span>
+
           <button
             type="button"
             onClick={onOpenEditHeader}
             className="min-h-10 rounded-xl border border-stone-300 bg-white px-3 text-xs font-medium text-stone-700 hover:bg-stone-50"
           >
-            Изменить заказ
+            Изменить
           </button>
         </div>
       </div>
@@ -92,7 +120,7 @@ export function OrderHeader({
         </div>
       )}
 
-      {/* Предупреждение о блокировке (U5) */}
+      {/* Предупреждение о блокировке (U4, U5) */}
       {locked && (
         <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-xs">
           <div className="flex items-start gap-2.5">
@@ -109,7 +137,7 @@ export function OrderHeader({
             onClick={onOpenUnlockModal}
             className="self-start sm:self-auto min-h-10 whitespace-nowrap rounded-xl bg-amber-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-950 active:scale-98"
           >
-            Создать новую версию расчёта
+            Открыть для правок
           </button>
         </div>
       )}
@@ -155,40 +183,40 @@ export function OrderHeader({
           </div>
         </div>
 
-        {/* Вкладки: Расчёт / История / Факт */}
-        <div className="mt-4 flex items-center gap-1 border-t border-stone-100 pt-3">
+        {/* Этапы выполнения: Смета → Договор → Факт (U5.1) */}
+        <div className="mt-4 flex items-center gap-1.5 border-t border-stone-100 pt-3">
           <button
             type="button"
-            onClick={() => onSelectTab("calc")}
-            className={`min-h-10 flex-1 rounded-xl text-xs font-bold transition-all ${
-              orderTab === "calc"
+            onClick={() => onSelectStage("quote")}
+            className={`min-h-11 flex-1 rounded-xl text-xs font-bold transition-all ${
+              currentStage === "quote"
                 ? "bg-emerald-900 text-white shadow-xs"
-                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
             }`}
           >
-            1. Расчёт ({linesCount} поз.)
+            Смета ({linesCount})
           </button>
           <button
             type="button"
-            onClick={() => onSelectTab("history")}
-            className={`min-h-10 flex-1 rounded-xl text-xs font-bold transition-all ${
-              orderTab === "history"
+            onClick={() => onSelectStage("contract")}
+            className={`min-h-11 flex-1 rounded-xl text-xs font-bold transition-all ${
+              currentStage === "contract"
                 ? "bg-emerald-900 text-white shadow-xs"
-                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
             }`}
           >
-            2. История версий ({calculationsCount})
+            Договор
           </button>
           <button
             type="button"
-            onClick={() => onSelectTab("fact")}
-            className={`min-h-10 flex-1 rounded-xl text-xs font-bold transition-all ${
-              orderTab === "fact"
+            onClick={() => onSelectStage("fact")}
+            className={`min-h-11 flex-1 rounded-xl text-xs font-bold transition-all ${
+              currentStage === "fact"
                 ? "bg-emerald-900 text-white shadow-xs"
-                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
             }`}
           >
-            3. Факт ({factCount})
+            Факт ({factCount})
           </button>
         </div>
       </div>

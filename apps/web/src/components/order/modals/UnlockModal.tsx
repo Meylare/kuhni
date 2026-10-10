@@ -2,6 +2,7 @@ interface UnlockModalProps {
   isOpen: boolean;
   onClose: () => void;
   statusLabel: string;
+  nextVersionNumber?: number;
   isSaving: boolean;
   onConfirm: () => Promise<void> | void;
 }
@@ -10,6 +11,7 @@ export function UnlockModal({
   isOpen,
   onClose,
   statusLabel,
+  nextVersionNumber,
   isSaving,
   onConfirm,
 }: UnlockModalProps) {
@@ -19,7 +21,7 @@ export function UnlockModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
       <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xl">
         <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-          <h3 className="text-base font-bold text-stone-900">Создать новую версию расчёта</h3>
+          <h3 className="text-base font-bold text-stone-900">Открыть для правок</h3>
           <button
             type="button"
             onClick={onClose}
@@ -34,7 +36,8 @@ export function UnlockModal({
             Заказ сейчас находится в статусе «<strong>{statusLabel}</strong>».
           </p>
           <p className="mt-2">
-            Чтобы внести изменения в позиции или параметры, текущий расчёт будет зафиксирован в истории версий, а статус заказа переведён в «<strong>Оценён</strong>» (quoted) для редактирования.
+            Открыть для правок? Текущий расчёт будет зафиксирован как версия{" "}
+            {nextVersionNumber ? `№${nextVersionNumber}` : "в истории"}, а статус изменится на «<strong>Оценён</strong>» для внесения изменений.
           </p>
         </div>
 
@@ -53,7 +56,7 @@ export function UnlockModal({
             onClick={() => void onConfirm()}
             className="min-h-11 rounded-xl bg-amber-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-amber-950 disabled:opacity-50"
           >
-            {isSaving ? "Обработка…" : "Разблокировать для правок"}
+            {isSaving ? "Обработка…" : "Открыть для правок"}
           </button>
         </div>
       </div>

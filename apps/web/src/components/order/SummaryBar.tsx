@@ -1,4 +1,5 @@
 import { type CalculationOutcome } from "@kuhni/calc";
+import { type VersionSyncStatus } from "../../lib/calculation-versions";
 import { getMarginColor } from "../../lib/margin-colors";
 import { formatKzt } from "../../lib/money";
 import {
@@ -14,6 +15,7 @@ export interface SummaryBarProps {
   calcOutcome: CalculationOutcome | null;
   calcMode: "quote" | "check_contract";
   calcSaveSuccess: string | null;
+  syncStatus?: VersionSyncStatus;
   locked: boolean;
   calcSaving: boolean;
   networkError: string | null;
@@ -31,6 +33,7 @@ export function SummaryBar({
   calcOutcome,
   calcMode,
   calcSaveSuccess,
+  syncStatus,
   locked,
   calcSaving,
   networkError,
@@ -154,6 +157,18 @@ export function SummaryBar({
                   )}
                 </div>
               )}
+              {syncStatus && (
+                <div
+                  className={`mt-2 flex items-center justify-between rounded-xl p-2.5 border text-xs font-semibold ${
+                    syncStatus.badgeColor === "warning"
+                      ? "bg-amber-50 text-amber-900 border-amber-300"
+                      : "bg-stone-50 text-stone-700 border-stone-200"
+                  }`}
+                >
+                  <span className="text-stone-500">Версия расчёта:</span>
+                  <span>{syncStatus.label}</span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -185,6 +200,12 @@ export function SummaryBar({
           )}
 
           <div className="flex items-center gap-1.5">
+            {syncStatus && syncStatus.badgeColor === "warning" && (
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900 border border-amber-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-600 inline-block" />
+                Есть изменения
+              </span>
+            )}
             {!locked ? (
               <button
                 type="button"

@@ -7,5 +7,6 @@ export * from "./SummaryBar";
 export * from "./DesktopSummaryCard";
 export * from "./HistoryTab";
 export * from "./OrderModals";
+export * from "./ContractStageCard";
 export * from "./CalcModeSwitch";
 export * from "./modals";

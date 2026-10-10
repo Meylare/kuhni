@@ -34,14 +34,32 @@ export function OrderParametersAccordion({
   paramsSaving,
   onSaveOrderSettings,
 }: OrderParametersAccordionProps) {
+  const isCustomized = Boolean(
+    customMargin ||
+    customAssemblyMode !== "default" ||
+    customAssemblyPct ||
+    customTechnologPct
+  );
+
   return (
     <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between text-left text-xs font-bold text-stone-800"
+        className="flex w-full items-center justify-between text-left text-xs font-bold text-stone-800 gap-2 flex-wrap"
       >
-        <span>⚙️ Индивидуальные параметры расчёта заказа</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span>⚙️ Дополнительно (параметры)</span>
+          {isCustomized ? (
+            <span className="rounded-md bg-amber-100 text-amber-900 px-2 py-0.5 text-[11px] font-semibold border border-amber-300">
+              изменены{customMargin ? `: маржа ${customMargin}%` : ""}
+            </span>
+          ) : (
+            <span className="rounded-md bg-stone-100 text-stone-600 px-2 py-0.5 text-[11px] font-normal">
+              используются общие параметры
+            </span>
+          )}
+        </div>
         <span>{isOpen ? "▲ Скрыть" : "▼ Настроить"}</span>
       </button>
 

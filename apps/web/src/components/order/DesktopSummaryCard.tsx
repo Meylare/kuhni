@@ -1,4 +1,5 @@
 import { type CalculationOutcome } from "@kuhni/calc";
+import { type VersionSyncStatus } from "../../lib/calculation-versions";
 import { getMarginColor } from "../../lib/margin-colors";
 import { formatKzt } from "../../lib/money";
 import {
@@ -14,6 +15,7 @@ export interface DesktopSummaryCardProps {
   calcOutcome: CalculationOutcome | null;
   calcMode: "quote" | "check_contract";
   calcSaveSuccess: string | null;
+  syncStatus?: VersionSyncStatus;
   locked: boolean;
   calcSaving: boolean;
   networkError: string | null;
@@ -29,6 +31,7 @@ export function DesktopSummaryCard({
   calcOutcome,
   calcMode,
   calcSaveSuccess,
+  syncStatus,
   locked,
   calcSaving,
   networkError,
@@ -119,6 +122,22 @@ export function DesktopSummaryCard({
             >
               🔒 Открыть для правок
             </button>
+          )}
+
+          {/* Индикатор статуса синхронизации версии (U4) */}
+          {syncStatus && (
+            <div
+              className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold ${
+                syncStatus.badgeColor === "warning"
+                  ? "bg-amber-100 text-amber-900 border border-amber-300"
+                  : "bg-stone-100 text-stone-600"
+              }`}
+            >
+              {syncStatus.badgeColor === "warning" && (
+                <span className="h-2 w-2 rounded-full bg-amber-600 inline-block" />
+              )}
+              <span>{syncStatus.label}</span>
+            </div>
           )}
 
           {/* Источник расчёта */}

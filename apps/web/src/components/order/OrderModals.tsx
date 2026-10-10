@@ -8,6 +8,7 @@ import {
   PricePickerModal,
   SaveAsTemplateModal,
   UnlockModal,
+  VersionsModal,
 } from "./modals";
 import {
   useOrderAdjustments,
@@ -28,6 +29,8 @@ interface OrderModalsProps {
   isApplyTemplateOpen: boolean;
   setIsApplyTemplateOpen: (open: boolean) => void;
   applyTemplateDefaultItemId?: string;
+  isVersionsModalOpen: boolean;
+  setIsVersionsModalOpen: (open: boolean) => void;
   onTemplateSaved?: (name: string) => void;
 }
 
@@ -42,6 +45,8 @@ export function OrderModals({
   isApplyTemplateOpen,
   setIsApplyTemplateOpen,
   applyTemplateDefaultItemId,
+  isVersionsModalOpen,
+  setIsVersionsModalOpen,
   onTemplateSaved,
 }: OrderModalsProps) {
   return (
@@ -191,6 +196,16 @@ export function OrderModals({
         globalParams={orderData.globalParams}
         locked={orderData.locked}
         defaultItemId={applyTemplateDefaultItemId}
+      />
+
+      <VersionsModal
+        isOpen={isVersionsModalOpen}
+        onClose={() => setIsVersionsModalOpen(false)}
+        calculations={orderData.calculations}
+        locked={orderData.locked}
+        onSetBaseline={(calcId) => void orderCalcs.handleSetBaseline(calcId)}
+        onSaveCalculation={orderCalcs.handleSaveCalculation}
+        calcSaving={orderCalcs.calcSaving}
       />
     </>
   );

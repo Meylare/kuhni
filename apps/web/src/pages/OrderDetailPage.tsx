@@ -1,19 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDialog } from "../components/DialogProvider";
 import { FactTab } from "../components/FactTab";
 import {
   AdjustmentsSection,
-  CalcModeSwitch,
+  ContractStageCard,
   DesktopSummaryCard,
-  HistoryTab,
   ItemsSection,
   LinesSection,
   OrderHeader,
   OrderModals,
   OrderParametersAccordion,
   SummaryBar,
+  type OrderStage,
 } from "../components/order";
-
 import {
   useOrderAdjustments,
   useOrderCalculations,
@@ -21,6 +20,13 @@ import {
   useOrderItems,
   useOrderLines,
 } from "../hooks";
+import {
+  getVersionSyncStatus,
+  type CurrentCalculationSnapshotInput,
+} from "../lib/calculation-versions";
+import { formatErrorMessage } from "../lib/errors";
+import { mergeOrderParameters } from "../lib/orders";
+import { getSupabase } from "../lib/supabase";
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -28,11 +34,26 @@ interface OrderDetailPageProps {
 }
 
 export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
-  // Активная вкладка заказа: "calc" (расчёт) | "history" (история) | "fact" (факт)
-  const [orderTab, setOrderTab] = useState<"calc" | "history" | "fact">("calc");
+  // Этап выполнения заказа (U5): "quote" (Смета) | "contract" (Договор) | "fact" (Факт)
+  const [currentStage, setCurrentStage] = useState<OrderStage>("quote");
 
-  // Раскрытие подробной сводки затрат
+  // Раскрытие подробной мобильной шторки затрат
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  // Модалка истории версий (U5.5)
+  const [isVersionsModalOpen, setIsVersionsModalOpen] = useState(false);
+
+  // Кратковременное уведомление об автосохранении (U4: 2 сек)
+  const [autoSaveToast, setAutoSaveToast] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerAutoSaveToast = useCallback((msg = "Изменения сохранены") => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    setAutoSaveToast(msg);
+    autoSaveTimerRef.current = setTimeout(() => {
+      setAutoSaveToast(null);
+    }, 2000);
+  }, []);
 
   // Шаблоны изделий (U2)
   const dialog = useDialog();
@@ -128,6 +149,75 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     locked,
   });
 
+  // Переключение этапа с синхронизацией режима расчёта (U5)
+  const handleSelectStage = useCallback(
+    (stage: OrderStage) => {
+      setCurrentStage(stage);
+      if (stage === "quote") {
+        orderCalcs.handleSelectCalcMode("quote");
+      } else if (stage === "contract") {
+        orderCalcs.handleSelectCalcMode("check_contract");
+      }
+    },
+    [orderCalcs],
+  );
+
+  // Вычисление статуса синхронизации версий (U4: isDirtySince, getVersionSyncStatus)
+  const effectiveParams = useMemo(
+    () => mergeOrderParameters(globalParams, order?.settings),
+    [globalParams, order?.settings],
+  );
+
+  const latestVersion = useMemo(() => {
+    if (calculations.length === 0) return null;
+    return [...calculations].sort((a, b) => b.version - a.version)[0];
+  }, [calculations]);
+
+  const currentSnapshotInput: CurrentCalculationSnapshotInput = useMemo(
+    () => ({
+      mode: orderCalcs.calcMode,
+      contractPrice: order?.contract_price ?? null,
+      parameters: effectiveParams,
+      lines,
+      items,
+      adjustments,
+    }),
+    [orderCalcs.calcMode, order?.contract_price, effectiveParams, lines, items, adjustments],
+  );
+
+  const syncStatus = useMemo(
+    () => getVersionSyncStatus(latestVersion, currentSnapshotInput),
+    [latestVersion, currentSnapshotInput],
+  );
+
+  // Обновление цены договора из этапа «Договор» (U5.3)
+  async function handleUpdateContractPrice(newPrice: number | null) {
+    if (!order || locked) return;
+    const { error: updErr } = await getSupabase()
+      .from("orders")
+      .update({ contract_price: newPrice })
+      .eq("id", order.id);
+    if (updErr) {
+      await dialog.alert({
+        title: "Ошибка сохранения цены",
+        message: formatErrorMessage(updErr),
+        variant: "error",
+      });
+      return;
+    }
+    orderData.setOrder((prev) => (prev ? { ...prev, contract_price: newPrice } : prev));
+    triggerAutoSaveToast("Цена договора сохранена");
+  }
+
+  // Назначение договорной версии из карточки этапа «Договор»
+  async function handleSetBaselineFromContractStage() {
+    if (latestVersion) {
+      await orderCalcs.handleSetBaseline(latestVersion.id);
+    } else {
+      await orderCalcs.handleSaveCalculation();
+    }
+  }
+
   // Горячие клавиши на ПК (U3.4)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -179,7 +269,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-4 pb-48 md:pb-32 lg:pb-12">
-      {/* Верхняя навигация, статус, ошибки и вкладки */}
+      {/* Верхняя навигация, статус, этапы и кнопка версий */}
       <OrderHeader
         order={order}
         statusConfig={statusConfig}
@@ -187,7 +277,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         locked={locked}
         networkError={networkError}
         copySuccess={orderCalcs.copySuccess}
-        orderTab={orderTab}
+        autoSaveToast={autoSaveToast}
+        currentStage={currentStage}
         linesCount={lines.length}
         calculationsCount={calculations.length}
         factCount={expenses.length + payments.length}
@@ -195,48 +286,42 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         onOpenEditHeader={handleOpenEditHeader}
         onRetryLoad={() => void loadOrderData()}
         onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
+        onOpenVersionsModal={() => setIsVersionsModalOpen(true)}
         onCopySummary={orderCalcs.handleCopySummary}
-        onSelectTab={setOrderTab}
+        onSelectStage={handleSelectStage}
       />
 
-      {orderTab === "history" && (
-        <HistoryTab
-          calculations={calculations}
-          locked={locked}
-          calcSaving={orderCalcs.calcSaving}
-          networkError={networkError}
-          calcSaveSuccess={orderCalcs.calcSaveSuccess}
-          calcOutcome={orderCalcs.calcOutcome}
-          expandedVersionId={orderCalcs.expandedVersionId}
-          setExpandedVersionId={orderCalcs.setExpandedVersionId}
-          onSaveCalculation={orderCalcs.handleSaveCalculation}
-          onSetBaseline={orderCalcs.handleSetBaseline}
-        />
+      {/* Этап «Факт» */}
+      {currentStage === "fact" && (
+        <div className="mt-4">
+          <FactTab
+            order={order}
+            expenses={expenses}
+            payments={payments}
+            calculations={calculations}
+            onExpensesChange={setExpenses}
+            onPaymentsChange={setPayments}
+          />
+        </div>
       )}
 
-      {orderTab === "fact" && (
-        <FactTab
-          order={order}
-          expenses={expenses}
-          payments={payments}
-          calculations={calculations}
-          onExpensesChange={setExpenses}
-          onPaymentsChange={setPayments}
-        />
-      )}
-
-      {orderTab === "calc" && (
+      {/* Этапы «Смета» и «Договор» */}
+      {currentStage !== "fact" && (
         <div className="mt-4 flex flex-col lg:flex-row gap-6 items-start">
           <div className="flex-1 min-w-0 w-full">
-            <CalcModeSwitch
-              calcMode={orderCalcs.calcMode}
-              onSelectCalcMode={orderCalcs.handleSelectCalcMode}
-              contractPrice={order.contract_price}
-              priceDiff={orderLines.priceDiff}
-              isUpdatingPrices={orderLines.isUpdatingPrices}
-              locked={locked}
-              onOpenPriceDiffModal={() => orderLines.setIsPriceDiffModalOpen(true)}
-            />
+            {/* Карточка этапа «Договор» (U5.3) */}
+            {currentStage === "contract" && (
+              <ContractStageCard
+                order={order}
+                displayCalc={orderCalcs.displayCalc}
+                targetMarginPct={globalParams.target_margin_pct}
+                locked={locked}
+                calcSaving={orderCalcs.calcSaving}
+                onSaveCalculation={orderCalcs.handleSaveCalculation}
+                onSetBaseline={() => void handleSetBaselineFromContractStage()}
+                onUpdateContractPrice={handleUpdateContractPrice}
+              />
+            )}
 
             <ItemsSection
               items={items}
@@ -274,31 +359,34 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               onDeleteAdjustment={(id) => void orderAdjustments.handleDeleteAdjustment(id)}
             />
 
-            <OrderParametersAccordion
-              isOpen={isParamsAccordionOpen}
-              setIsOpen={setIsParamsAccordionOpen}
-              globalParams={globalParams}
-              customMargin={customMargin}
-              setCustomMargin={setCustomMargin}
-              customAssemblyMode={customAssemblyMode}
-              setCustomAssemblyMode={setCustomAssemblyMode}
-              customAssemblyPct={customAssemblyPct}
-              setCustomAssemblyPct={setCustomAssemblyPct}
-              customTechnologPct={customTechnologPct}
-              setCustomTechnologPct={setCustomTechnologPct}
-              customRiskReservePct={customRiskReservePct}
-              locked={locked}
-              paramsSaving={paramsSaving}
-              onSaveOrderSettings={handleSaveOrderSettings}
-            />
+            {currentStage === "quote" && (
+              <OrderParametersAccordion
+                isOpen={isParamsAccordionOpen}
+                setIsOpen={setIsParamsAccordionOpen}
+                globalParams={globalParams}
+                customMargin={customMargin}
+                setCustomMargin={setCustomMargin}
+                customAssemblyMode={customAssemblyMode}
+                setCustomAssemblyMode={setCustomAssemblyMode}
+                customAssemblyPct={customAssemblyPct}
+                setCustomAssemblyPct={setCustomAssemblyPct}
+                customTechnologPct={customTechnologPct}
+                setCustomTechnologPct={setCustomTechnologPct}
+                customRiskReservePct={customRiskReservePct}
+                locked={locked}
+                paramsSaving={paramsSaving}
+                onSaveOrderSettings={handleSaveOrderSettings}
+              />
+            )}
           </div>
 
-          {/* Правая закрепленная колонка на ПК (U3: sticky top-20) */}
+          {/* Правая закрепленная колонка на ПК (U3, U4: sticky top-20) */}
           <DesktopSummaryCard
             displayCalc={orderCalcs.displayCalc}
             calcOutcome={orderCalcs.calcOutcome}
             calcMode={orderCalcs.calcMode}
             calcSaveSuccess={orderCalcs.calcSaveSuccess}
+            syncStatus={syncStatus}
             locked={locked}
             calcSaving={orderCalcs.calcSaving}
             networkError={networkError}
@@ -311,13 +399,14 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         </div>
       )}
 
-      {/* Мобильная сводка расчёта (lg:hidden) */}
-      {orderTab === "calc" && (
+      {/* Мобильная сводка расчёта (U3, U4: lg:hidden) */}
+      {currentStage !== "fact" && (
         <SummaryBar
           displayCalc={orderCalcs.displayCalc}
           calcOutcome={orderCalcs.calcOutcome}
           calcMode={orderCalcs.calcMode}
           calcSaveSuccess={orderCalcs.calcSaveSuccess}
+          syncStatus={syncStatus}
           locked={locked}
           calcSaving={orderCalcs.calcSaving}
           networkError={networkError}
@@ -343,6 +432,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         isApplyTemplateOpen={isApplyTemplateOpen}
         setIsApplyTemplateOpen={setIsApplyTemplateOpen}
         applyTemplateDefaultItemId={applyTemplateDefaultItemId}
+        isVersionsModalOpen={isVersionsModalOpen}
+        setIsVersionsModalOpen={setIsVersionsModalOpen}
         onTemplateSaved={(name) => {
           void dialog.alert({
             title: "Шаблон сохранён",
