@@ -21,6 +21,7 @@ import {
   prepareCalculationSnapshot,
   resolveOrderDisplayCalculation,
   shouldConfirmCalculationSave,
+  SnapshotCorruptedError,
   validateAdjustmentInput,
   validateManualLineInput,
   validateOrderInput,
@@ -1434,7 +1435,39 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                   hour: "2-digit",
                   minute: "2-digit",
                 });
-                const normalized = normalizeOrderCalculation(calc);
+                let normalized: ReturnType<typeof normalizeOrderCalculation> | null = null;
+                let corruptionField: string | null = null;
+                try {
+                  normalized = normalizeOrderCalculation(calc);
+                } catch (err) {
+                  if (err instanceof SnapshotCorruptedError) {
+                    corruptionField = err.missingField;
+                  } else {
+                    corruptionField = "данные";
+                  }
+                }
+
+                if (corruptionField || !normalized) {
+                  return (
+                    <div
+                      key={calc.id}
+                      className="overflow-hidden rounded-2xl border border-rose-300 bg-rose-50/60 p-4 shadow-xs"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-extrabold text-rose-900">
+                            Версия #{calc.version}: данные повреждены (поле {corruptionField})
+                          </span>
+                          <span className="text-xs text-rose-600">{formattedDate}</span>
+                        </div>
+                        <span className="rounded-md bg-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-800">
+                          Недоступна для отображения
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+
                 const paramsSnap = normalized.parameters;
                 const resSnap = normalized.result;
                 const inputLines = normalized.input.lines;

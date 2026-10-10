@@ -6,9 +6,12 @@ import {
   parametersArrayToMap,
 } from "./parameters";
 import {
+  DEFAULT_SNAPSHOT_PARAMS,
+  getPlanCalculation,
   normalizeOrderCalculation,
   prepareCalculationSnapshot,
   resolveOrderDisplayCalculation,
+  SnapshotCorruptedError,
 } from "./orders";
 
 describe("Step B5: Calculation versions snapshot format and compatibility layer", () => {
@@ -75,61 +78,40 @@ describe("Step B5: Calculation versions snapshot format and compatibility layer"
     expect(result.priceTotal).toBeGreaterThan(0);
   });
 
-  it("normalizeOrderCalculation recognizes legacy snake_case format", () => {
-    const legacyCalc: OrderCalculation = {
-      id: "calc-old-1",
+  it("throws SnapshotCorruptedError when mandatory parameters fields are missing", () => {
+    const corruptedParamsCalc: OrderCalculation = {
+      id: "calc-bad-params",
       order_id: "ord-test-1",
       version: 1,
       mode: "quote",
       params_snapshot: {
-        target_margin_pct: 0.18,
-        assembly_mode: "percent",
-        assembly_pct: 0.145,
-        assembly_per_meter_kitchen: 35000,
-        assembly_per_meter_wardrobe: 25000,
-        technolog_mode: "percent",
-        technolog_pct: 0.04,
-        technolog_per_sheet: 4000,
-        risk_reserve_pct: 0.02,
-        price_rounding: 1000,
+        // targetMarginPct missing
+        assemblyMode: "percent",
+        assemblyPct: 0.145,
+        assemblyPerMeterKitchen: 35000,
+        assemblyPerMeterWardrobe: 25000,
+        technologMode: "percent",
+        technologPct: 0.04,
+        technologPerSheet: 4000,
+        riskReservePct: 0.02,
+        priceRounding: 1000,
       },
-      input_snapshot: {
-        contract_price: null,
-        items: [
-          {
-            id: "item-1",
-            title: "Кухня",
-            kind: "kitchen",
-            linear_meters: 3.5,
-          },
-        ],
-        lines: [
-          {
-            id: "line-1",
-            category: "materials",
-            name: "ЛДСП",
-            unit: "лист",
-            qty: 5,
-            unit_price: 14000,
-            waste_pct: 0.10,
-            billable_qty_rounding: "none",
-            counts_for_technolog: true,
-            is_manual: false,
-          },
-        ],
-        adjustments: [],
-      },
+      input_snapshot: { lines: [] },
       result: {
-        categoryTotals: { materials: 77000 },
+        categoryTotals: {},
         costTotal: 100000,
         priceTotal: 130000,
         margin: 30000,
         marginPct: 0.2307,
-        assembly: 18850,
-        technolog: 5200,
-        riskReserve: 2600,
+        fixedCost: 20000,
+        fixedAssembly: 15000,
+        fixedTechnolog: 5000,
+        assembly: 15000,
+        technolog: 5000,
+        riskReserve: 2000,
         minPriceForTargetMargin: 125000,
         warnings: [],
+        lineCalculations: [],
       },
       cost_total: 100000,
       price_total: 130000,
@@ -138,19 +120,84 @@ describe("Step B5: Calculation versions snapshot format and compatibility layer"
       created_at: "2026-10-01T12:00:00Z",
     };
 
-    const normalized = normalizeOrderCalculation(legacyCalc);
+    expect(() => normalizeOrderCalculation(corruptedParamsCalc)).toThrow(SnapshotCorruptedError);
+    try {
+      normalizeOrderCalculation(corruptedParamsCalc);
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(SnapshotCorruptedError);
+      expect(e.missingField).toBe("targetMarginPct");
+    }
+  });
 
-    expect(normalized.version).toBe(1);
-    expect(normalized.parameters.targetMarginPct).toBe(0.18);
-    expect(normalized.parameters.assemblyMode).toBe("percent");
-    expect(normalized.parameters.riskReservePct).toBe(0.02);
+  it("throws SnapshotCorruptedError when mandatory lines or result fields are missing", () => {
+    const corruptedLinesCalc: OrderCalculation = {
+      id: "calc-bad-lines",
+      order_id: "ord-test-1",
+      version: 1,
+      mode: "quote",
+      params_snapshot: DEFAULT_SNAPSHOT_PARAMS,
+      input_snapshot: {
+        lines: [
+          {
+            id: "line-1",
+            name: "ЛДСП",
+            category: "materials",
+            unit: "лист",
+            // qty is missing
+            unitPrice: 14000,
+            wastePct: 0.10,
+          },
+        ],
+      },
+      result: {
+        categoryTotals: {},
+        costTotal: 100000,
+        priceTotal: 130000,
+        margin: 30000,
+        marginPct: 0.2307,
+        fixedCost: 20000,
+        fixedAssembly: 15000,
+        fixedTechnolog: 5000,
+        assembly: 15000,
+        technolog: 5000,
+        riskReserve: 2000,
+        minPriceForTargetMargin: 125000,
+        warnings: [],
+        lineCalculations: [],
+      },
+      cost_total: 100000,
+      price_total: 130000,
+      margin_pct: 0.2307,
+      is_contract_baseline: false,
+      created_at: "2026-10-01T12:00:00Z",
+    };
 
-    expect(normalized.input.items[0].linearMeters).toBe(3.5);
-    expect(normalized.input.lines[0].unitPrice).toBe(14000);
-    expect(normalized.input.lines[0].wastePct).toBe(0.10);
+    expect(() => normalizeOrderCalculation(corruptedLinesCalc)).toThrow(SnapshotCorruptedError);
+    try {
+      normalizeOrderCalculation(corruptedLinesCalc);
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(SnapshotCorruptedError);
+      expect(e.missingField).toBe("lines[0].qty");
+    }
 
-    expect(normalized.result.costTotal).toBe(100000);
-    expect(normalized.result.priceTotal).toBe(130000);
+    const corruptedResultCalc: OrderCalculation = {
+      ...corruptedLinesCalc,
+      input_snapshot: { lines: [] },
+      result: {
+        // costTotal missing
+        categoryTotals: {},
+        priceTotal: 130000,
+        margin: 30000,
+      },
+    };
+
+    expect(() => normalizeOrderCalculation(corruptedResultCalc)).toThrow(SnapshotCorruptedError);
+    try {
+      normalizeOrderCalculation(corruptedResultCalc);
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(SnapshotCorruptedError);
+      expect(e.missingField).toBe("costTotal");
+    }
   });
 
   it("normalizeOrderCalculation recognizes modern packages/calc camelCase format", () => {
@@ -203,11 +250,15 @@ describe("Step B5: Calculation versions snapshot format and compatibility layer"
         priceTotal: 850000,
         margin: 650000,
         marginPct: 0.7647,
+        fixedCost: 40000,
+        fixedAssembly: 120000,
+        fixedTechnolog: 20000,
         assembly: 120000,
         technolog: 20000,
         riskReserve: 8500,
         minPriceForTargetMargin: 300000,
         warnings: [],
+        lineCalculations: [],
       },
       cost_total: 200000,
       price_total: 850000,
@@ -231,42 +282,111 @@ describe("Step B5: Calculation versions snapshot format and compatibility layer"
     expect(normalized.result.priceTotal).toBe(850000);
   });
 
-  it("resolveOrderDisplayCalculation renders accurately for both old and new formats", () => {
-    const legacyCalc: OrderCalculation = {
-      id: "calc-1",
+  it("resolveOrderDisplayCalculation does not crash on corrupted calculation version and falls back", () => {
+    const corruptedCalc: OrderCalculation = {
+      id: "calc-corrupted",
       order_id: "ord-test-1",
       version: 1,
       mode: "quote",
-      params_snapshot: { target_margin_pct: 0.18 },
+      params_snapshot: {}, // missing all fields
       input_snapshot: {},
-      result: {
-        cost_total: 706025,
-        price_total: 861000,
-        margin_pct: 0.18,
-        category_totals: { materials: 300000 },
-        assembly: 124845,
-        technolog: 34440,
-      },
-      cost_total: 706025,
-      price_total: 861000,
-      margin_pct: 0.18,
-      is_contract_baseline: true,
-      created_at: "2026-10-01T12:00:00Z",
+      result: {},
+      cost_total: 100000,
+      price_total: 130000,
+      margin_pct: 0.23,
+      is_contract_baseline: false,
+      created_at: "2026-10-01T10:00:00Z",
     };
 
+    // Should not throw, should fall back to liveOutcome
     const display = resolveOrderDisplayCalculation({
       order: sampleOrder,
-      calculations: [legacyCalc],
-      liveOutcome: null,
+      calculations: [corruptedCalc],
+      liveOutcome: {
+        ok: true,
+        result: {
+          priceTotal: 500000,
+          costTotal: 400000,
+          margin: 100000,
+          marginPct: 0.20,
+          fixedCost: 50000,
+          fixedAssembly: 30000,
+          fixedTechnolog: 10000,
+          assembly: 30000,
+          technolog: 10000,
+          riskReserve: 0,
+          minPriceForTargetMargin: 500000,
+          warnings: [],
+          categoryTotals: {
+            materials: 300000,
+            workshop: 0,
+            facades: 0,
+            hardware: 0,
+            transport: 0,
+            labor: 0,
+            other: 0,
+            adjustments: 0,
+          },
+          lineCalculations: [],
+        },
+      },
       mode: "quote",
       showLivePreview: false,
     });
 
     expect(display).not.toBeNull();
-    expect(display?.source).toBe("saved");
-    expect(display?.priceTotal).toBe(861000);
-    expect(display?.costTotal).toBe(706025);
-    expect(display?.assembly).toBe(124845);
-    expect(display?.technolog).toBe(34440);
+    expect(display?.source).toBe("live");
+    expect(display?.priceTotal).toBe(500000);
+  });
+
+  it("getPlanCalculation filters out corrupted calculations and selects the latest valid one", () => {
+    const corruptedCalc: OrderCalculation = {
+      id: "calc-bad-1",
+      order_id: "ord-test-1",
+      version: 2, // higher version, but corrupted!
+      mode: "quote",
+      params_snapshot: {},
+      input_snapshot: {},
+      result: {},
+      cost_total: 500000,
+      price_total: 600000,
+      margin_pct: 0.2,
+      is_contract_baseline: false,
+      created_at: "2026-10-02T10:00:00Z",
+    };
+
+    const validCalc: OrderCalculation = {
+      id: "calc-good-1",
+      order_id: "ord-test-1",
+      version: 1,
+      mode: "quote",
+      params_snapshot: DEFAULT_SNAPSHOT_PARAMS,
+      input_snapshot: { lines: [] },
+      result: {
+        costTotal: 100000,
+        priceTotal: 130000,
+        margin: 30000,
+        marginPct: 0.23,
+        fixedCost: 20000,
+        fixedAssembly: 10000,
+        fixedTechnolog: 5000,
+        assembly: 10000,
+        technolog: 5000,
+        riskReserve: 0,
+        minPriceForTargetMargin: 130000,
+        warnings: [],
+        categoryTotals: {},
+        lineCalculations: [],
+      },
+      cost_total: 100000,
+      price_total: 130000,
+      margin_pct: 0.23,
+      is_contract_baseline: false,
+      created_at: "2026-10-01T10:00:00Z",
+    };
+
+    const plan = getPlanCalculation([corruptedCalc, validCalc]);
+    expect(plan?.id).toBe("calc-good-1");
+    expect(plan?.version).toBe(1);
   });
 });

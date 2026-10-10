@@ -9,12 +9,23 @@ import {
   type CalculationOrderItem,
   type CalculationOutcome,
   type CalculationParameters,
+  type CalculationResult,
   type CalculationSnapshotAdjustment,
   type CalculationSnapshotLine,
   type CalculationSnapshotOrderItem,
   type CostCategory,
   type LineCalculation,
 } from "@kuhni/calc";
+
+export class SnapshotCorruptedError extends Error {
+  readonly missingField: string;
+
+  constructor(missingField: string) {
+    super(`Снимок расчёта повреждён: отсутствует обязательное поле '${missingField}'`);
+    this.name = "SnapshotCorruptedError";
+    this.missingField = missingField;
+  }
+}
 
 import type {
   BillableQtyRounding,
@@ -46,9 +57,10 @@ export function getLatestCalculation(
 
 /**
  * Выбирает базовую (опорную) версию расчёта для сравнения План/Факт (Step A5, Q3):
- * 1. Если есть версия с отметкой договора (is_contract_baseline = true), возвращает её.
- * 2. Если договорная версия не отмечена, возвращает последнюю сохранённую версию (по номеру версии).
- * 3. Если версий нет, возвращает null.
+ * 1. Исключает повреждённые версии (не прошедшие строгую валидацию снимков).
+ * 2. Если есть версия с отметкой договора (is_contract_baseline = true), возвращает её.
+ * 3. Если договорная версия не отмечена, возвращает последнюю сохранённую версию (по номеру версии).
+ * 4. Если версий нет, возвращает null.
  */
 export function getPlanCalculation<
   T extends { version: number; is_contract_baseline?: boolean }
@@ -56,11 +68,18 @@ export function getPlanCalculation<
   if (!calculations || calculations.length === 0) {
     return null;
   }
-  const baseline = calculations.find((c) => Boolean(c.is_contract_baseline));
+  const validCalcs = calculations.filter((c) => {
+    if ("params_snapshot" in c && "input_snapshot" in c && "result" in c) {
+      return isCalculationValid(c as unknown as OrderCalculation);
+    }
+    return true;
+  });
+  if (validCalcs.length === 0) return null;
+  const baseline = validCalcs.find((c) => Boolean(c.is_contract_baseline));
   if (baseline) {
     return baseline;
   }
-  return [...calculations].sort((a, b) => b.version - a.version)[0] ?? null;
+  return [...validCalcs].sort((a, b) => b.version - a.version)[0] ?? null;
 }
 
 export interface ResolveOrderDisplayOptions {
@@ -106,18 +125,20 @@ export function getVisibleAdjustments(
   return adjustments;
 }
 
-export interface NormalizedCalculationParams {
-  targetMarginPct: number;
-  assemblyMode: "percent" | "per_meter";
-  assemblyPct: number;
-  assemblyPerMeterKitchen: number;
-  assemblyPerMeterWardrobe: number;
-  technologMode: "percent" | "per_sheet";
-  technologPct: number;
-  technologPerSheet: number;
-  riskReservePct: number;
-  priceRounding: number;
-}
+export type NormalizedCalculationParams = CalculationParameters;
+
+export const DEFAULT_SNAPSHOT_PARAMS: CalculationParameters = {
+  targetMarginPct: 0.18,
+  assemblyMode: "percent",
+  assemblyPct: 0.145,
+  assemblyPerMeterKitchen: 35000,
+  assemblyPerMeterWardrobe: 25000,
+  technologMode: "percent",
+  technologPct: 0.04,
+  technologPerSheet: 4000,
+  riskReservePct: 0.02,
+  priceRounding: 1000,
+};
 
 export interface NormalizedCalculationInputLine {
   id: string;
@@ -159,22 +180,7 @@ export interface NormalizedCalculationInput {
   adjustments: NormalizedCalculationInputAdjustment[];
 }
 
-export interface NormalizedCalculationResult {
-  categoryTotals: Record<CostCategory | "adjustments", number>;
-  lineCalculations: LineCalculation[];
-  fixedAssembly: number;
-  fixedTechnolog: number;
-  fixedCost: number;
-  assembly: number;
-  technolog: number;
-  riskReserve: number;
-  costTotal: number;
-  priceTotal: number;
-  margin: number;
-  marginPct: number | null;
-  minPriceForTargetMargin: number;
-  warnings: string[];
-}
+export type NormalizedCalculationResult = CalculationResult;
 
 export interface NormalizedOrderCalculation {
   id: string;
@@ -192,123 +198,161 @@ export interface NormalizedOrderCalculation {
 }
 
 /**
- * Нормализует снимок параметров расчёта, поддерживая как новый camelCase (packages/calc),
- * так и исторический snake_case (Step B5).
+ * Нормализует снимок параметров расчёта (Step A7).
+ * Строго требует формат camelCase из packages/calc. При отсутствии обязательного поля выбрасывает SnapshotCorruptedError.
  */
 export function normalizeCalculationParams(
   raw: Record<string, unknown> | null | undefined,
 ): NormalizedCalculationParams {
-  const p = raw || {};
+  if (!raw || typeof raw !== "object") {
+    throw new SnapshotCorruptedError("targetMarginPct");
+  }
+
+  if (typeof raw.targetMarginPct !== "number" || !Number.isFinite(raw.targetMarginPct)) {
+    throw new SnapshotCorruptedError("targetMarginPct");
+  }
+  if (raw.assemblyMode !== "percent" && raw.assemblyMode !== "per_meter") {
+    throw new SnapshotCorruptedError("assemblyMode");
+  }
+  if (typeof raw.assemblyPct !== "number" || !Number.isFinite(raw.assemblyPct)) {
+    throw new SnapshotCorruptedError("assemblyPct");
+  }
+  if (typeof raw.assemblyPerMeterKitchen !== "number" || !Number.isFinite(raw.assemblyPerMeterKitchen)) {
+    throw new SnapshotCorruptedError("assemblyPerMeterKitchen");
+  }
+  if (typeof raw.assemblyPerMeterWardrobe !== "number" || !Number.isFinite(raw.assemblyPerMeterWardrobe)) {
+    throw new SnapshotCorruptedError("assemblyPerMeterWardrobe");
+  }
+  if (raw.technologMode !== "percent" && raw.technologMode !== "per_sheet") {
+    throw new SnapshotCorruptedError("technologMode");
+  }
+  if (typeof raw.technologPct !== "number" || !Number.isFinite(raw.technologPct)) {
+    throw new SnapshotCorruptedError("technologPct");
+  }
+  if (typeof raw.technologPerSheet !== "number" || !Number.isFinite(raw.technologPerSheet)) {
+    throw new SnapshotCorruptedError("technologPerSheet");
+  }
+  if (typeof raw.riskReservePct !== "number" || !Number.isFinite(raw.riskReservePct)) {
+    throw new SnapshotCorruptedError("riskReservePct");
+  }
+  if (typeof raw.priceRounding !== "number" || !Number.isFinite(raw.priceRounding)) {
+    throw new SnapshotCorruptedError("priceRounding");
+  }
+
   return {
-    targetMarginPct: Number(p.targetMarginPct ?? p.target_margin_pct ?? 0.18),
-    assemblyMode:
-      p.assemblyMode === "per_meter" || p.assembly_mode === "per_meter"
-        ? "per_meter"
-        : "percent",
-    assemblyPct: Number(p.assemblyPct ?? p.assembly_pct ?? 0.145),
-    assemblyPerMeterKitchen: Number(
-      p.assemblyPerMeterKitchen ?? p.assembly_per_meter_kitchen ?? 35000,
-    ),
-    assemblyPerMeterWardrobe: Number(
-      p.assemblyPerMeterWardrobe ?? p.assembly_per_meter_wardrobe ?? 25000,
-    ),
-    technologMode:
-      p.technologMode === "per_sheet" || p.technolog_mode === "per_sheet"
-        ? "per_sheet"
-        : "percent",
-    technologPct: Number(p.technologPct ?? p.technolog_pct ?? 0.04),
-    technologPerSheet: Number(
-      p.technologPerSheet ?? p.technolog_per_sheet ?? 4000,
-    ),
-    riskReservePct: Number(p.riskReservePct ?? p.risk_reserve_pct ?? 0),
-    priceRounding: Number(p.priceRounding ?? p.price_rounding ?? 1000),
+    targetMarginPct: raw.targetMarginPct,
+    assemblyMode: raw.assemblyMode,
+    assemblyPct: raw.assemblyPct,
+    assemblyPerMeterKitchen: raw.assemblyPerMeterKitchen,
+    assemblyPerMeterWardrobe: raw.assemblyPerMeterWardrobe,
+    technologMode: raw.technologMode,
+    technologPct: raw.technologPct,
+    technologPerSheet: raw.technologPerSheet,
+    riskReservePct: raw.riskReservePct,
+    priceRounding: raw.priceRounding,
   };
 }
 
 /**
- * Нормализует входной снимок расчёта, поддерживая как новый camelCase (packages/calc),
- * так и исторический snake_case (Step B5).
+ * Нормализует входной снимок расчёта (Step A7).
+ * Строго требует формат camelCase из packages/calc. При отсутствии обязательного поля выбрасывает SnapshotCorruptedError.
  */
 export function normalizeCalculationInput(
   raw: Record<string, unknown> | null | undefined,
 ): NormalizedCalculationInput {
-  const inp = raw || {};
-  const rawItems = Array.isArray(inp.orderItems)
-    ? inp.orderItems
-    : Array.isArray(inp.items)
-    ? inp.items
-    : [];
-  const rawLines = Array.isArray(inp.lines) ? inp.lines : [];
-  const rawAdjs = Array.isArray(inp.adjustments) ? inp.adjustments : [];
+  if (!raw || typeof raw !== "object") {
+    throw new SnapshotCorruptedError("lines");
+  }
+  const rawLines = raw.lines;
+  if (!Array.isArray(rawLines)) {
+    throw new SnapshotCorruptedError("lines");
+  }
+  const rawItems = raw.items ?? raw.orderItems ?? [];
+  if (!Array.isArray(rawItems)) {
+    throw new SnapshotCorruptedError("items");
+  }
+  const rawAdjs = raw.adjustments ?? [];
+  if (!Array.isArray(rawAdjs)) {
+    throw new SnapshotCorruptedError("adjustments");
+  }
 
   const items: NormalizedCalculationInputItem[] = rawItems.map(
-    (it: Record<string, unknown>) => ({
-      id: String(it.id ?? ""),
-      title: String(it.title ?? ""),
-      kind: (it.kind as OrderItemKind) ?? "kitchen",
-      linearMeters:
-        it.linearMeters !== undefined && it.linearMeters !== null
-          ? Number(it.linearMeters)
-          : it.linear_meters !== undefined && it.linear_meters !== null
-          ? Number(it.linear_meters)
-          : null,
-      description:
-        it.description !== undefined && it.description !== null
-          ? String(it.description)
-          : null,
-    }),
+    (it: Record<string, unknown>, idx: number) => {
+      if (!it || typeof it !== "object") {
+        throw new SnapshotCorruptedError(`items[${idx}]`);
+      }
+      return {
+        id: String(it.id ?? ""),
+        title: String(it.title ?? ""),
+        kind: (it.kind as OrderItemKind) ?? "kitchen",
+        linearMeters:
+          it.linearMeters !== undefined && it.linearMeters !== null
+            ? Number(it.linearMeters)
+            : null,
+        description:
+          it.description !== undefined && it.description !== null
+            ? String(it.description)
+            : null,
+      };
+    },
   );
 
   const lines: NormalizedCalculationInputLine[] = rawLines.map(
-    (l: Record<string, unknown>) => ({
-      id: String(l.id ?? ""),
-      name: String(l.name ?? ""),
-      category: (l.category as CostCategory) ?? "other",
-      unit: String(l.unit ?? "шт"),
-      qty: Number(l.qty ?? 0),
-      unitPrice: Number(l.unitPrice ?? l.unit_price ?? 0),
-      wastePct: Number(l.wastePct ?? l.waste_pct ?? 0),
-      billableQtyRounding: (l.billableQtyRounding ??
-        l.billable_qty_rounding ??
-        "none") as BillableQtyRounding,
-      countsForTechnolog: Boolean(
-        l.countsForTechnolog ?? l.counts_for_technolog,
-      ),
-      isManual: Boolean(l.isManual ?? l.is_manual),
-      priceItemId:
-        l.priceItemId !== undefined
-          ? (l.priceItemId as string | null)
-          : (l.price_item_id as string | null) ?? null,
-      orderItemId:
-        l.orderItemId !== undefined
-          ? (l.orderItemId as string | null)
-          : (l.order_item_id as string | null) ?? null,
-      comment:
-        l.comment !== undefined && l.comment !== null
-          ? String(l.comment)
-          : null,
-    }),
+    (l: Record<string, unknown>, idx: number) => {
+      if (!l || typeof l !== "object") {
+        throw new SnapshotCorruptedError(`lines[${idx}]`);
+      }
+      if (!l.category) throw new SnapshotCorruptedError(`lines[${idx}].category`);
+      if (typeof l.qty !== "number" || !Number.isFinite(l.qty)) {
+        throw new SnapshotCorruptedError(`lines[${idx}].qty`);
+      }
+      if (typeof l.unitPrice !== "number" || !Number.isFinite(l.unitPrice)) {
+        throw new SnapshotCorruptedError(`lines[${idx}].unitPrice`);
+      }
+      if (typeof l.wastePct !== "number" || !Number.isFinite(l.wastePct)) {
+        throw new SnapshotCorruptedError(`lines[${idx}].wastePct`);
+      }
+
+      return {
+        id: String(l.id ?? ""),
+        name: String(l.name ?? ""),
+        category: l.category as CostCategory,
+        unit: String(l.unit ?? "шт"),
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        wastePct: l.wastePct,
+        billableQtyRounding: (l.billableQtyRounding ?? "none") as BillableQtyRounding,
+        countsForTechnolog: Boolean(l.countsForTechnolog),
+        isManual: Boolean(l.isManual),
+        priceItemId: l.priceItemId !== undefined ? (l.priceItemId as string | null) : null,
+        orderItemId: l.orderItemId !== undefined ? (l.orderItemId as string | null) : null,
+        comment: l.comment !== undefined && l.comment !== null ? String(l.comment) : null,
+      };
+    },
   );
 
   const adjustments: NormalizedCalculationInputAdjustment[] = rawAdjs.map(
-    (a: Record<string, unknown>) => ({
-      id: String(a.id ?? ""),
-      kind: (a.kind as "price" | "cost") ?? "price",
-      category: "adjustments",
-      label: String(a.label ?? ""),
-      amount: Number(a.amount ?? 0),
-      comment:
-        a.comment !== undefined && a.comment !== null
-          ? String(a.comment)
-          : null,
-    }),
+    (a: Record<string, unknown>, idx: number) => {
+      if (!a || typeof a !== "object") {
+        throw new SnapshotCorruptedError(`adjustments[${idx}]`);
+      }
+      if (typeof a.amount !== "number" || !Number.isFinite(a.amount)) {
+        throw new SnapshotCorruptedError(`adjustments[${idx}].amount`);
+      }
+      return {
+        id: String(a.id ?? ""),
+        kind: (a.kind as "price" | "cost") ?? "price",
+        category: "adjustments",
+        label: String(a.label ?? ""),
+        amount: a.amount,
+        comment: a.comment !== undefined && a.comment !== null ? String(a.comment) : null,
+      };
+    },
   );
 
   const contractPrice =
-    inp.contractPrice !== undefined && inp.contractPrice !== null
-      ? Number(inp.contractPrice)
-      : inp.contract_price !== undefined && inp.contract_price !== null
-      ? Number(inp.contract_price)
+    raw.contractPrice !== undefined && raw.contractPrice !== null
+      ? Number(raw.contractPrice)
       : null;
 
   return {
@@ -320,69 +364,93 @@ export function normalizeCalculationInput(
 }
 
 /**
- * Нормализует результаты расчёта, поддерживая camelCase и snake_case (Step B5).
+ * Нормализует результаты расчёта (Step A7).
+ * Строго требует формат camelCase из packages/calc. При отсутствии обязательного поля выбрасывает SnapshotCorruptedError.
  */
 export function normalizeCalculationResult(
   raw: Record<string, unknown> | null | undefined,
-  defaults?: { priceTotal?: number; costTotal?: number; marginPct?: number | null },
 ): NormalizedCalculationResult {
-  const r = raw || {};
-  const catTotals = (r.categoryTotals ||
-    r.category_totals ||
-    {}) as Record<string, number>;
-  const costTotal = Number(r.costTotal ?? r.cost_total ?? defaults?.costTotal ?? 0);
-  const priceTotal = Number(r.priceTotal ?? r.price_total ?? defaults?.priceTotal ?? 0);
-  const margin = Number(r.margin ?? priceTotal - costTotal);
+  if (!raw || typeof raw !== "object") {
+    throw new SnapshotCorruptedError("result");
+  }
+  if (!raw.categoryTotals || typeof raw.categoryTotals !== "object") {
+    throw new SnapshotCorruptedError("categoryTotals");
+  }
+  const catTotals = raw.categoryTotals as Record<string, unknown>;
+  const categoryTotals: Record<CostCategory | "adjustments", number> = {
+    materials: typeof catTotals.materials === "number" ? catTotals.materials : 0,
+    workshop: typeof catTotals.workshop === "number" ? catTotals.workshop : 0,
+    facades: typeof catTotals.facades === "number" ? catTotals.facades : 0,
+    hardware: typeof catTotals.hardware === "number" ? catTotals.hardware : 0,
+    transport: typeof catTotals.transport === "number" ? catTotals.transport : 0,
+    labor: typeof catTotals.labor === "number" ? catTotals.labor : 0,
+    other: typeof catTotals.other === "number" ? catTotals.other : 0,
+    adjustments: typeof catTotals.adjustments === "number" ? catTotals.adjustments : 0,
+  };
+
+  if (typeof raw.costTotal !== "number" || !Number.isFinite(raw.costTotal)) {
+    throw new SnapshotCorruptedError("costTotal");
+  }
+  if (typeof raw.priceTotal !== "number" || !Number.isFinite(raw.priceTotal)) {
+    throw new SnapshotCorruptedError("priceTotal");
+  }
+  if (typeof raw.margin !== "number" || !Number.isFinite(raw.margin)) {
+    throw new SnapshotCorruptedError("margin");
+  }
   const marginPct =
-    r.marginPct !== undefined && r.marginPct !== null
-      ? Number(r.marginPct)
-      : r.margin_pct !== undefined && r.margin_pct !== null
-      ? Number(r.margin_pct)
-      : defaults?.marginPct ?? null;
-  const fixedCost = Number(r.fixedCost ?? r.fixed_cost ?? 0);
-  const fixedAssembly = Number(r.fixedAssembly ?? r.fixed_assembly ?? 0);
-  const fixedTechnolog = Number(r.fixedTechnolog ?? r.fixed_technolog ?? 0);
-  const assembly = Number(r.assembly ?? fixedAssembly);
-  const technolog = Number(r.technolog ?? fixedTechnolog);
-  const riskReserve = Number(r.riskReserve ?? r.risk_reserve ?? 0);
-  const minPriceForTargetMargin = Number(
-    r.minPriceForTargetMargin ?? r.min_price_for_target_margin ?? 0,
-  );
-  const warnings = Array.isArray(r.warnings) ? (r.warnings as string[]) : [];
-  const lineCalculations = Array.isArray(r.lineCalculations ?? r.line_calculations)
-    ? (r.lineCalculations ?? r.line_calculations)
-    : [];
+    raw.marginPct === null || raw.marginPct === undefined
+      ? null
+      : typeof raw.marginPct === "number" && Number.isFinite(raw.marginPct)
+      ? raw.marginPct
+      : (() => {
+          throw new SnapshotCorruptedError("marginPct");
+        })();
+
+  if (typeof raw.fixedCost !== "number" || !Number.isFinite(raw.fixedCost)) {
+    throw new SnapshotCorruptedError("fixedCost");
+  }
+  const fixedAssembly = Number(raw.fixedAssembly ?? 0);
+  const fixedTechnolog = Number(raw.fixedTechnolog ?? 0);
+  if (typeof raw.assembly !== "number" || !Number.isFinite(raw.assembly)) {
+    throw new SnapshotCorruptedError("assembly");
+  }
+  if (typeof raw.technolog !== "number" || !Number.isFinite(raw.technolog)) {
+    throw new SnapshotCorruptedError("technolog");
+  }
+  if (typeof raw.riskReserve !== "number" || !Number.isFinite(raw.riskReserve)) {
+    throw new SnapshotCorruptedError("riskReserve");
+  }
+  if (typeof raw.minPriceForTargetMargin !== "number" || !Number.isFinite(raw.minPriceForTargetMargin)) {
+    throw new SnapshotCorruptedError("minPriceForTargetMargin");
+  }
+  if (!Array.isArray(raw.warnings)) {
+    throw new SnapshotCorruptedError("warnings");
+  }
+  if (!Array.isArray(raw.lineCalculations)) {
+    throw new SnapshotCorruptedError("lineCalculations");
+  }
 
   return {
-    categoryTotals: {
-      materials: Number(catTotals.materials ?? 0),
-      workshop: Number(catTotals.workshop ?? 0),
-      facades: Number(catTotals.facades ?? 0),
-      hardware: Number(catTotals.hardware ?? 0),
-      transport: Number(catTotals.transport ?? 0),
-      labor: Number(catTotals.labor ?? 0),
-      other: Number(catTotals.other ?? 0),
-      adjustments: Number(catTotals.adjustments ?? 0),
-    },
-    lineCalculations: lineCalculations as LineCalculation[],
+    categoryTotals,
+    lineCalculations: raw.lineCalculations as LineCalculation[],
     fixedAssembly,
     fixedTechnolog,
-    fixedCost,
-    assembly,
-    technolog,
-    riskReserve,
-    costTotal,
-    priceTotal,
-    margin,
+    fixedCost: raw.fixedCost,
+    assembly: raw.assembly,
+    technolog: raw.technolog,
+    riskReserve: raw.riskReserve,
+    costTotal: raw.costTotal,
+    priceTotal: raw.priceTotal,
+    margin: raw.margin,
     marginPct,
-    minPriceForTargetMargin,
-    warnings,
+    minPriceForTargetMargin: raw.minPriceForTargetMargin,
+    warnings: raw.warnings as string[],
   };
 }
 
 /**
- * Единый слой совместимости для версий расчёта (Step B5, п. 2.12).
- * Распознаёт как новый формат packages/calc, так и исторический snake_case.
+ * Единый слой нормализации версии расчёта (Step A7).
+ * Строго валидирует снимок и выбрасывает SnapshotCorruptedError при повреждении данных.
  */
 export function normalizeOrderCalculation(
   calc: OrderCalculation,
@@ -402,24 +470,27 @@ export function normalizeOrderCalculation(
         : null,
     parameters: normalizeCalculationParams(calc.params_snapshot),
     input: normalizeCalculationInput(calc.input_snapshot),
-    result: normalizeCalculationResult(calc.result, {
-      costTotal: Number(calc.cost_total),
-      priceTotal: Number(calc.price_total),
-      marginPct:
-        calc.margin_pct !== null && calc.margin_pct !== undefined
-          ? Number(calc.margin_pct)
-          : null,
-    }),
+    result: normalizeCalculationResult(calc.result),
   };
 }
 
 /**
- * Определяет расчёт для отображения в сводке заказа (Step A6, Q2):
+ * Проверяет, является ли снимок расчёта валидным и не повреждённым (Step A7).
+ */
+export function isCalculationValid(calc: OrderCalculation): boolean {
+  try {
+    normalizeOrderCalculation(calc);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Определяет расчёт для отображения в сводке заказа (Step A6, Q2, Step A7):
  * - Если у заказа есть сохранённые версии и не включён предпросмотр (showLivePreview = false),
  *   возвращает данные опорной сохранённой версии (договорной или последней по номеру).
- *   Это защищает старые заказы от спонтанного изменения цен при правке глобальных параметров.
- * - Если пользователь явно нажал «Пересчитать по актуальным параметрам» (showLivePreview = true)
- *   или у заказа нет сохранённых версий, возвращает результат живого расчёта.
+ * - Если сохранённая версия повреждена (SnapshotCorruptedError), функция не падает, а переходит к живому расчёту.
  */
 export function resolveOrderDisplayCalculation(
   options: ResolveOrderDisplayOptions,
@@ -429,56 +500,57 @@ export function resolveOrderDisplayCalculation(
   const activeSaved = getPlanCalculation(candidateCalcs);
 
   if (activeSaved && !showLivePreview) {
-    const normalized = normalizeOrderCalculation(activeSaved);
-    const priceTotal = normalized.priceTotal;
-    const costTotal = normalized.costTotal;
-    const margin =
-      typeof normalized.result.margin === "number"
-        ? normalized.result.margin
-        : priceTotal - costTotal;
-    const marginPct =
-      normalized.marginPct !== null
-        ? normalized.marginPct
-        : priceTotal === 0
-        ? null
-        : margin / priceTotal;
+    try {
+      const normalized = normalizeOrderCalculation(activeSaved);
+      const priceTotal = normalized.priceTotal;
+      const costTotal = normalized.costTotal;
+      const margin = normalized.result.margin;
+      const marginPct =
+        normalized.marginPct !== null
+          ? normalized.marginPct
+          : priceTotal === 0
+          ? null
+          : margin / priceTotal;
 
-    const currentContractPrice =
-      options.order.contract_price !== null && options.order.contract_price !== undefined
-        ? Number(options.order.contract_price)
-        : null;
+      const currentContractPrice =
+        options.order.contract_price !== null && options.order.contract_price !== undefined
+          ? Number(options.order.contract_price)
+          : null;
 
-    let contractPriceMismatch: { snapshot: number; current: number } | null = null;
-    if (
-      normalized.mode === "check_contract" &&
-      currentContractPrice !== null &&
-      currentContractPrice !== priceTotal
-    ) {
-      contractPriceMismatch = {
-        snapshot: priceTotal,
-        current: currentContractPrice,
+      let contractPriceMismatch: { snapshot: number; current: number } | null = null;
+      if (
+        normalized.mode === "check_contract" &&
+        currentContractPrice !== null &&
+        currentContractPrice !== priceTotal
+      ) {
+        contractPriceMismatch = {
+          snapshot: priceTotal,
+          current: currentContractPrice,
+        };
+      }
+
+      return {
+        source: "saved",
+        version: normalized.version,
+        createdAt: normalized.createdAt,
+        isContractBaseline: normalized.isContractBaseline,
+        priceTotal,
+        costTotal,
+        margin,
+        marginPct,
+        fixedCost: normalized.result.fixedCost,
+        minPriceForTargetMargin: normalized.result.minPriceForTargetMargin,
+        warnings: normalized.result.warnings,
+        categoryTotals: normalized.result.categoryTotals,
+        assembly: normalized.result.assembly,
+        technolog: normalized.result.technolog,
+        riskReserve: normalized.result.riskReserve,
+        lineCalculations: normalized.result.lineCalculations,
+        contractPriceMismatch,
       };
+    } catch {
+      // При повреждении сохранённого снимка не падаем, переходим к живому предпросмотру
     }
-
-    return {
-      source: "saved",
-      version: normalized.version,
-      createdAt: normalized.createdAt,
-      isContractBaseline: normalized.isContractBaseline,
-      priceTotal,
-      costTotal,
-      margin,
-      marginPct,
-      fixedCost: normalized.result.fixedCost,
-      minPriceForTargetMargin: normalized.result.minPriceForTargetMargin,
-      warnings: normalized.result.warnings,
-      categoryTotals: normalized.result.categoryTotals,
-      assembly: normalized.result.assembly,
-      technolog: normalized.result.technolog,
-      riskReserve: normalized.result.riskReserve,
-      lineCalculations: normalized.result.lineCalculations,
-      contractPriceMismatch,
-    };
   }
 
   if (liveOutcome && liveOutcome.ok) {
