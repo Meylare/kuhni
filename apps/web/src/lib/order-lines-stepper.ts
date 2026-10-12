@@ -203,3 +203,43 @@ export function getRecentPriceItems(
 
   return result;
 }
+
+export interface PricePickerInitialValues {
+  qty: string;
+  waste: string;
+  comment: string;
+  isExisting: boolean;
+}
+
+/**
+ * Инициализирует поля детальной формы модального окна справочника цен (B2).
+ * Если позиция уже добавлена в заказ — подставляет её текущие значения.
+ * Если позиции нет — сбрасывает в дефолты и не оставляет значения от предыдущего выбора.
+ */
+export function getInitialPricePickerValues(
+  priceItem: PriceItem,
+  existingLine: OrderLine | null | undefined,
+  globalParams: ParametersMap
+): PricePickerInitialValues {
+  if (existingLine) {
+    return {
+      qty: String(existingLine.qty),
+      waste:
+        existingLine.waste_pct > 0
+          ? String(roundQuantity(existingLine.waste_pct * 100))
+          : "",
+      comment: existingLine.comment || "",
+      isExisting: true,
+    };
+  }
+
+  return {
+    qty: "1",
+    waste:
+      priceItem.waste_applicable && priceItem.waste_kind === "edge"
+        ? String(roundQuantity(globalParams.waste_edge_pct * 100))
+        : "",
+    comment: "",
+    isExisting: false,
+  };
+}

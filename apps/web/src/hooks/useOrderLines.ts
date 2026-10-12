@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDialog } from "../components/DialogProvider";
 import { formatErrorMessage } from "../lib/errors";
 import {
+  getInitialPricePickerValues,
   getRecentPriceItems,
   mergeOrAddPriceItem,
   roundQuantity,
@@ -120,7 +121,15 @@ export function useOrderLines({
 
   function handleSelectPriceItem(pi: PriceItem) {
     setSelectedPriceItem(pi);
-    setPickerWaste(pi.waste_applicable ? String(globalParams.waste_edge_pct * 100) : "0");
+    setPickerError(null);
+
+    const existing = linesRef.current.find(
+      (l) => l.price_item_id === pi.id && (l.order_item_id || "") === (pickerItemId || "")
+    );
+    const initial = getInitialPricePickerValues(pi, existing, globalParams);
+    setPickerQty(initial.qty);
+    setPickerWaste(initial.waste);
+    setPickerComment(initial.comment);
   }
 
   /**
@@ -297,33 +306,80 @@ export function useOrderLines({
     try {
       setPickerSaving(true);
       setPickerError(null);
-      const { data, error: insertErr } = await getSupabase()
-        .from("order_lines")
-        .insert({
-          order_id: order.id,
-          order_item_id: pickerItemId || null,
-          price_item_id: selectedPriceItem.id,
-          category: selectedPriceItem.category,
-          name: selectedPriceItem.name,
-          unit: selectedPriceItem.unit,
-          qty: qtyNum,
-          unit_price: selectedPriceItem.price,
-          waste_pct: wasteNum,
-          billable_qty_rounding: selectedPriceItem.billable_qty_rounding,
-          counts_for_technolog: selectedPriceItem.counts_for_technolog,
-          is_manual: false,
-          comment: pickerComment.trim() || null,
-        })
-        .select()
-        .single();
 
-      if (insertErr) {
-        setPickerError(formatErrorMessage(insertErr, "Ошибка добавления позиции."));
-      } else if (data) {
-        setLines((prev) => [...prev, data as OrderLine]);
-        setAddedItemsCount((prev) => prev + 1);
-        setSelectedPriceItem(null);
-        setPickerComment("");
+      const existing = linesRef.current.find(
+        (l) =>
+          l.price_item_id === selectedPriceItem.id &&
+          (l.order_item_id || "") === (pickerItemId || "")
+      );
+
+      if (existing) {
+        if (existing.id.startsWith("temp-")) {
+          setLines((prev) =>
+            prev.map((l) =>
+              l.id === existing.id
+                ? {
+                    ...l,
+                    qty: qtyNum,
+                    waste_pct: wasteNum,
+                    comment: pickerComment.trim() || null,
+                  }
+                : l
+            )
+          );
+          setSelectedPriceItem(null);
+          setPickerComment("");
+        } else {
+          const { data, error: updErr } = await getSupabase()
+            .from("order_lines")
+            .update({
+              qty: qtyNum,
+              waste_pct: wasteNum,
+              comment: pickerComment.trim() || null,
+            })
+            .eq("id", existing.id)
+            .select()
+            .single();
+
+          if (updErr) {
+            setPickerError(formatErrorMessage(updErr, "Ошибка обновления позиции."));
+          } else if (data) {
+            setLines((prev) =>
+              prev.map((l) => (l.id === existing.id ? (data as OrderLine) : l))
+            );
+            setSelectedPriceItem(null);
+            setPickerComment("");
+          }
+        }
+      } else {
+        const { data, error: insertErr } = await getSupabase()
+          .from("order_lines")
+          .insert({
+            order_id: order.id,
+            order_item_id: pickerItemId || null,
+            price_item_id: selectedPriceItem.id,
+            category: selectedPriceItem.category,
+            name: selectedPriceItem.name,
+            unit: selectedPriceItem.unit,
+            qty: qtyNum,
+            unit_price: selectedPriceItem.price,
+            waste_pct: wasteNum,
+            billable_qty_rounding: selectedPriceItem.billable_qty_rounding,
+            counts_for_technolog: selectedPriceItem.counts_for_technolog,
+            is_manual: false,
+            comment: pickerComment.trim() || null,
+          })
+          .select()
+          .single();
+
+        if (insertErr) {
+          setPickerError(formatErrorMessage(insertErr, "Ошибка добавления позиции."));
+        } else if (data) {
+          setLines((prev) => [...prev, data as OrderLine]);
+          setAddedItemsCount((prev) => prev + 1);
+          setSelectedPriceItem(null);
+          setPickerComment("");
+        }
       }
     } catch (err: unknown) {
       setPickerError(formatErrorMessage(err, "Ошибка добавления позиции."));

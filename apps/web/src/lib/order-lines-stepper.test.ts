@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { OrderLine, PriceItem } from "../types/database";
 import {
+  getInitialPricePickerValues,
   getRecentPriceItems,
   getStepIncrement,
   mergeOrAddPriceItem,
@@ -213,5 +214,38 @@ describe("order-lines-stepper", () => {
     // pi-2 used 3 times, pi-1 used 1 time
     expect(recent[0].id).toBe("pi-2");
     expect(recent[1].id).toBe("pi-1");
+  });
+
+  describe("getInitialPricePickerValues (Step B2)", () => {
+    it("returns existing line values when line is already in order", () => {
+      const existingLine: OrderLine = {
+        ...dummyLine1,
+        qty: 8.5,
+        waste_pct: 0.1,
+        comment: "на верхние шкафы",
+      };
+
+      const res = getInitialPricePickerValues(dummyPriceItem1, existingLine, dummyParams);
+      expect(res.isExisting).toBe(true);
+      expect(res.qty).toBe("8.5");
+      expect(res.waste).toBe("10");
+      expect(res.comment).toBe("на верхние шкафы");
+    });
+
+    it("resets to default 1 and empty comment when item is new", () => {
+      const res = getInitialPricePickerValues(dummyPriceItem1, null, dummyParams);
+      expect(res.isExisting).toBe(false);
+      expect(res.qty).toBe("1");
+      expect(res.waste).toBe("");
+      expect(res.comment).toBe("");
+    });
+
+    it("sets default edge waste when new item has edge waste applicable", () => {
+      const res = getInitialPricePickerValues(dummyPriceItem2, null, dummyParams);
+      expect(res.isExisting).toBe(false);
+      expect(res.qty).toBe("1");
+      expect(res.waste).toBe("15"); // dummyParams.waste_edge_pct = 0.15
+      expect(res.comment).toBe("");
+    });
   });
 });

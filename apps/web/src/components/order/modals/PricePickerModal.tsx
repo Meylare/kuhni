@@ -439,7 +439,11 @@ export function PricePickerModal({
                 disabled={pickerSaving}
                 className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
               >
-                {pickerSaving ? "Добавление…" : "Добавить в заказ"}
+                {pickerSaving
+                  ? "Сохранение…"
+                  : (selectedPriceItem && getExistingLine(selectedPriceItem.id))
+                  ? "Сохранить изменения"
+                  : "Добавить в заказ"}
               </button>
             </div>
           </form>
