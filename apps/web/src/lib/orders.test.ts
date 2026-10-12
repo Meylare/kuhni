@@ -459,6 +459,66 @@ describe("orders helpers", () => {
     ]);
   });
 
+  it("calculates per_meter assembly when meters are defined directly in order settings without separate order_items (Step B4)", () => {
+    const orderWithoutItems: Order = {
+      id: "ord-meter-test",
+      name: "Кухня по метрам",
+      client_label: "Тест",
+      status: "draft",
+      contract_price: null,
+      settings: {
+        assembly_mode: "per_meter",
+        order_linear_meters: 3,
+        order_kind: "kitchen",
+      },
+      note: null,
+      created_at: "2026-10-01T10:00:00Z",
+      updated_at: "2026-10-01T10:00:00Z",
+    };
+
+    const outcome = calculateOrderLive({
+      order: orderWithoutItems,
+      items: [], // no items created
+      lines: [
+        {
+          id: "line-1",
+          order_id: "ord-meter-test",
+          order_item_id: null,
+          price_item_id: null,
+          category: "materials",
+          name: "Материал",
+          unit: "шт",
+          qty: 1,
+          unit_price: 100_000,
+          waste_pct: 0,
+          billable_qty_rounding: "none",
+          counts_for_technolog: false,
+          is_manual: true,
+          comment: null,
+        },
+      ],
+      adjustments: [],
+      globalParams: DEFAULT_PARAMETERS,
+      mode: "quote",
+    });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error("Expected outcome to be ok");
+    // In packages/calc outcome: per_meter assembly is in fixedAssembly
+    expect(outcome.result.fixedAssembly).toBe(105_000);
+
+    // In display calculation (SummaryBar): total assembly must be 105 000
+    const display = resolveOrderDisplayCalculation({
+      order: orderWithoutItems,
+      calculations: [],
+      liveOutcome: outcome,
+      mode: "quote",
+      showLivePreview: true,
+    });
+    expect(display?.assembly).toBe(105_000);
+    expect(display?.categoryTotals.assembly).toBe(105_000);
+  });
+
   it("calculates the 886 000 variant from ui_spec.md when 10% waste applies to MDF", () => {
     const order: Order = {
       id: "ord-886",

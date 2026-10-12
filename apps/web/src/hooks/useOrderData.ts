@@ -62,6 +62,8 @@ export function useOrderData(orderId: string) {
   const [customMargin, setCustomMargin] = useState("");
   const [customAssemblyMode, setCustomAssemblyMode] = useState<"default" | "percent" | "per_meter">("default");
   const [customAssemblyPct, setCustomAssemblyPct] = useState("");
+  const [customLinearMeters, setCustomLinearMeters] = useState("");
+  const [customOrderKind, setCustomOrderKind] = useState<"kitchen" | "wardrobe">("kitchen");
   const [customTechnologMode, setCustomTechnologMode] = useState<"default" | "percent" | "per_sheet">("default");
   const [customTechnologPct, setCustomTechnologPct] = useState("");
   const [customRiskReservePct, setCustomRiskReservePct] = useState("");
@@ -130,6 +132,14 @@ export function useOrderData(orderId: string) {
       setCustomMargin(typeof s.target_margin_pct === "number" ? formatPercent(s.target_margin_pct) : "");
       setCustomAssemblyMode(s.assembly_mode === "percent" || s.assembly_mode === "per_meter" ? s.assembly_mode : "default");
       setCustomAssemblyPct(typeof s.assembly_pct === "number" ? formatPercent(s.assembly_pct) : "");
+      const orderMeters =
+        typeof s.order_linear_meters === "number"
+          ? String(s.order_linear_meters)
+          : typeof s.linear_meters === "number"
+          ? String(s.linear_meters)
+          : "";
+      setCustomLinearMeters(orderMeters);
+      setCustomOrderKind((s.order_kind as "kitchen" | "wardrobe") || "kitchen");
       setCustomTechnologMode(s.technolog_mode === "percent" || s.technolog_mode === "per_sheet" ? s.technolog_mode : "default");
       setCustomTechnologPct(typeof s.technolog_pct === "number" ? formatPercent(s.technolog_pct) : "");
       setCustomRiskReservePct(typeof s.risk_reserve_pct === "number" ? formatPercent(s.risk_reserve_pct) : "");
@@ -202,6 +212,11 @@ export function useOrderData(orderId: string) {
       if (customAssemblyMode !== "default") newSettings.assembly_mode = customAssemblyMode;
       const assemblyParsed = parsePercent(customAssemblyPct);
       if (assemblyParsed !== null) newSettings.assembly_pct = assemblyParsed;
+      const metersNum = Number(customLinearMeters.replace(/,/g, ".").trim());
+      if (Number.isFinite(metersNum) && metersNum > 0) {
+        newSettings.order_linear_meters = metersNum;
+        newSettings.order_kind = customOrderKind;
+      }
       if (customTechnologMode !== "default") newSettings.technolog_mode = customTechnologMode;
       const techParsed = parsePercent(customTechnologPct);
       if (techParsed !== null) newSettings.technolog_pct = techParsed;
@@ -285,6 +300,10 @@ export function useOrderData(orderId: string) {
     setCustomAssemblyMode,
     customAssemblyPct,
     setCustomAssemblyPct,
+    customLinearMeters,
+    setCustomLinearMeters,
+    customOrderKind,
+    setCustomOrderKind,
     customTechnologMode,
     setCustomTechnologMode,
     customTechnologPct,

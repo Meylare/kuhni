@@ -102,6 +102,10 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     setCustomAssemblyMode,
     customAssemblyPct,
     setCustomAssemblyPct,
+    customLinearMeters,
+    setCustomLinearMeters,
+    customOrderKind,
+    setCustomOrderKind,
     customTechnologPct,
     setCustomTechnologPct,
     customRiskReservePct,
@@ -389,6 +393,11 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
                 setCustomAssemblyMode={setCustomAssemblyMode}
                 customAssemblyPct={customAssemblyPct}
                 setCustomAssemblyPct={setCustomAssemblyPct}
+                customLinearMeters={customLinearMeters}
+                setCustomLinearMeters={setCustomLinearMeters}
+                customOrderKind={customOrderKind}
+                setCustomOrderKind={setCustomOrderKind}
+                items={items}
                 customTechnologPct={customTechnologPct}
                 setCustomTechnologPct={setCustomTechnologPct}
                 customRiskReservePct={customRiskReservePct}

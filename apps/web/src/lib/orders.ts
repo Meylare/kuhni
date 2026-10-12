@@ -530,6 +530,11 @@ export function resolveOrderDisplayCalculation(
         };
       }
 
+      const savedAssembly =
+        normalized.result.assembly + (normalized.result.fixedAssembly ?? 0);
+      const savedTechnolog =
+        normalized.result.technolog + (normalized.result.fixedTechnolog ?? 0);
+
       return {
         source: "saved",
         version: normalized.version,
@@ -542,9 +547,13 @@ export function resolveOrderDisplayCalculation(
         fixedCost: normalized.result.fixedCost,
         minPriceForTargetMargin: normalized.result.minPriceForTargetMargin,
         warnings: normalized.result.warnings,
-        categoryTotals: normalized.result.categoryTotals,
-        assembly: normalized.result.assembly,
-        technolog: normalized.result.technolog,
+        categoryTotals: {
+          ...normalized.result.categoryTotals,
+          assembly: savedAssembly,
+          technolog: savedTechnolog,
+        },
+        assembly: savedAssembly,
+        technolog: savedTechnolog,
         riskReserve: normalized.result.riskReserve,
         lineCalculations: normalized.result.lineCalculations,
         contractPriceMismatch,
@@ -557,6 +566,9 @@ export function resolveOrderDisplayCalculation(
   if (liveOutcome && liveOutcome.ok) {
     const res = liveOutcome.result;
     const priceTotal = res.priceTotal;
+    const totalAssembly = res.assembly + (res.fixedAssembly ?? 0);
+    const totalTechnolog = res.technolog + (res.fixedTechnolog ?? 0);
+
     return {
       source: "live",
       version: null,
@@ -576,13 +588,13 @@ export function resolveOrderDisplayCalculation(
         hardware: res.categoryTotals.hardware,
         transport: res.categoryTotals.transport,
         labor: res.categoryTotals.labor,
-        assembly: res.assembly,
-        technolog: res.technolog,
+        assembly: totalAssembly,
+        technolog: totalTechnolog,
         other: res.categoryTotals.other,
         adjustments: res.categoryTotals.adjustments,
       },
-      assembly: res.assembly,
-      technolog: res.technolog,
+      assembly: totalAssembly,
+      technolog: totalTechnolog,
       riskReserve: res.riskReserve,
       lineCalculations: res.lineCalculations,
       contractPriceMismatch: null,
@@ -752,13 +764,47 @@ export function buildCalculationInput(params: {
     countsForTechnolog: line.counts_for_technolog,
   }));
 
-  const calcItems: CalculationOrderItem[] = items.map((item) => ({
-    kind: item.kind,
-    linearMeters:
-      item.linear_meters !== null && item.linear_meters !== undefined
-        ? Number(item.linear_meters)
-        : undefined,
-  }));
+  const s = (order.settings || {}) as Record<string, unknown>;
+  const itemsWithMeters = items.filter(
+    (item) =>
+      item.linear_meters !== null &&
+      item.linear_meters !== undefined &&
+      Number(item.linear_meters) > 0
+  );
+
+  let calcItems: CalculationOrderItem[];
+  if (itemsWithMeters.length > 0) {
+    calcItems = items.map((item) => ({
+      kind: item.kind,
+      linearMeters:
+        item.linear_meters !== null && item.linear_meters !== undefined
+          ? Number(item.linear_meters)
+          : undefined,
+    }));
+  } else {
+    const settingsMeters =
+      typeof s.order_linear_meters === "number"
+        ? s.order_linear_meters
+        : typeof s.linear_meters === "number"
+        ? s.linear_meters
+        : undefined;
+
+    const settingsKind = (s.order_kind as "kitchen" | "wardrobe") || "kitchen";
+
+    if (settingsMeters !== undefined && settingsMeters > 0) {
+      calcItems = [
+        {
+          kind: settingsKind,
+          linearMeters: settingsMeters,
+        },
+      ];
+    } else {
+      calcItems = items.map((item) => ({
+        kind: item.kind,
+        linearMeters: undefined,
+      }));
+    }
+  }
 
   const calcAdjustments: CalculationAdjustment[] = adjustments.map((adj) => ({
     kind: adj.kind,

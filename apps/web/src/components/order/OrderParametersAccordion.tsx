@@ -1,4 +1,6 @@
+import { formatKzt } from "../../lib/money";
 import { formatPercent, type ParametersMap } from "../../lib/parameters";
+import type { OrderItem } from "../../types/database";
 
 export interface OrderParametersAccordionProps {
   isOpen: boolean;
@@ -10,6 +12,11 @@ export interface OrderParametersAccordionProps {
   setCustomAssemblyMode: (v: "default" | "percent" | "per_meter") => void;
   customAssemblyPct: string;
   setCustomAssemblyPct: (v: string) => void;
+  customLinearMeters?: string;
+  setCustomLinearMeters?: (v: string) => void;
+  customOrderKind?: "kitchen" | "wardrobe";
+  setCustomOrderKind?: (v: "kitchen" | "wardrobe") => void;
+  items?: OrderItem[];
   customTechnologPct: string;
   setCustomTechnologPct: (v: string) => void;
   customRiskReservePct?: string;
@@ -28,6 +35,11 @@ export function OrderParametersAccordion({
   setCustomAssemblyMode,
   customAssemblyPct,
   setCustomAssemblyPct,
+  customLinearMeters = "",
+  setCustomLinearMeters,
+  customOrderKind = "kitchen",
+  setCustomOrderKind,
+  items = [],
   customTechnologPct,
   setCustomTechnologPct,
   locked,
@@ -38,7 +50,23 @@ export function OrderParametersAccordion({
     customMargin ||
     customAssemblyMode !== "default" ||
     customAssemblyPct ||
+    customLinearMeters ||
     customTechnologPct
+  );
+
+  const isPerMeter =
+    customAssemblyMode === "per_meter" ||
+    (customAssemblyMode === "default" && globalParams.assembly_mode === "per_meter");
+
+  const itemsWithMeters = (items || []).filter(
+    (item) =>
+      item.linear_meters !== null &&
+      item.linear_meters !== undefined &&
+      Number(item.linear_meters) > 0
+  );
+  const totalItemsMeters = itemsWithMeters.reduce(
+    (sum, item) => sum + Number(item.linear_meters),
+    0
   );
 
   return (
@@ -102,19 +130,97 @@ export function OrderParametersAccordion({
               </select>
             </div>
 
-            <div>
-              <label className="block font-semibold text-stone-700 mb-1">
-                Сборка, % (по умолч. {formatPercent(globalParams.assembly_pct)})
-              </label>
-              <input
-                type="text"
-                placeholder="14,5%"
-                value={customAssemblyPct}
-                onChange={(e) => setCustomAssemblyPct(e.target.value)}
-                disabled={locked}
-                className="min-h-10 w-full rounded-xl border border-stone-300 px-3 py-1.5 focus:border-emerald-800"
-              />
-            </div>
+            {isPerMeter ? (
+              <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50/70 p-3 flex flex-col gap-3">
+                {itemsWithMeters.length > 0 ? (
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-xs text-sky-900">
+                    <p className="font-semibold">ℹ️ Метраж берётся из изделий заказа</p>
+                    <p className="mt-0.5 text-stone-600">
+                      Всего в карточках изделий: <span className="font-bold">{totalItemsMeters.toFixed(2)} м</span>
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block font-semibold text-stone-700 mb-1">
+                          Погонные метры изделия (м)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Например, 3.0"
+                          value={customLinearMeters}
+                          onChange={(e) => setCustomLinearMeters?.(e.target.value)}
+                          disabled={locked}
+                          className="min-h-10 w-full rounded-xl border border-stone-300 bg-white px-3 py-1.5 focus:border-emerald-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-stone-700 mb-1">
+                          Тип изделия для сборки
+                        </label>
+                        <select
+                          value={customOrderKind}
+                          onChange={(e) =>
+                            setCustomOrderKind?.(e.target.value as "kitchen" | "wardrobe")
+                          }
+                          disabled={locked}
+                          className="min-h-10 w-full rounded-xl border border-stone-300 bg-white px-3 py-1.5 focus:border-emerald-800"
+                        >
+                          <option value="kitchen">
+                            Кухня ({formatKzt(globalParams.assembly_per_meter_kitchen || 35000)} ₸/м)
+                          </option>
+                          <option value="wardrobe">
+                            Шкаф ({formatKzt(globalParams.assembly_per_meter_wardrobe || 25000)} ₸/м)
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const parsedMeters = Number(customLinearMeters.replace(/,/g, ".").trim());
+                      if (!Number.isFinite(parsedMeters) || parsedMeters <= 0) {
+                        return (
+                          <p className="text-amber-800 text-xs bg-amber-50 border border-amber-200 rounded-lg p-2 font-medium">
+                            ⚠️ Укажите погонные метры, иначе сборка = 0 ₸
+                          </p>
+                        );
+                      }
+                      const rate =
+                        customOrderKind === "wardrobe"
+                          ? (globalParams.assembly_per_meter_wardrobe || 25000)
+                          : (globalParams.assembly_per_meter_kitchen || 35000);
+                      const estAssembly = Math.round(parsedMeters * rate);
+                      return (
+                        <div className="flex items-center justify-between text-xs text-stone-700 bg-white border border-stone-200 rounded-lg px-3 py-2">
+                          <span>
+                            Расчёт сборки: <strong>{parsedMeters} м</strong> × {formatKzt(rate)} ₸
+                          </span>
+                          <span className="font-bold text-emerald-800">
+                            {formatKzt(estAssembly)} ₸
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Сборка, % (по умолч. {formatPercent(globalParams.assembly_pct)})
+                </label>
+                <input
+                  type="text"
+                  placeholder="14,5%"
+                  value={customAssemblyPct}
+                  onChange={(e) => setCustomAssemblyPct(e.target.value)}
+                  disabled={locked}
+                  className="min-h-10 w-full rounded-xl border border-stone-300 px-3 py-1.5 focus:border-emerald-800"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block font-semibold text-stone-700 mb-1">
