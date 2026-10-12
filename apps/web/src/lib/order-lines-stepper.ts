@@ -20,13 +20,14 @@ export function getStepIncrement(_unit: string): number {
 
 export interface MergeOrAddResult {
   lines: OrderLine[];
-  affectedLine: OrderLine;
-  action: "added" | "updated";
+  affectedLine: OrderLine | null;
+  action: "added" | "updated" | "deleted" | "noop";
 }
 
 /**
  * Находит существующую позицию по price_item_id и order_item_id
- * и суммирует количество, либо добавляет новую строку.
+ * и суммирует/вычитает количество, либо добавляет новую строку.
+ * При deltaQty < 0 и qty <= 0 — удаляет строку.
  */
 export function mergeOrAddPriceItem(
   currentLines: OrderLine[],
@@ -39,7 +40,6 @@ export function mergeOrAddPriceItem(
   }
 ): MergeOrAddResult {
   const { priceItem, orderItemId, orderId, deltaQty = 1, globalParams } = params;
-  const normalizedDelta = roundQuantity(Math.max(0.001, deltaQty));
 
   const existingIndex = currentLines.findIndex(
     (l) => l.order_item_id === orderItemId && l.price_item_id === priceItem.id
@@ -47,9 +47,19 @@ export function mergeOrAddPriceItem(
 
   if (existingIndex >= 0) {
     const existing = currentLines[existingIndex];
+    const newQty = roundQuantity(existing.qty + deltaQty);
+
+    if (newQty <= 0) {
+      return {
+        lines: currentLines.filter((_, idx) => idx !== existingIndex),
+        affectedLine: existing,
+        action: "deleted",
+      };
+    }
+
     const updatedLine: OrderLine = {
       ...existing,
-      qty: roundQuantity(existing.qty + normalizedDelta),
+      qty: newQty,
     };
     const nextLines = [...currentLines];
     nextLines[existingIndex] = updatedLine;
@@ -59,6 +69,17 @@ export function mergeOrAddPriceItem(
       action: "updated",
     };
   }
+
+  // Если позиции нет и запрошено уменьшение — ничего не делаем
+  if (deltaQty <= 0) {
+    return {
+      lines: currentLines,
+      affectedLine: null,
+      action: "noop",
+    };
+  }
+
+  const normalizedDelta = roundQuantity(deltaQty);
 
   // Расчёт отхода по умолчанию для новой позиции (для кромки берётся из параметров)
   let defaultWaste = 0;

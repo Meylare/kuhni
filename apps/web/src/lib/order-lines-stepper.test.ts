@@ -98,9 +98,54 @@ describe("order-lines-stepper", () => {
 
     expect(res.action).toBe("updated");
     expect(res.lines.length).toBe(1);
-    expect(res.affectedLine.qty).toBe(6);
+    expect(res.affectedLine?.qty).toBe(6);
     // Existing comment & properties must be preserved
-    expect(res.affectedLine.comment).toBe("петли с доводчиком");
+    expect(res.affectedLine?.comment).toBe("петли с доводчиком");
+  });
+
+  it("mergeOrAddPriceItem decrements quantity when deltaQty is negative", () => {
+    const lines = [dummyLine1]; // qty = 4
+    const res = mergeOrAddPriceItem(lines, {
+      priceItem: dummyPriceItem1,
+      orderItemId: "item-kitchen",
+      orderId: "ord-1",
+      deltaQty: -1,
+      globalParams: dummyParams,
+    });
+
+    expect(res.action).toBe("updated");
+    expect(res.lines.length).toBe(1);
+    expect(res.affectedLine?.qty).toBe(3);
+  });
+
+  it("mergeOrAddPriceItem deletes line when deltaQty reduces quantity to <= 0", () => {
+    const singleQtyLine = { ...dummyLine1, qty: 1 };
+    const lines = [singleQtyLine];
+    const res = mergeOrAddPriceItem(lines, {
+      priceItem: dummyPriceItem1,
+      orderItemId: "item-kitchen",
+      orderId: "ord-1",
+      deltaQty: -1,
+      globalParams: dummyParams,
+    });
+
+    expect(res.action).toBe("deleted");
+    expect(res.lines.length).toBe(0);
+    expect(res.affectedLine?.id).toBe("line-1");
+  });
+
+  it("mergeOrAddPriceItem does not add line when deltaQty is negative and item is not present", () => {
+    const lines: OrderLine[] = [];
+    const res = mergeOrAddPriceItem(lines, {
+      priceItem: dummyPriceItem1,
+      orderItemId: "item-kitchen",
+      orderId: "ord-1",
+      deltaQty: -1,
+      globalParams: dummyParams,
+    });
+
+    expect(res.action).toBe("noop");
+    expect(res.lines.length).toBe(0);
   });
 
   it("mergeOrAddPriceItem adds new line when item exists in a different order_item", () => {
@@ -115,8 +160,8 @@ describe("order-lines-stepper", () => {
 
     expect(res.action).toBe("added");
     expect(res.lines.length).toBe(2);
-    expect(res.affectedLine.order_item_id).toBe("item-wardrobe");
-    expect(res.affectedLine.qty).toBe(2);
+    expect(res.affectedLine?.order_item_id).toBe("item-wardrobe");
+    expect(res.affectedLine?.qty).toBe(2);
   });
 
   it("mergeOrAddPriceItem adds new line with default waste for edge material", () => {
@@ -131,9 +176,9 @@ describe("order-lines-stepper", () => {
 
     expect(res.action).toBe("added");
     expect(res.lines.length).toBe(2);
-    expect(res.affectedLine.name).toBe("Кромка ПВХ 2мм");
-    expect(res.affectedLine.waste_pct).toBe(0.15); // waste_edge_pct
-    expect(res.affectedLine.billable_qty_rounding).toBe("none");
+    expect(res.affectedLine?.name).toBe("Кромка ПВХ 2мм");
+    expect(res.affectedLine?.waste_pct).toBe(0.15); // waste_edge_pct
+    expect(res.affectedLine?.billable_qty_rounding).toBe("none");
   });
 
   it("updateLineQuantity updates quantity when newQty > 0", () => {

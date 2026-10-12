@@ -197,17 +197,37 @@ export function useOrderLines({
       globalParams,
     });
 
-    setLines(result.lines);
-    setAddedItemsCount((prev) => prev + 1);
+    if (result.action === "noop" || !result.affectedLine) return;
 
-    // Планируем отправку в БД с дебаунсом 400 мс
+    setLines(result.lines);
+    if (delta > 0) {
+      setAddedItemsCount((prev) => prev + 1);
+    }
+
     const lineKey = result.affectedLine.id;
     const existingTimer = debounceTimers.current.get(lineKey);
     if (existingTimer) clearTimeout(existingTimer);
 
+    if (result.action === "deleted") {
+      const timer = setTimeout(async () => {
+        debounceTimers.current.delete(lineKey);
+        if (!lineKey.startsWith("temp-")) {
+          try {
+            await getSupabase().from("order_lines").delete().eq("id", lineKey);
+          } catch (err) {
+            console.error("Ошибка удаления позиции:", err);
+          }
+        }
+      }, 400);
+      debounceTimers.current.set(lineKey, timer);
+      return;
+    }
+
+    // Планируем отправку в БД с дебаунсом 400 мс
+    const affected = result.affectedLine;
     const timer = setTimeout(() => {
       debounceTimers.current.delete(lineKey);
-      void syncLineToDatabase(result.affectedLine);
+      void syncLineToDatabase(affected);
     }, 400);
 
     debounceTimers.current.set(lineKey, timer);
