@@ -5,6 +5,7 @@ import {
   filterPriceItems,
   parsePrice,
   validatePriceItem,
+  type PriceItemInput,
 } from "./price-items";
 
 describe("parsePrice", () => {
@@ -151,5 +152,108 @@ describe("filterPriceItems", () => {
     expect(filterPriceItems(items, "", "workshop", false)).toHaveLength(1);
     expect(filterPriceItems(items, "", "all", false)).toHaveLength(2); // Без архивных
     expect(filterPriceItems(items, "", "all", true)).toHaveLength(3); // С архивными
+  });
+});
+
+describe("Step B6 additional price items validation", () => {
+  const newItems: PriceItemInput[] = [
+    {
+      name: "Витрина алюминиевый профиль",
+      category: "facades",
+      unit: "м2",
+      price: 55000,
+      waste_applicable: false,
+      waste_kind: null,
+      billable_qty_rounding: "none",
+      counts_for_technolog: false,
+    },
+    {
+      name: "Столешница EGGER/F&S 4м",
+      category: "materials",
+      unit: "шт",
+      price: 70000,
+      waste_applicable: false,
+      waste_kind: null,
+      billable_qty_rounding: "none",
+      counts_for_technolog: false,
+    },
+    {
+      name: "Столешница EGGER/F&S 3м",
+      category: "materials",
+      unit: "шт",
+      price: 46000,
+      waste_applicable: false,
+      waste_kind: null,
+      billable_qty_rounding: "none",
+      counts_for_technolog: false,
+    },
+    {
+      name: "Столешница стандарт 3м",
+      category: "materials",
+      unit: "шт",
+      price: 30000,
+      waste_applicable: false,
+      waste_kind: null,
+      billable_qty_rounding: "none",
+      counts_for_technolog: false,
+    },
+    {
+      name: "Ручки",
+      category: "hardware",
+      unit: "шт",
+      price: 1500,
+      waste_applicable: false,
+      waste_kind: null,
+      billable_qty_rounding: "none",
+      counts_for_technolog: false,
+    },
+    {
+      name: "Профиль Gola 3м",
+      category: "hardware",
+      unit: "шт",
+      price: 25000,
+      waste_applicable: false,
+      waste_kind: null,
+      billable_qty_rounding: "none",
+      counts_for_technolog: false,
+    },
+    {
+      name: "Сушка стандарт 600 мм",
+      category: "hardware",
+      unit: "шт",
+      price: 5000,
+      waste_applicable: false,
+      waste_kind: null,
+      billable_qty_rounding: "none",
+      counts_for_technolog: false,
+    },
+    {
+      name: "Сушка стандарт 900 мм",
+      category: "hardware",
+      unit: "шт",
+      price: 10000,
+      waste_applicable: false,
+      waste_kind: null,
+      billable_qty_rounding: "none",
+      counts_for_technolog: false,
+    },
+    {
+      name: "Сушка нижнего монтажа 600 мм",
+      category: "hardware",
+      unit: "шт",
+      price: 45000,
+      waste_applicable: false,
+      waste_kind: null,
+      billable_qty_rounding: "none",
+      counts_for_technolog: false,
+    },
+  ];
+
+  it("all 9 new items pass client validation successfully", () => {
+    for (const item of newItems) {
+      const result = validatePriceItem(item);
+      expect(result.isValid).toBe(true);
+      expect(result.error).toBeUndefined();
+    }
   });
 });
