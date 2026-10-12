@@ -4,6 +4,7 @@ import {
   DEFAULT_PARAMETERS,
   evaluateDenominator,
   formatPercent,
+  formatMarginPercent,
   formatPercentInput,
   parsePercent,
 } from "./parameters";
@@ -25,6 +26,22 @@ describe("formatPercent", () => {
     expect(formatPercent(-9.99)).toBe("-999 %");
     expect(formatPercent(-9.99185)).toBe("< −999 %");
     expect(formatPercent(-100)).toBe("< −999 %");
+  });
+});
+
+describe("formatMarginPercent", () => {
+  it("форматирует маржу с округлением до 1 знака или без знаков при целых числах", () => {
+    expect(formatMarginPercent(0.18)).toBe("18 %");
+    expect(formatMarginPercent(0.15)).toBe("15 %");
+    expect(formatMarginPercent(0.15029)).toBe("15 %");
+    expect(formatMarginPercent(0.152)).toBe("15,2 %");
+    expect(formatMarginPercent(0.145)).toBe("14,5 %");
+    expect(formatMarginPercent(0.04)).toBe("4 %");
+    expect(formatMarginPercent(0)).toBe("0 %");
+    expect(formatMarginPercent(null)).toBe("—");
+    expect(formatMarginPercent(undefined)).toBe("—");
+    expect(formatMarginPercent(-0.052)).toBe("-5,2 %");
+    expect(formatMarginPercent(-100)).toBe("< −999 %");
   });
 });
 

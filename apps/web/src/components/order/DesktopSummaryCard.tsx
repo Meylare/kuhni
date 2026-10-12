@@ -7,7 +7,7 @@ import {
   getPlanCalculation,
   type OrderDisplayCalculation,
 } from "../../lib/orders";
-import { formatPercent } from "../../lib/parameters";
+import { formatMarginPercent } from "../../lib/parameters";
 import type { OrderCalculation } from "../../types/database";
 
 export interface DesktopSummaryCardProps {
@@ -98,7 +98,7 @@ export function DesktopSummaryCard({
                 <span className="text-[10px] text-stone-500 block">Маржа</span>
                 <span className={`font-bold ${marginStyle.text}`}>
                   {formatKzt(displayCalc.margin)} ₸{" "}
-                  {displayCalc.marginPct !== null && `(${formatPercent(displayCalc.marginPct)})`}
+                  {displayCalc.marginPct !== null && `(${formatMarginPercent(displayCalc.marginPct)})`}
                 </span>
               </div>
             </div>

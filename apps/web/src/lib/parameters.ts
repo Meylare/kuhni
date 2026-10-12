@@ -154,6 +154,23 @@ export function formatPercent(fraction: number | null | undefined): string {
 }
 
 /**
+ * Преобразует долю маржи в процент с округлением до 1 знака (например, "15 %" или "15,2 %").
+ */
+export function formatMarginPercent(fraction: number | null | undefined): string {
+  if (fraction === null || fraction === undefined || !Number.isFinite(fraction)) {
+    return "—";
+  }
+  const pct = Math.round(fraction * 100 * 10) / 10;
+  if (pct < -999) {
+    return "< −999 %";
+  }
+  const formatted = pct
+    .toLocaleString("ru-RU", { maximumFractionDigits: 1 })
+    .replace(/\u00A0/g, " ");
+  return `${formatted} %`;
+}
+
+/**
  * Преобразует десятичную долю (0.145) в чистое строковое значение для поля ввода ("14,5"),
  * округляя до 3 знаков после запятой и устраняя артефакты IEEE-754 (например, 14.499999999999998).
  */

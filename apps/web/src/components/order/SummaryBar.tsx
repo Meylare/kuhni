@@ -7,7 +7,7 @@ import {
   getPlanCalculation,
   type OrderDisplayCalculation,
 } from "../../lib/orders";
-import { formatPercent } from "../../lib/parameters";
+import { formatMarginPercent } from "../../lib/parameters";
 import type { OrderCalculation } from "../../types/database";
 
 export interface SummaryBarProps {
@@ -107,7 +107,7 @@ export function SummaryBar({
                 <span className="text-stone-600">Маржа:</span>
                 <span className={`font-bold ${marginStyle.text}`}>
                   {formatKzt(displayCalc.margin)} ₸{" "}
-                  {displayCalc.marginPct !== null && `(${formatPercent(displayCalc.marginPct)})`}
+                  {displayCalc.marginPct !== null && `(${formatMarginPercent(displayCalc.marginPct)})`}
                 </span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-stone-100">
@@ -191,7 +191,7 @@ export function SummaryBar({
                   Маржа
                 </span>
                 <span className={`text-xs font-black ${marginStyle.text} leading-none`}>
-                  {displayCalc.marginPct !== null ? formatPercent(displayCalc.marginPct) : "—"}
+                  {formatMarginPercent(displayCalc.marginPct)}
                 </span>
               </div>
             </div>
