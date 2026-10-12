@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { formatErrorMessage } from "../../../lib/errors";
 import { getSupabase } from "../../../lib/supabase";
+import { isDemoModeActive, demoSaveTemplate } from "../../../lib/demo-data";
 import { groupOrderLinesForTemplate } from "../../../lib/templates";
-import type { OrderLine } from "../../../types/database";
+import type { OrderLine, ProductTemplateWithLines } from "../../../types/database";
 
 export interface SaveAsTemplateModalProps {
   isOpen: boolean;
@@ -40,6 +41,28 @@ export function SaveAsTemplateModal({
     try {
       setSaving(true);
       setError(null);
+
+      if (isDemoModeActive()) {
+        const newTemplateId = `demo-tpl-${Date.now()}`;
+        const newTemplate: ProductTemplateWithLines = {
+          id: newTemplateId,
+          name: templateName.trim(),
+          description: description.trim() || null,
+          lines: grouped.templateLines.map((tl) => ({
+            template_id: newTemplateId,
+            price_item_id: tl.price_item_id,
+            qty: tl.qty,
+            note: tl.note || null,
+          })),
+        };
+        demoSaveTemplate(newTemplate);
+        onSuccess(templateName.trim());
+        setTemplateName("");
+        setDescription("");
+        onClose();
+        return;
+      }
+
       const supabase = getSupabase();
 
       // 1. Создаём шаблон

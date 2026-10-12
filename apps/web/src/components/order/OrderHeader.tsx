@@ -45,60 +45,62 @@ export function OrderHeader({
   onSelectStage,
 }: OrderHeaderProps) {
   return (
-    <>
-      {/* Верхняя навигация, статус и версии */}
-      <div className="flex items-center justify-between gap-2 border-b border-stone-200 pb-3 flex-wrap">
-        <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-4">
+      {/* Навигационная полоса: назад, автосохранение, версии и статус */}
+      <div className="flex items-center justify-between gap-2 border-b border-stone-200/80 pb-3 flex-wrap">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={onBack}
-            className="flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white/80 px-3.5 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-white active:scale-98"
+            className="flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3.5 text-xs font-bold text-stone-700 shadow-xs hover:bg-stone-50 hover:text-stone-900 active:scale-98 transition-all cursor-pointer"
           >
             <span>←</span>
-            <span>Заказы</span>
+            <span>К списку заказов</span>
           </button>
 
-          {/* Кратковременное уведомление об автосохранении (U4: 2 сек) */}
+          {/* Индикатор автосохранения */}
           {autoSaveToast && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800 transition-opacity">
-              <span>✓</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 px-3 py-1 text-xs font-bold text-emerald-800 transition-all animate-pulse">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               <span>{autoSaveToast}</span>
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Кнопка версий расчёта (U5.5) */}
+          {/* Кнопка версий расчёта */}
           <button
             type="button"
             onClick={onOpenVersionsModal}
-            className="flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50 active:scale-98"
-            title="История сохранённых версий"
+            className="flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 text-xs font-bold text-stone-700 shadow-xs hover:bg-stone-50 active:scale-98 transition-all cursor-pointer"
+            title="История версий расчёта"
           >
             <span>🕘</span>
             <span>Версии ({calculationsCount})</span>
           </button>
 
+          {/* Статус заказа */}
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot}`} />
             {statusLabel}
           </span>
 
+          {/* Редактировать инфо */}
           <button
             type="button"
             onClick={onOpenEditHeader}
-            className="min-h-10 rounded-xl border border-stone-300 bg-white px-3 text-xs font-medium text-stone-700 hover:bg-stone-50"
+            className="min-h-10 rounded-xl border border-stone-200 bg-white px-3 text-xs font-bold text-stone-700 hover:bg-stone-50 hover:text-stone-900 shadow-xs transition-all cursor-pointer"
           >
-            Изменить
+            ✏️ Инфо
           </button>
         </div>
       </div>
 
-      {/* Баннер сетевой ошибки загрузки заказа (Step B4) */}
+      {/* Ошибка сети */}
       {networkError && (
-        <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border-2 border-rose-300 bg-rose-50 p-4 text-xs text-rose-950 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border-2 border-rose-300 bg-rose-50 p-4 text-xs text-rose-950 shadow-sm">
           <div className="flex items-start gap-2.5">
             <span className="text-xl leading-none">⚠️</span>
             <div>
@@ -106,7 +108,7 @@ export function OrderHeader({
                 {networkError}
               </strong>
               <p className="mt-0.5 text-rose-700">
-                Редактирование, добавление позиций и сохранение расчёта заблокированы для предотвращения потери данных.
+                Редактирование защищено от потери данных.
               </p>
             </div>
           </div>
@@ -120,106 +122,149 @@ export function OrderHeader({
         </div>
       )}
 
-      {/* Предупреждение о блокировке (U4, U5) */}
+      {/* Предупреждение о блокировке */}
       {locked && (
-        <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-xs">
           <div className="flex items-start gap-2.5">
             <span className="text-xl leading-none">🔒</span>
             <div>
-              <strong className="text-sm font-bold text-amber-950">Заказ заблокирован от случайных правок</strong>
+              <strong className="text-sm font-bold text-amber-950">Заказ зафиксирован в статусе «{statusLabel}»</strong>
               <p className="mt-0.5 text-amber-800">
-                Заказ находится в статусе «{statusLabel}». Позиции и параметры защищены от изменений.
+                Смета защищена от случайных изменений. Нажмите кнопку справа, чтобы внести правки.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onOpenUnlockModal}
-            className="self-start sm:self-auto min-h-10 whitespace-nowrap rounded-xl bg-amber-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-950 active:scale-98"
+            className="self-start sm:self-auto min-h-10 whitespace-nowrap rounded-xl bg-amber-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-950 active:scale-98 cursor-pointer"
           >
             Открыть для правок
           </button>
         </div>
       )}
 
-      {/* Карточка заказа: название, клиент, сумма */}
-      <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-stone-900 md:text-2xl">
+      {/* Главная карточка проекта */}
+      <div className="rounded-3xl border border-stone-200/90 bg-white p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight leading-tight">
               {order.name}
             </h1>
-            {order.client_label && (
-              <p className="mt-0.5 text-xs text-stone-500">
-                Клиент: <span className="font-semibold text-stone-800">{order.client_label}</span>
-              </p>
-            )}
-            {order.note && (
-              <p className="mt-1 text-xs text-stone-600 bg-stone-50 p-2 rounded-lg italic">
+            <div className="mt-1 flex items-center gap-3 text-xs text-stone-500 font-medium flex-wrap">
+              {order.client_label ? (
+                <span className="text-stone-800 font-bold flex items-center gap-1">
+                  <span>👤</span>
+                  <span>{order.client_label}</span>
+                </span>
+              ) : null}
+              {order.created_at && (
+                <span>
+                  Создан: {new Date(order.created_at).toLocaleDateString("ru-RU")}
+                </span>
+              )}
+            </div>
+
+            {order.note ? (
+              <p className="mt-2 text-xs text-stone-600 bg-stone-50 border border-stone-200/60 p-2.5 rounded-xl italic">
                 {order.note}
               </p>
-            )}
+            ) : null}
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Правая часть: договорная сумма и кнопка экспорта КП */}
+          <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center">
             {order.contract_price !== null && (
-              <div className="rounded-xl bg-stone-100 px-3 py-1.5 text-right">
-                <span className="block text-[10px] text-stone-500 uppercase tracking-wide">
+              <div className="rounded-2xl bg-indigo-50/70 border border-indigo-200/60 px-3.5 py-2 text-right">
+                <span className="block text-[10px] text-indigo-700 font-bold uppercase tracking-wider">
                   Договор
                 </span>
-                <span className="text-sm font-bold text-stone-900">
+                <span className="text-sm sm:text-base font-black text-indigo-950 tabular-nums">
                   {formatKzt(order.contract_price)} ₸
                 </span>
               </div>
             )}
+
             <button
               type="button"
               onClick={onCopySummary}
-              className="min-h-10 rounded-xl border border-stone-200 bg-stone-50 px-3 text-xs font-medium text-stone-700 hover:bg-stone-100"
-              title="Копировать сводку расчёта"
+              className={`flex min-h-11 items-center gap-1.5 rounded-2xl border px-3.5 text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                copySuccess
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-900"
+                  : "border-stone-200 bg-white text-stone-800 hover:bg-stone-50"
+              }`}
+              title="Скопировать коммерческое предложение для клиента (WhatsApp / Telegram)"
             >
-              {copySuccess ? "✓ Скопировано" : "📋 Скопировать"}
+              <span>{copySuccess ? "✓" : "📋"}</span>
+              <span>{copySuccess ? "КП скопировано!" : "Скопировать КП"}</span>
             </button>
           </div>
         </div>
 
-        {/* Этапы выполнения: Смета → Договор → Факт (U5.1) */}
-        <div className="mt-4 flex items-center gap-1.5 border-t border-stone-100 pt-3">
-          <button
-            type="button"
-            onClick={() => onSelectStage("quote")}
-            className={`min-h-11 flex-1 rounded-xl text-xs font-bold transition-all ${
-              currentStage === "quote"
-                ? "bg-emerald-900 text-white shadow-xs"
-                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
-            }`}
-          >
-            Смета ({linesCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => onSelectStage("contract")}
-            className={`min-h-11 flex-1 rounded-xl text-xs font-bold transition-all ${
-              currentStage === "contract"
-                ? "bg-emerald-900 text-white shadow-xs"
-                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
-            }`}
-          >
-            Договор
-          </button>
-          <button
-            type="button"
-            onClick={() => onSelectStage("fact")}
-            className={`min-h-11 flex-1 rounded-xl text-xs font-bold transition-all ${
-              currentStage === "fact"
-                ? "bg-emerald-900 text-white shadow-xs"
-                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
-            }`}
-          >
-            Факт ({factCount})
-          </button>
+        {/* 3-Этапный конвейер проекта: Смета ──> Договор ──> Факт */}
+        <div className="mt-5 border-t border-stone-100 pt-4">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2">
+            Этап проекта:
+          </div>
+          <div className="grid grid-cols-3 gap-2 rounded-2xl bg-stone-100/80 p-1.5 border border-stone-200/60">
+            <button
+              type="button"
+              onClick={() => onSelectStage("quote")}
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 min-h-11 rounded-xl py-2 px-3 text-xs font-bold transition-all cursor-pointer ${
+                currentStage === "quote"
+                  ? "bg-white text-emerald-950 shadow-xs font-black"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+              }`}
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-900 text-[11px]">
+                1
+              </span>
+              <span>Смета</span>
+              <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-600 font-semibold">
+                {linesCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectStage("contract")}
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 min-h-11 rounded-xl py-2 px-3 text-xs font-bold transition-all cursor-pointer ${
+                currentStage === "contract"
+                  ? "bg-white text-indigo-950 shadow-xs font-black"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+              }`}
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-900 text-[11px]">
+                2
+              </span>
+              <span>Договор</span>
+              {order.contract_price !== null && (
+                <span className="hidden sm:inline rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] text-indigo-700 font-semibold">
+                  согласован
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectStage("fact")}
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 min-h-11 rounded-xl py-2 px-3 text-xs font-bold transition-all cursor-pointer ${
+                currentStage === "fact"
+                  ? "bg-white text-emerald-950 shadow-xs font-black"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+              }`}
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-teal-900 text-[11px]">
+                3
+              </span>
+              <span>Факт</span>
+              <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-600 font-semibold">
+                {factCount}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

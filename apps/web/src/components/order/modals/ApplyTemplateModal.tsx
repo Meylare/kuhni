@@ -13,6 +13,7 @@ import {
   type PriceItem,
   type ProductTemplateWithLines,
 } from "../../../types/database";
+import { isDemoModeActive, demoSaveLine } from "../../../lib/demo-data";
 
 export interface ApplyTemplateModalProps {
   isOpen: boolean;
@@ -79,6 +80,28 @@ export function ApplyTemplateModal({
         orderItemId: targetItemId || null,
         globalParams,
       });
+
+      if (isDemoModeActive()) {
+        const finalLines: OrderLine[] = applyRes.nextLines.map((l, i) => ({
+          ...l,
+          id: l.id.startsWith("temp-") ? `demo-line-${Date.now()}-${i}` : l.id,
+        }));
+        finalLines.forEach((l) => demoSaveLine(l));
+        setLines(finalLines);
+        onClose();
+
+        let msg = `Добавлено/обновлено позиций из шаблона: ${applyRes.appliedCount}.`;
+        if (applyRes.skippedInactiveCount > 0) {
+          msg += ` Пропущено неактивных позиций (${applyRes.skippedInactiveCount}): ${applyRes.skippedNames.join(", ")}.`;
+        }
+
+        await dialog.alert({
+          title: "Шаблон применён",
+          message: msg,
+          variant: "info",
+        });
+        return;
+      }
 
       // Сохраняем новые позиции в базу данных
       const supabase = getSupabase();

@@ -9,6 +9,7 @@ import {
   type PriceItemInput,
 } from "../lib/price-items";
 import { assertSingleRowAffected, getSupabase } from "../lib/supabase";
+import { demoSavePriceItem, isDemoModeActive, loadDemoState } from "../lib/demo-data";
 import { useDialog } from "../components/DialogProvider";
 import {
   ALL_CATEGORIES,
@@ -50,6 +51,13 @@ export function PriceListPage() {
 
   async function loadItems() {
     try {
+      if (isDemoModeActive()) {
+        const state = loadDemoState();
+        setItems(state.priceItems || []);
+        setLoading(false);
+        return;
+      }
+
       const supabase = getSupabase();
       const { data, error: fetchErr } = await supabase
         .from("price_items")
@@ -119,6 +127,16 @@ export function PriceListPage() {
     setInlineSaving(true);
     setInlineError(null);
     try {
+      if (isDemoModeActive()) {
+        const updatedItem = { ...item, price: parsed, updated_at: new Date().toISOString() };
+        demoSavePriceItem(updatedItem);
+        setItems((prev) =>
+          prev.map((it) => (it.id === item.id ? updatedItem : it)),
+        );
+        setInlineEditingId(null);
+        return;
+      }
+
       const supabase = getSupabase();
       const res = await supabase
         .from("price_items")
@@ -166,6 +184,21 @@ export function PriceListPage() {
     }
 
     try {
+      if (isDemoModeActive()) {
+        const updatedItem: PriceItem = {
+          ...selectedItem,
+          ...merged,
+          name: merged.name.trim(),
+          supplier: merged.supplier?.trim() || null,
+          note: merged.note?.trim() || null,
+          updated_at: new Date().toISOString(),
+        };
+        demoSavePriceItem(updatedItem);
+        setSelectedItem(updatedItem);
+        setItems((prev) => prev.map((it) => (it.id === updatedItem.id ? updatedItem : it)));
+        return;
+      }
+
       const supabase = getSupabase();
       const res = await supabase
         .from("price_items")
@@ -201,6 +234,16 @@ export function PriceListPage() {
   async function handleToggleActive(item: PriceItem) {
     const nextActive = !item.active;
     try {
+      if (isDemoModeActive()) {
+        const updated = { ...item, active: nextActive, updated_at: new Date().toISOString() };
+        demoSavePriceItem(updated);
+        setItems((prev) => prev.map((it) => (it.id === item.id ? updated : it)));
+        if (selectedItem?.id === item.id) {
+          setSelectedItem(updated);
+        }
+        return;
+      }
+
       const supabase = getSupabase();
       const res = await supabase
         .from("price_items")
@@ -231,6 +274,28 @@ export function PriceListPage() {
     }
 
     try {
+      if (isDemoModeActive()) {
+        const newItem: PriceItem = {
+          id: `demo-price-${Date.now()}`,
+          name: newInput.name.trim(),
+          category: newInput.category,
+          unit: newInput.unit,
+          price: newInput.price,
+          supplier: newInput.supplier?.trim() || null,
+          waste_applicable: newInput.waste_applicable,
+          waste_kind: newInput.waste_kind,
+          billable_qty_rounding: newInput.billable_qty_rounding,
+          counts_for_technolog: newInput.counts_for_technolog,
+          note: newInput.note?.trim() || null,
+          active: true,
+          updated_at: new Date().toISOString(),
+        };
+        demoSavePriceItem(newItem);
+        setItems((prev) => [...prev, newItem]);
+        setIsAddingNew(false);
+        return { ok: true };
+      }
+
       const supabase = getSupabase();
       const { data, error: insertErr } = await supabase
         .from("price_items")

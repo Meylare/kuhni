@@ -359,6 +359,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
             <LinesSection
               lines={lines}
+              items={items}
+              priceItems={priceItems}
               categoryTotals={orderCalcs.categoryTotals}
               lineCalculationsById={orderCalcs.lineCalculationsById}
               priceItemsById={orderLines.priceItemsById}
@@ -370,6 +372,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               onDuplicateLine={(line) => void orderLines.handleDuplicateLine(line)}
               onDeleteLine={handleDeleteLineWithUndo}
               onStepLineQty={orderLines.handleStepLineQty}
+              onStepPriceItem={orderLines.handleStepPriceItem}
               onOpenApplyTemplate={() => handleOpenApplyTemplate()}
             />
 

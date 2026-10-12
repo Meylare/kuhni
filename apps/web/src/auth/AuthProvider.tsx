@@ -11,6 +11,7 @@ import type { Session } from "@supabase/supabase-js";
 import { getPublicSupabaseConfig } from "../lib/config";
 import { getSupabase } from "../lib/supabase";
 import { clearAllCaches } from "../lib/cache";
+import { isDemoModeActive, setDemoModeActive } from "../lib/demo-data";
 
 export type AuthContextValue = {
   session: Session | null;
@@ -20,6 +21,9 @@ export type AuthContextValue = {
   configError: string | null;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
+  isDemoMode: boolean;
+  enterDemoMode: () => void;
+  exitDemoMode: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -37,12 +41,19 @@ function mapAuthError(message: string): string {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const config = getPublicSupabaseConfig();
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => isDemoModeActive());
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(config.ok);
+  const [loading, setLoading] = useState(config.ok && !isDemoModeActive());
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [checkingRole, setCheckingRole] = useState(false);
 
   useEffect(() => {
+    if (isDemoMode) {
+      setLoading(false);
+      setIsOwner(true);
+      return;
+    }
+
     if (!config.ok) {
       return;
     }
@@ -87,15 +98,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       data.subscription.unsubscribe();
     };
-  }, [config.ok]);
+  }, [config.ok, isDemoMode]);
+
+  const enterDemoMode = () => {
+    setDemoModeActive(true);
+    setIsDemoMode(true);
+    setIsOwner(true);
+    setLoading(false);
+  };
+
+  const exitDemoMode = () => {
+    setDemoModeActive(false);
+    setIsDemoMode(false);
+    setIsOwner(null);
+    setLoading(false);
+  };
+
+  const demoSession = useMemo<Session | null>(() => {
+    if (!isDemoMode) return null;
+    return {
+      access_token: "demo-token",
+      refresh_token: "demo-refresh",
+      expires_in: 999999,
+      token_type: "bearer",
+      user: {
+        id: "demo-owner",
+        app_metadata: {},
+        user_metadata: { name: "Тестовый Мастер" },
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+        email: "demo@kuhni.kz",
+      },
+    } as unknown as Session;
+  }, [isDemoMode]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      session,
-      loading,
-      isOwner,
-      checkingRole,
-      configError: config.ok ? null : config.reason,
+      session: isDemoMode ? demoSession : session,
+      loading: isDemoMode ? false : loading,
+      isOwner: isDemoMode ? true : isOwner,
+      checkingRole: isDemoMode ? false : checkingRole,
+      configError: isDemoMode ? null : (config.ok ? null : config.reason),
+      isDemoMode,
+      enterDemoMode,
+      exitDemoMode,
       signIn: async (email, password) => {
         const { error } = await getSupabase().auth.signInWithPassword({
           email,
@@ -104,12 +150,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return error ? mapAuthError(error.message) : null;
       },
       signOut: async () => {
+        if (isDemoMode) {
+          exitDemoMode();
+          return;
+        }
         await getSupabase().auth.signOut();
         setIsOwner(null);
         await clearAllCaches();
       },
     }),
-    [config, loading, session, isOwner, checkingRole],
+    [config, loading, session, isOwner, checkingRole, isDemoMode, demoSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

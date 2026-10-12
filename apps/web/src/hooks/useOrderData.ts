@@ -30,6 +30,12 @@ import {
   type PriceItem,
 } from "../types/database";
 import { MAX_PRICE_SHARES_SUM } from "@kuhni/calc";
+import {
+  demoGetOrder,
+  demoSaveOrder,
+  isDemoModeActive,
+  loadDemoState,
+} from "../lib/demo-data";
 
 export function useOrderData(orderId: string) {
   const dialog = useDialog();
@@ -74,6 +80,41 @@ export function useOrderData(orderId: string) {
       setLoading(true);
       setError(null);
       setNetworkError(null);
+
+      if (isDemoModeActive()) {
+        const ord = demoGetOrder(orderId);
+        if (!ord) {
+          throw new Error("Заказ не найден в демо-режиме");
+        }
+        const state = loadDemoState();
+        setOrder(ord);
+        setItems(state.items[orderId] || []);
+        setLines(state.lines[orderId] || []);
+        setAdjustments(state.adjustments[orderId] || []);
+        setPriceItems(state.priceItems || []);
+        setCalculations(state.calculations[orderId] || []);
+        setExpenses(state.expenses[orderId] || []);
+        setPayments(state.payments[orderId] || []);
+        setGlobalParams(state.parameters || DEFAULT_PARAMETERS);
+
+        const s = (ord.settings || {}) as Record<string, unknown>;
+        setCustomMargin(typeof s.target_margin_pct === "number" ? formatPercent(s.target_margin_pct) : "");
+        setCustomAssemblyMode(s.assembly_mode === "percent" || s.assembly_mode === "per_meter" ? s.assembly_mode : "default");
+        setCustomAssemblyPct(typeof s.assembly_pct === "number" ? formatPercent(s.assembly_pct) : "");
+        const orderMeters =
+          typeof s.order_linear_meters === "number"
+            ? String(s.order_linear_meters)
+            : typeof s.linear_meters === "number"
+            ? String(s.linear_meters)
+            : "";
+        setCustomLinearMeters(orderMeters);
+        setCustomOrderKind((s.order_kind as "kitchen" | "wardrobe") || "kitchen");
+        setCustomTechnologMode(s.technolog_mode === "percent" || s.technolog_mode === "per_sheet" ? s.technolog_mode : "default");
+        setCustomTechnologPct(typeof s.technolog_pct === "number" ? formatPercent(s.technolog_pct) : "");
+        setCustomRiskReservePct(typeof s.risk_reserve_pct === "number" ? formatPercent(s.risk_reserve_pct) : "");
+        return;
+      }
+
       const supabase = getSupabase();
 
       const { data: ordData, error: ordErr } = await supabase
@@ -181,6 +222,23 @@ export function useOrderData(orderId: string) {
     try {
       setHeaderSaving(true);
       setHeaderError(null);
+
+      if (isDemoModeActive()) {
+        const updatedOrder: Order = {
+          ...order,
+          name: headerName.trim(),
+          client_label: headerClient.trim() || null,
+          status: headerStatus,
+          contract_price: contractPriceNum,
+          note: headerNote.trim() || null,
+          updated_at: new Date().toISOString(),
+        };
+        demoSaveOrder(updatedOrder);
+        setOrder(updatedOrder);
+        setIsEditingHeader(false);
+        return;
+      }
+
       const res = await getSupabase()
         .from("orders")
         .update({
@@ -234,6 +292,17 @@ export function useOrderData(orderId: string) {
           message: `Сумма процентных ставок (${(sumShares * 100).toFixed(1)}%) превышает максимально допустимые ${(MAX_PRICE_SHARES_SUM * 100).toFixed(0)}%. Уменьшите маржу или другие ставки.`,
           variant: "error",
         });
+        return;
+      }
+
+      if (isDemoModeActive()) {
+        const updatedOrder: Order = {
+          ...order,
+          settings: newSettings,
+          updated_at: new Date().toISOString(),
+        };
+        demoSaveOrder(updatedOrder);
+        setOrder(updatedOrder);
         return;
       }
 

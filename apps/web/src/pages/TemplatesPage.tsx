@@ -3,6 +3,7 @@ import { useDialog } from "../components/DialogProvider";
 import { useProductTemplates } from "../hooks/useProductTemplates";
 import { formatKzt } from "../lib/money";
 import { getSupabase } from "../lib/supabase";
+import { isDemoModeActive, demoGetPriceItems } from "../lib/demo-data";
 import type { PriceItem, ProductTemplateWithLines } from "../types/database";
 
 interface TemplatesPageProps {
@@ -18,6 +19,11 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
   useEffect(() => {
     void loadTemplates();
     void (async () => {
+      if (isDemoModeActive()) {
+        const items = demoGetPriceItems();
+        setPriceItemsById(new Map(items.map((p: PriceItem) => [p.id, p])));
+        return;
+      }
       const { data } = await getSupabase().from("price_items").select("*");
       if (data) {
         setPriceItemsById(new Map((data as PriceItem[]).map((p) => [p.id, p])));

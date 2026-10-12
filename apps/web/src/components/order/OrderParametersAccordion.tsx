@@ -100,12 +100,37 @@ export function OrderParametersAccordion({
               </label>
               <input
                 type="text"
-                placeholder="18%"
+                placeholder="28%"
                 value={customMargin}
                 onChange={(e) => setCustomMargin(e.target.value)}
                 disabled={locked}
                 className="min-h-10 w-full rounded-xl border border-stone-300 px-3 py-1.5 focus:border-emerald-800"
               />
+              {!locked && (
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setCustomMargin("20")}
+                    className="rounded-lg bg-stone-100 hover:bg-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-700 cursor-pointer"
+                  >
+                    20% Эконом
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCustomMargin("28")}
+                    className="rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold cursor-pointer"
+                  >
+                    28% Стандарт
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCustomMargin("35")}
+                    className="rounded-lg bg-stone-100 hover:bg-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-700 cursor-pointer"
+                  >
+                    35% Премиум
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>

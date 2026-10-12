@@ -3,6 +3,7 @@ import { useDialog } from "../components/DialogProvider";
 import { formatErrorMessage } from "../lib/errors";
 import { validateAdjustmentInput } from "../lib/orders";
 import { assertSingleRowAffected, getSupabase } from "../lib/supabase";
+import { demoDeleteAdjustment, demoSaveAdjustment, isDemoModeActive } from "../lib/demo-data";
 import {
   type Order,
   type OrderAdjustment,
@@ -61,6 +62,23 @@ export function useOrderAdjustments({
     try {
       setAdjSaving(true);
       setAdjError(null);
+
+      if (isDemoModeActive()) {
+        const newAdj: OrderAdjustment = {
+          id: `demo-adj-${Date.now()}`,
+          order_id: order.id,
+          kind: effectiveKind,
+          category: "adjustments",
+          label: effectiveKind === "cost" ? "Корректировка затрат" : "Корректировка цены",
+          amount: amountNum,
+          comment: adjComment.trim() || null,
+        };
+        demoSaveAdjustment(newAdj);
+        setAdjustments((prev) => [...prev, newAdj]);
+        setIsAdjustmentModalOpen(false);
+        return;
+      }
+
       const { data, error: insertErr } = await getSupabase()
         .from("adjustments")
         .insert({
@@ -97,6 +115,12 @@ export function useOrderAdjustments({
     });
     if (!confirmed) return;
     try {
+      if (isDemoModeActive()) {
+        if (order) demoDeleteAdjustment(order.id, adjId);
+        setAdjustments((prev) => prev.filter((a) => a.id !== adjId));
+        return;
+      }
+
       const res = await getSupabase()
         .from("adjustments")
         .delete()

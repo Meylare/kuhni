@@ -23,6 +23,13 @@ import {
   type Payment,
   type PriceCategory,
 } from "../types/database";
+import {
+  isDemoModeActive,
+  demoSaveExpense,
+  demoDeleteExpense,
+  demoSavePayment,
+  demoDeletePayment,
+} from "../lib/demo-data";
 
 interface FactTabProps {
   order: Order;
@@ -126,6 +133,26 @@ export function FactTab({
     try {
       setExpSaving(true);
       setExpError(null);
+
+      if (isDemoModeActive()) {
+        const newExp: ActualExpense = {
+          id: `demo-exp-${Date.now()}`,
+          order_id: order.id,
+          expense_date: expDate,
+          category: expCategory,
+          name: expName.trim(),
+          amount: amountNum,
+          is_rework: expIsRework,
+          rework_reason: expIsRework ? expReworkReason.trim() : null,
+          note: expNote.trim() || null,
+        };
+        demoSaveExpense(newExp);
+        onExpensesChange([newExp, ...expenses]);
+        resetExpenseForm();
+        setIsExpenseFormOpen(false);
+        return;
+      }
+
       const supabase = getSupabase();
       const { data, error: insertErr } = await supabase
         .from("actual_expenses")
@@ -165,6 +192,12 @@ export function FactTab({
     });
     if (!confirmed) return;
     try {
+      if (isDemoModeActive()) {
+        demoDeleteExpense(order.id, expId);
+        onExpensesChange(expenses.filter((e) => e.id !== expId));
+        return;
+      }
+
       const supabase = getSupabase();
       const res = await supabase
         .from("actual_expenses")
@@ -194,6 +227,22 @@ export function FactTab({
     try {
       setPaySaving(true);
       setPayError(null);
+
+      if (isDemoModeActive()) {
+        const newPay: Payment = {
+          id: `demo-pay-${Date.now()}`,
+          order_id: order.id,
+          paid_at: payDate,
+          amount: amountNum,
+          note: payNote.trim() || null,
+        };
+        demoSavePayment(newPay);
+        onPaymentsChange([newPay, ...payments]);
+        resetPaymentForm();
+        setIsPaymentFormOpen(false);
+        return;
+      }
+
       const supabase = getSupabase();
       const { data, error: insertErr } = await supabase
         .from("payments")
@@ -229,6 +278,12 @@ export function FactTab({
     });
     if (!confirmed) return;
     try {
+      if (isDemoModeActive()) {
+        demoDeletePayment(order.id, payId);
+        onPaymentsChange(payments.filter((p) => p.id !== payId));
+        return;
+      }
+
       const supabase = getSupabase();
       const res = await supabase
         .from("payments")

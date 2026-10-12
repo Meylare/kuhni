@@ -13,6 +13,7 @@ import {
 } from "../lib/parameters";
 import { parsePrice } from "../lib/price-items";
 import { getSupabase } from "../lib/supabase";
+import { demoSaveParameters, isDemoModeActive, loadDemoState } from "../lib/demo-data";
 import type { ParameterItem } from "../types/database";
 
 interface FormState {
@@ -52,6 +53,26 @@ export function ParametersPage() {
   // Загрузка параметров из базы
   async function loadParameters() {
     try {
+      if (isDemoModeActive()) {
+        const state = loadDemoState();
+        const map = state.parameters;
+        setForm({
+          target_margin_pct: formatPercentInput(map.target_margin_pct),
+          price_rounding: String(map.price_rounding),
+          assembly_mode: map.assembly_mode,
+          assembly_pct: formatPercentInput(map.assembly_pct),
+          assembly_per_meter_kitchen: String(map.assembly_per_meter_kitchen),
+          assembly_per_meter_wardrobe: String(map.assembly_per_meter_wardrobe),
+          technolog_mode: map.technolog_mode,
+          technolog_pct: formatPercentInput(map.technolog_pct),
+          technolog_per_sheet: String(map.technolog_per_sheet),
+          waste_edge_pct: formatPercentInput(map.waste_edge_pct),
+          risk_reserve_pct: formatPercentInput(map.risk_reserve_pct),
+        });
+        setLoading(false);
+        return;
+      }
+
       const supabase = getSupabase();
       const { data, error: fetchErr } = await supabase.from("parameters").select("*");
 
@@ -173,6 +194,26 @@ export function ParametersPage() {
     }
 
     try {
+      if (isDemoModeActive()) {
+        const newMap: ParametersMap = {
+          target_margin_pct: targetMargin,
+          price_rounding: priceRounding,
+          assembly_mode: form.assembly_mode,
+          assembly_pct: assemblyPct,
+          assembly_per_meter_kitchen: assemblyKitchen,
+          assembly_per_meter_wardrobe: assemblyWardrobe,
+          technolog_mode: form.technolog_mode,
+          technolog_pct: technologPct,
+          technolog_per_sheet: technologSheet,
+          waste_edge_pct: wasteEdge,
+          risk_reserve_pct: riskReserve,
+        };
+        demoSaveParameters(newMap);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 4000);
+        return;
+      }
+
       const supabase = getSupabase();
       // Атомарное сохранение 11 параметров в единой транзакции через RPC-функцию save_parameters
       const { error: rpcErr } = await supabase.rpc("save_parameters", {

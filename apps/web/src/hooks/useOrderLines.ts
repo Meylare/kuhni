@@ -12,6 +12,12 @@ import { computePriceUpdatesDiff } from "../lib/orders";
 import { type ParametersMap } from "../lib/parameters";
 import { assertSingleRowAffected, getSupabase } from "../lib/supabase";
 import {
+  demoDeleteLine,
+  demoDuplicateLine,
+  demoSaveLine,
+  isDemoModeActive,
+} from "../lib/demo-data";
+import {
   type Order,
   type OrderItem,
   type OrderLine,
@@ -138,6 +144,11 @@ export function useOrderLines({
   async function syncLineToDatabase(line: OrderLine) {
     if (!order) return;
     try {
+      if (isDemoModeActive()) {
+        demoSaveLine(line);
+        return;
+      }
+
       if (line.id.startsWith("temp-")) {
         // Создание новой строки в БД
         const { data, error } = await getSupabase()
@@ -269,6 +280,10 @@ export function useOrderLines({
       // При достижении 0 удаляем строку из БД
       const timer = setTimeout(async () => {
         debounceTimers.current.delete(lineId);
+        if (isDemoModeActive()) {
+          if (order) demoDeleteLine(order.id, lineId);
+          return;
+        }
         if (!lineId.startsWith("temp-")) {
           try {
             await getSupabase().from("order_lines").delete().eq("id", lineId);
@@ -312,6 +327,42 @@ export function useOrderLines({
           l.price_item_id === selectedPriceItem.id &&
           (l.order_item_id || "") === (pickerItemId || "")
       );
+
+      if (isDemoModeActive()) {
+        if (existing) {
+          const updated: OrderLine = {
+            ...existing,
+            qty: qtyNum,
+            waste_pct: wasteNum,
+            comment: pickerComment.trim() || null,
+          };
+          demoSaveLine(updated);
+          setLines((prev) => prev.map((l) => (l.id === existing.id ? updated : l)));
+        } else {
+          const newLine: OrderLine = {
+            id: `demo-line-${Date.now()}`,
+            order_id: order.id,
+            order_item_id: pickerItemId || null,
+            price_item_id: selectedPriceItem.id,
+            category: selectedPriceItem.category,
+            name: selectedPriceItem.name,
+            unit: selectedPriceItem.unit,
+            qty: qtyNum,
+            unit_price: selectedPriceItem.price,
+            waste_pct: wasteNum,
+            billable_qty_rounding: selectedPriceItem.billable_qty_rounding,
+            counts_for_technolog: selectedPriceItem.counts_for_technolog,
+            is_manual: false,
+            comment: pickerComment.trim() || null,
+          };
+          demoSaveLine(newLine);
+          setLines((prev) => [...prev, newLine]);
+          setAddedItemsCount((prev) => prev + 1);
+        }
+        setSelectedPriceItem(null);
+        setPickerComment("");
+        return;
+      }
 
       if (existing) {
         if (existing.id.startsWith("temp-")) {
@@ -391,6 +442,12 @@ export function useOrderLines({
   async function handleDuplicateLine(line: OrderLine) {
     if (locked || !order) return;
     try {
+      if (isDemoModeActive()) {
+        const dup = demoDuplicateLine(order.id, line);
+        setLines((prev) => [...prev, dup]);
+        return;
+      }
+
       const { data, error: insertErr } = await getSupabase()
         .from("order_lines")
         .insert({
@@ -434,6 +491,12 @@ export function useOrderLines({
     });
     if (!confirmed) return;
     try {
+      if (isDemoModeActive()) {
+        if (order) demoDeleteLine(order.id, lineId);
+        setLines((prev) => prev.filter((l) => l.id !== lineId));
+        return;
+      }
+
       const res = await getSupabase().from("order_lines").delete().eq("id", lineId).select();
       assertSingleRowAffected(res);
       setLines((prev) => prev.filter((l) => l.id !== lineId));

@@ -18,6 +18,7 @@ import {
   type OrderItem,
   type OrderLine,
 } from "../types/database";
+import { demoSaveCalculation, demoSetBaseline, isDemoModeActive } from "../lib/demo-data";
 
 interface UseOrderCalculationsProps {
   order: Order | null;
@@ -149,6 +150,31 @@ export function useOrderCalculations({
     try {
       setCalcSaving(true);
       setCalcSaveSuccess(null);
+
+      if (isDemoModeActive()) {
+        const nextVer = (calculations[0]?.version || 0) + 1;
+        const newCalc: OrderCalculation = {
+          id: `demo-calc-${Date.now()}`,
+          order_id: order.id,
+          version: nextVer,
+          mode: calcMode,
+          params_snapshot: {},
+          input_snapshot: {},
+          result: calcOutcome.result as unknown as Record<string, unknown>,
+          price_total: calcOutcome.result.priceTotal,
+          cost_total: calcOutcome.result.costTotal,
+          margin_pct: calcOutcome.result.marginPct,
+          is_contract_baseline: false,
+          created_at: new Date().toISOString(),
+        };
+        demoSaveCalculation(newCalc);
+        setCalculations((prev) => [newCalc, ...prev]);
+        setCalcSaveSuccess(`Версия №${newCalc.version} успешно сохранена в истории`);
+        setShowLivePreview(false);
+        setTimeout(() => setCalcSaveSuccess(null), 4000);
+        return;
+      }
+
       const payload = prepareCalculationSnapshot({
         order,
         items,
@@ -200,6 +226,17 @@ export function useOrderCalculations({
   async function handleSetBaseline(calcId: string) {
     if (!order) return;
     try {
+      if (isDemoModeActive()) {
+        demoSetBaseline(order.id, calcId);
+        setCalculations((prev) =>
+          prev.map((c) => ({
+            ...c,
+            is_baseline: c.id === calcId,
+          }))
+        );
+        return;
+      }
+
       const supabase = getSupabase();
       const { error: rpcErr } = await supabase.rpc("set_contract_baseline", {
         p_order_id: order.id,

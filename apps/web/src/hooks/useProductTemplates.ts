@@ -1,6 +1,11 @@
 import { useCallback, useState } from "react";
 import { formatErrorMessage } from "../lib/errors";
 import { getSupabase } from "../lib/supabase";
+import {
+  isDemoModeActive,
+  demoGetTemplates,
+  demoDeleteTemplate,
+} from "../lib/demo-data";
 import type {
   ProductTemplate,
   ProductTemplateLine,
@@ -16,6 +21,12 @@ export function useProductTemplates() {
     try {
       setLoading(true);
       setError(null);
+
+      if (isDemoModeActive()) {
+        setTemplates(demoGetTemplates());
+        return;
+      }
+
       const supabase = getSupabase();
 
       const { data: tData, error: tErr } = await supabase
@@ -56,6 +67,12 @@ export function useProductTemplates() {
 
   async function deleteTemplate(id: string) {
     try {
+      if (isDemoModeActive()) {
+        demoDeleteTemplate(id);
+        setTemplates((prev) => prev.filter((t) => t.id !== id));
+        return { success: true };
+      }
+
       const { error } = await getSupabase()
         .from("product_templates")
         .delete()

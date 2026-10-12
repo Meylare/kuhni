@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { getSupabase } from "../lib/supabase";
+import { demoDeleteItem, demoDeleteLine, isDemoModeActive } from "../lib/demo-data";
 import type { OrderItem, OrderLine } from "../types/database";
 import { useUndoDelete } from "./useUndoDelete";
 
@@ -30,6 +31,10 @@ export function useOrderDeletions({
         id: lineId,
         label: `«${line.name}»`,
         executeDelete: async () => {
+          if (isDemoModeActive()) {
+            if (line.order_id) demoDeleteLine(line.order_id, lineId);
+            return;
+          }
           await getSupabase().from("order_lines").delete().eq("id", lineId);
         },
         restore: () => {
@@ -52,6 +57,10 @@ export function useOrderDeletions({
         id: itemId,
         label: `Изделие «${item.title}»`,
         executeDelete: async () => {
+          if (isDemoModeActive()) {
+            demoDeleteItem(item.order_id, itemId);
+            return;
+          }
           if (itemLines.length > 0) {
             await getSupabase().from("order_lines").delete().eq("order_item_id", itemId);
           }
