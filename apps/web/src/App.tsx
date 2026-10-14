@@ -31,11 +31,11 @@ function PageSkeleton() {
       aria-label="Загрузка страницы"
       className="mx-auto flex w-full max-w-4xl flex-col px-4 py-6 animate-pulse"
     >
-      <div className="h-8 w-44 rounded-xl bg-stone-300/70 mb-6" />
+      <div className="h-8 w-44 rounded-xl bg-zinc-800/70 mb-6" />
       <div className="space-y-3">
-        <div className="h-24 w-full rounded-2xl bg-stone-200/80" />
-        <div className="h-24 w-full rounded-2xl bg-stone-200/80" />
-        <div className="h-24 w-full rounded-2xl bg-stone-200/80" />
+        <div className="h-24 w-full rounded-2xl bg-zinc-900/80" />
+        <div className="h-24 w-full rounded-2xl bg-zinc-900/80" />
+        <div className="h-24 w-full rounded-2xl bg-zinc-900/80" />
       </div>
     </div>
   );
@@ -89,7 +89,7 @@ function MainApp() {
   const { tab: activeTab, orderId: selectedOrderId } = route;
 
   return (
-    <div className="min-h-svh bg-[#f6f1ea] flex flex-col">
+    <div className="min-h-svh bg-[#09090b] text-zinc-100 flex flex-col">
       <Navigation
         activeTab={activeTab}
         onTabChange={handleTabChange}

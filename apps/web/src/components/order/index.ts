@@ -9,4 +9,5 @@ export * from "./HistoryTab";
 export * from "./OrderModals";
 export * from "./ContractStageCard";
 export * from "./CalcModeSwitch";
+export * from "./CockpitView";
 export * from "./modals";

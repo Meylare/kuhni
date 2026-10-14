@@ -51,37 +51,37 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
       )}
 
       {/* Верхняя навигационная панель */}
-      <header className="sticky top-0 z-30 border-b border-stone-200/80 bg-[#fbfaf7]/90 backdrop-blur-md transition-all">
+      <header className="sticky top-0 z-30 border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-xl transition-all">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           {/* Бренд */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => onTabChange("orders")}>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-900 text-lg font-black text-white shadow-sm shadow-emerald-950/20">
-              К
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-lg font-black text-emerald-400 shadow-sm shadow-emerald-500/10">
+              ⚡
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base font-black tracking-tight text-stone-900 leading-tight">
-                  Калькулятор 2.0
+                <span className="text-base font-black tracking-tight text-white leading-tight">
+                  Cockpit 2.0
                 </span>
-                <span className="hidden sm:inline-block rounded-md bg-stone-200/60 px-1.5 py-0.5 text-[10px] font-bold text-stone-700">
-                  Мебель
+                <span className="hidden sm:inline-block rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-bold text-zinc-300 border border-zinc-700/60">
+                  Luxury
                 </span>
               </div>
-              <span className="block text-[11px] text-stone-500 font-medium">
-                Кухни • Шкафы • Быстрый расчёт
+              <span className="block text-[11px] text-zinc-400 font-medium">
+                Кухни • Шкафы • Экспресс-смета
               </span>
             </div>
           </div>
 
           {/* Вкладки для ПК (Segmented Control) */}
-          <nav className="hidden md:flex items-center gap-1 rounded-2xl bg-stone-200/60 p-1 text-xs font-semibold border border-stone-200/60 shadow-inner">
+          <nav className="hidden md:flex items-center gap-1 rounded-2xl bg-zinc-900/90 p-1 text-xs font-semibold border border-zinc-800 shadow-inner">
             <button
               type="button"
               onClick={() => onTabChange("orders")}
               className={`flex items-center gap-1.5 min-h-8 rounded-xl px-3.5 py-1.5 transition-all cursor-pointer ${
                 activeTab === "orders"
-                  ? "bg-white text-stone-900 shadow-xs font-bold"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+                  ? "bg-zinc-800 text-white shadow-xs font-bold"
+                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
               }`}
             >
               <span>📋</span>
@@ -92,8 +92,8 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
               onClick={() => onTabChange("prices")}
               className={`flex items-center gap-1.5 min-h-8 rounded-xl px-3.5 py-1.5 transition-all cursor-pointer ${
                 activeTab === "prices"
-                  ? "bg-white text-stone-900 shadow-xs font-bold"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+                  ? "bg-zinc-800 text-white shadow-xs font-bold"
+                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
               }`}
             >
               <span>🏷️</span>
@@ -104,8 +104,8 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
               onClick={() => onTabChange("templates")}
               className={`flex items-center gap-1.5 min-h-8 rounded-xl px-3.5 py-1.5 transition-all cursor-pointer ${
                 activeTab === "templates"
-                  ? "bg-white text-stone-900 shadow-xs font-bold"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+                  ? "bg-zinc-800 text-white shadow-xs font-bold"
+                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
               }`}
             >
               <span>⚡</span>
@@ -116,8 +116,8 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
               onClick={() => onTabChange("parameters")}
               className={`flex items-center gap-1.5 min-h-8 rounded-xl px-3.5 py-1.5 transition-all cursor-pointer ${
                 activeTab === "parameters"
-                  ? "bg-white text-stone-900 shadow-xs font-bold"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+                  ? "bg-zinc-800 text-white shadow-xs font-bold"
+                  : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
               }`}
             >
               <span>⚙️</span>
@@ -128,12 +128,12 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
           {/* Правая часть: пользователь и выход */}
           <div className="flex items-center gap-2.5">
             {isDemoMode ? (
-              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-100/80 px-2.5 py-1 text-[11px] font-bold text-emerald-800 border border-emerald-200">
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-400 border border-emerald-500/30">
                 <span>🎮</span>
                 <span>Тест-режим</span>
               </span>
             ) : email ? (
-              <span className="hidden lg:inline text-xs text-stone-500 max-w-[160px] truncate font-medium">
+              <span className="hidden lg:inline text-xs text-zinc-400 max-w-[160px] truncate font-medium">
                 {email}
               </span>
             ) : null}
@@ -141,7 +141,7 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
             <button
               type="button"
               onClick={() => void signOut()}
-              className="flex min-h-9 items-center justify-center rounded-xl border border-stone-200/80 bg-white/80 px-3 text-xs font-semibold text-stone-700 hover:bg-white hover:text-stone-900 active:scale-95 transition-all shadow-xs cursor-pointer"
+              className="flex min-h-9 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/90 px-3 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white active:scale-95 transition-all shadow-xs cursor-pointer"
             >
               {isDemoMode ? "Выйти" : "Выход"}
             </button>
@@ -151,14 +151,14 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
 
       {/* Нижняя мобильная панель навигации */}
       {!hideMobileNav && (
-        <nav className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-stone-200/80 bg-[#fbfaf7]/95 backdrop-blur-lg safe-bottom shadow-lg">
+        <nav className="fixed bottom-0 left-0 right-0 z-30 flex md:hidden border-t border-zinc-800/90 bg-zinc-950/95 backdrop-blur-xl safe-bottom shadow-2xl">
           <button
             type="button"
             onClick={() => onTabChange("orders")}
             className={`flex-1 min-h-14 flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-all ${
               activeTab === "orders"
-                ? "text-emerald-950 font-bold bg-emerald-50/50"
-                : "text-stone-500 hover:text-stone-800"
+                ? "text-emerald-400 font-bold bg-emerald-500/10"
+                : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             <span className="text-lg">📋</span>
@@ -169,8 +169,8 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
             onClick={() => onTabChange("prices")}
             className={`flex-1 min-h-14 flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-all ${
               activeTab === "prices"
-                ? "text-emerald-950 font-bold bg-emerald-50/50"
-                : "text-stone-500 hover:text-stone-800"
+                ? "text-emerald-400 font-bold bg-emerald-500/10"
+                : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             <span className="text-lg">🏷️</span>
@@ -181,8 +181,8 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
             onClick={() => onTabChange("templates")}
             className={`flex-1 min-h-14 flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-all ${
               activeTab === "templates"
-                ? "text-emerald-950 font-bold bg-emerald-50/50"
-                : "text-stone-500 hover:text-stone-800"
+                ? "text-emerald-400 font-bold bg-emerald-500/10"
+                : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             <span className="text-lg">⚡</span>
@@ -193,8 +193,8 @@ export function Navigation({ activeTab, onTabChange, hideMobileNav }: Navigation
             onClick={() => onTabChange("parameters")}
             className={`flex-1 min-h-14 flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-all ${
               activeTab === "parameters"
-                ? "text-emerald-950 font-bold bg-emerald-50/50"
-                : "text-stone-500 hover:text-stone-800"
+                ? "text-emerald-400 font-bold bg-emerald-500/10"
+                : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             <span className="text-lg">⚙️</span>

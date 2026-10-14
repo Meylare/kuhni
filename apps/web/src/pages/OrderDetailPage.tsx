@@ -3,6 +3,7 @@ import { useDialog } from "../components/DialogProvider";
 import { FactTab } from "../components/FactTab";
 import {
   AdjustmentsSection,
+  CockpitView,
   ContractStageCard,
   DesktopSummaryCard,
   ItemsSection,
@@ -36,6 +37,9 @@ interface OrderDetailPageProps {
 }
 
 export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
+  // Режим экрана: "cockpit" (новый минималистичный luxury кокпит) | "table" (подробная классическая спецификация)
+  const [displayMode, setDisplayMode] = useState<"cockpit" | "table">("cockpit");
+
   // Этап выполнения заказа (U5): "quote" (Смета) | "contract" (Договор) | "fact" (Факт)
   const [currentStage, setCurrentStage] = useState<OrderStage>("quote");
 
@@ -290,165 +294,207 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-4 pb-48 md:pb-32 lg:pb-12">
-      {/* Верхняя навигация, статус, этапы и кнопка версий */}
-      <OrderHeader
-        order={order}
-        statusConfig={statusConfig}
-        statusLabel={statusLabel}
-        locked={locked}
-        networkError={networkError}
-        copySuccess={orderCalcs.copySuccess}
-        autoSaveToast={autoSaveToast}
-        currentStage={currentStage}
-        linesCount={lines.length}
-        calculationsCount={calculations.length}
-        factCount={expenses.length + payments.length}
-        onBack={onBack}
-        onOpenEditHeader={handleOpenEditHeader}
-        onRetryLoad={() => void loadOrderData()}
-        onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
-        onOpenVersionsModal={() => setIsVersionsModalOpen(true)}
-        onCopySummary={orderCalcs.handleCopySummary}
-        onSelectStage={handleSelectStage}
-      />
-
-      {/* Этап «Факт» */}
-      {currentStage === "fact" && (
-        <div className="mt-4">
-          <FactTab
-            order={order}
-            expenses={expenses}
-            payments={payments}
-            calculations={calculations}
-            onExpensesChange={setExpenses}
-            onPaymentsChange={setPayments}
-          />
-        </div>
-      )}
-
-      {/* Этапы «Смета» и «Договор» */}
-      {currentStage !== "fact" && (
-        <div className="mt-4 flex flex-col lg:flex-row gap-6 items-start">
-          <div className="flex-1 min-w-0 w-full">
-            {/* Карточка этапа «Договор» (U5.3) */}
-            {currentStage === "contract" && (
-              <ContractStageCard
-                order={order}
-                displayCalc={orderCalcs.displayCalc}
-                targetMarginPct={globalParams.target_margin_pct}
-                locked={locked}
-                calcSaving={orderCalcs.calcSaving}
-                onSaveCalculation={orderCalcs.handleSaveCalculation}
-                onSetBaseline={() => void handleSetBaselineFromContractStage()}
-                onUpdateContractPrice={handleUpdateContractPrice}
-              />
-            )}
-
-            <ItemsSection
-              items={items}
-              lines={lines}
-              locked={locked}
-              networkError={networkError}
-              onOpenAddItem={orderItems.handleOpenAddItem}
-              onOpenEditItem={orderItems.handleOpenEditItem}
-              onDuplicateItem={(item) => void orderItems.handleDuplicateItem(item)}
-              onDeleteItem={handleDeleteItemWithUndo}
-              onOpenSaveAsTemplate={() => setIsSaveTemplateOpen(true)}
-              onOpenApplyTemplate={handleOpenApplyTemplate}
-            />
-
-            <LinesSection
-              lines={lines}
-              items={items}
-              priceItems={priceItems}
-              categoryTotals={orderCalcs.categoryTotals}
-              lineCalculationsById={orderCalcs.lineCalculationsById}
-              priceItemsById={orderLines.priceItemsById}
-              locked={locked}
-              networkError={networkError}
-              onOpenPricePicker={orderLines.handleOpenPricePicker}
-              onOpenAddManualLine={orderLines.handleOpenAddManualLine}
-              onOpenEditLine={orderLines.handleOpenEditLine}
-              onDuplicateLine={(line) => void orderLines.handleDuplicateLine(line)}
-              onDeleteLine={handleDeleteLineWithUndo}
-              onStepLineQty={orderLines.handleStepLineQty}
-              onStepPriceItem={orderLines.handleStepPriceItem}
-              onOpenApplyTemplate={() => handleOpenApplyTemplate()}
-            />
-
-            <AdjustmentsSection
-              adjustments={adjustments}
-              calcMode={orderCalcs.calcMode}
-              locked={locked}
-              networkError={networkError}
-              onOpenAddAdjustment={() => orderAdjustments.handleOpenAddAdjustment(orderCalcs.calcMode)}
-              onDeleteAdjustment={(id) => void orderAdjustments.handleDeleteAdjustment(id)}
-            />
-
-            {currentStage === "quote" && (
-              <OrderParametersAccordion
-                isOpen={isParamsAccordionOpen}
-                setIsOpen={setIsParamsAccordionOpen}
-                globalParams={globalParams}
-                customMargin={customMargin}
-                setCustomMargin={setCustomMargin}
-                customAssemblyMode={customAssemblyMode}
-                setCustomAssemblyMode={setCustomAssemblyMode}
-                customAssemblyPct={customAssemblyPct}
-                setCustomAssemblyPct={setCustomAssemblyPct}
-                customLinearMeters={customLinearMeters}
-                setCustomLinearMeters={setCustomLinearMeters}
-                customOrderKind={customOrderKind}
-                setCustomOrderKind={setCustomOrderKind}
-                items={items}
-                customTechnologPct={customTechnologPct}
-                setCustomTechnologPct={setCustomTechnologPct}
-                customRiskReservePct={customRiskReservePct}
-                locked={locked}
-                paramsSaving={paramsSaving}
-                onSaveOrderSettings={handleSaveOrderSettings}
-              />
-            )}
-          </div>
-
-          {/* Правая закрепленная колонка на ПК (U3, U4: sticky top-20) */}
-          <DesktopSummaryCard
-            displayCalc={orderCalcs.displayCalc}
-            calcOutcome={orderCalcs.calcOutcome}
-            calcMode={orderCalcs.calcMode}
-            calcSaveSuccess={orderCalcs.calcSaveSuccess}
-            syncStatus={syncStatus}
-            locked={locked}
-            calcSaving={orderCalcs.calcSaving}
-            networkError={networkError}
-            calculations={calculations}
-            targetMarginPct={globalParams.target_margin_pct}
-            onSaveCalculation={orderCalcs.handleSaveCalculation}
-            onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
-            onSetShowLivePreview={orderCalcs.setShowLivePreview}
-          />
-        </div>
-      )}
-
-      {/* Мобильная сводка расчёта (U3, U4: lg:hidden) */}
-      {currentStage !== "fact" && (
-        <SummaryBar
+      {/* 1. Инновационный режим Кокпита (Cockpit Luxury UI) */}
+      {displayMode === "cockpit" && currentStage !== "fact" ? (
+        <CockpitView
+          order={order}
+          lines={lines}
+          items={items}
+          adjustments={adjustments}
+          priceItems={priceItems}
+          globalParams={globalParams}
           displayCalc={orderCalcs.displayCalc}
           calcOutcome={orderCalcs.calcOutcome}
-          calcMode={orderCalcs.calcMode}
-          calcSaveSuccess={orderCalcs.calcSaveSuccess}
-          syncStatus={syncStatus}
           locked={locked}
-          calcSaving={orderCalcs.calcSaving}
-          networkError={networkError}
-          showBreakdown={showBreakdown}
-          setShowBreakdown={setShowBreakdown}
-          calculations={calculations}
-          targetMarginPct={globalParams.target_margin_pct}
+          currentStage={currentStage}
+          onSelectStage={handleSelectStage}
+          onUpdateContractPrice={handleUpdateContractPrice}
+          onStepLineQty={orderLines.handleStepLineQty}
+          onStepPriceItem={orderLines.handleStepPriceItem}
+          onDeleteLine={handleDeleteLineWithUndo}
+          onOpenPricePicker={orderLines.handleOpenPricePicker}
           onSaveCalculation={orderCalcs.handleSaveCalculation}
-          onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
-          onSetShowLivePreview={orderCalcs.setShowLivePreview}
+          onOpenVersionsModal={() => setIsVersionsModalOpen(true)}
+          onBack={onBack}
+          onToggleTableMode={() => setDisplayMode("table")}
         />
+      ) : (
+        /* 2. Классический подробный режим таблицы / этапа Факт */
+        <>
+          {currentStage !== "fact" && (
+            <div className="flex items-center justify-between mb-3">
+              <button
+                type="button"
+                onClick={() => setDisplayMode("cockpit")}
+                className="flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all cursor-pointer shadow-xs"
+              >
+                <span>⚡</span>
+                <span>Вернуться в Кокпит</span>
+              </button>
+            </div>
+          )}
+
+          {/* Верхняя навигация, статус, этапы и кнопка версий */}
+          <OrderHeader
+            order={order}
+            statusConfig={statusConfig}
+            statusLabel={statusLabel}
+            locked={locked}
+            networkError={networkError}
+            copySuccess={orderCalcs.copySuccess}
+            autoSaveToast={autoSaveToast}
+            currentStage={currentStage}
+            linesCount={lines.length}
+            calculationsCount={calculations.length}
+            factCount={expenses.length + payments.length}
+            onBack={onBack}
+            onOpenEditHeader={handleOpenEditHeader}
+            onRetryLoad={() => void loadOrderData()}
+            onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
+            onOpenVersionsModal={() => setIsVersionsModalOpen(true)}
+            onCopySummary={orderCalcs.handleCopySummary}
+            onSelectStage={handleSelectStage}
+          />
+
+          {/* Этап «Факт» */}
+          {currentStage === "fact" && (
+            <div className="mt-4">
+              <FactTab
+                order={order}
+                expenses={expenses}
+                payments={payments}
+                calculations={calculations}
+                onExpensesChange={setExpenses}
+                onPaymentsChange={setPayments}
+              />
+            </div>
+          )}
+
+          {/* Этапы «Смета» и «Договор» */}
+          {currentStage !== "fact" && (
+            <div className="mt-4 flex flex-col lg:flex-row gap-6 items-start">
+              <div className="flex-1 min-w-0 w-full">
+                {/* Карточка этапа «Договор» (U5.3) */}
+                {currentStage === "contract" && (
+                  <ContractStageCard
+                    order={order}
+                    displayCalc={orderCalcs.displayCalc}
+                    targetMarginPct={globalParams.target_margin_pct}
+                    locked={locked}
+                    calcSaving={orderCalcs.calcSaving}
+                    onSaveCalculation={orderCalcs.handleSaveCalculation}
+                    onSetBaseline={() => void handleSetBaselineFromContractStage()}
+                    onUpdateContractPrice={handleUpdateContractPrice}
+                  />
+                )}
+
+                <ItemsSection
+                  items={items}
+                  lines={lines}
+                  locked={locked}
+                  networkError={networkError}
+                  onOpenAddItem={orderItems.handleOpenAddItem}
+                  onOpenEditItem={orderItems.handleOpenEditItem}
+                  onDuplicateItem={(item) => void orderItems.handleDuplicateItem(item)}
+                  onDeleteItem={handleDeleteItemWithUndo}
+                  onOpenSaveAsTemplate={() => setIsSaveTemplateOpen(true)}
+                  onOpenApplyTemplate={handleOpenApplyTemplate}
+                />
+
+                <LinesSection
+                  lines={lines}
+                  items={items}
+                  priceItems={priceItems}
+                  categoryTotals={orderCalcs.categoryTotals}
+                  lineCalculationsById={orderCalcs.lineCalculationsById}
+                  priceItemsById={orderLines.priceItemsById}
+                  locked={locked}
+                  networkError={networkError}
+                  onOpenPricePicker={orderLines.handleOpenPricePicker}
+                  onOpenAddManualLine={orderLines.handleOpenAddManualLine}
+                  onOpenEditLine={orderLines.handleOpenEditLine}
+                  onDuplicateLine={(line) => void orderLines.handleDuplicateLine(line)}
+                  onDeleteLine={handleDeleteLineWithUndo}
+                  onStepLineQty={orderLines.handleStepLineQty}
+                  onStepPriceItem={orderLines.handleStepPriceItem}
+                  onOpenApplyTemplate={() => handleOpenApplyTemplate()}
+                />
+
+                <AdjustmentsSection
+                  adjustments={adjustments}
+                  calcMode={orderCalcs.calcMode}
+                  locked={locked}
+                  networkError={networkError}
+                  onOpenAddAdjustment={() => orderAdjustments.handleOpenAddAdjustment(orderCalcs.calcMode)}
+                  onDeleteAdjustment={(id) => void orderAdjustments.handleDeleteAdjustment(id)}
+                />
+
+                {currentStage === "quote" && (
+                  <OrderParametersAccordion
+                    isOpen={isParamsAccordionOpen}
+                    setIsOpen={setIsParamsAccordionOpen}
+                    globalParams={globalParams}
+                    customMargin={customMargin}
+                    setCustomMargin={setCustomMargin}
+                    customAssemblyMode={customAssemblyMode}
+                    setCustomAssemblyMode={setCustomAssemblyMode}
+                    customAssemblyPct={customAssemblyPct}
+                    setCustomAssemblyPct={setCustomAssemblyPct}
+                    customLinearMeters={customLinearMeters}
+                    setCustomLinearMeters={setCustomLinearMeters}
+                    customOrderKind={customOrderKind}
+                    setCustomOrderKind={setCustomOrderKind}
+                    items={items}
+                    customTechnologPct={customTechnologPct}
+                    setCustomTechnologPct={setCustomTechnologPct}
+                    customRiskReservePct={customRiskReservePct}
+                    locked={locked}
+                    paramsSaving={paramsSaving}
+                    onSaveOrderSettings={handleSaveOrderSettings}
+                  />
+                )}
+              </div>
+
+              {/* Правая закрепленная колонка на ПК (U3, U4: sticky top-20) */}
+              <DesktopSummaryCard
+                displayCalc={orderCalcs.displayCalc}
+                calcOutcome={orderCalcs.calcOutcome}
+                calcMode={orderCalcs.calcMode}
+                calcSaveSuccess={orderCalcs.calcSaveSuccess}
+                syncStatus={syncStatus}
+                locked={locked}
+                calcSaving={orderCalcs.calcSaving}
+                networkError={networkError}
+                calculations={calculations}
+                targetMarginPct={globalParams.target_margin_pct}
+                onSaveCalculation={orderCalcs.handleSaveCalculation}
+                onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
+                onSetShowLivePreview={orderCalcs.setShowLivePreview}
+              />
+            </div>
+          )}
+
+          {/* Мобильная сводка расчёта (U3, U4: lg:hidden) */}
+          {currentStage !== "fact" && (
+            <SummaryBar
+              displayCalc={orderCalcs.displayCalc}
+              calcOutcome={orderCalcs.calcOutcome}
+              calcMode={orderCalcs.calcMode}
+              calcSaveSuccess={orderCalcs.calcSaveSuccess}
+              syncStatus={syncStatus}
+              locked={locked}
+              calcSaving={orderCalcs.calcSaving}
+              networkError={networkError}
+              showBreakdown={showBreakdown}
+              setShowBreakdown={setShowBreakdown}
+              calculations={calculations}
+              targetMarginPct={globalParams.target_margin_pct}
+              onSaveCalculation={orderCalcs.handleSaveCalculation}
+              onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
+              onSetShowLivePreview={orderCalcs.setShowLivePreview}
+            />
+          )}
+        </>
       )}
 
       {/* Модальные окна заказа */}
