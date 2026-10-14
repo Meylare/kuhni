@@ -105,85 +105,85 @@ export function SaveAsTemplateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-xs p-0 sm:p-4">
-      <div className="flex w-full sm:max-w-lg flex-col rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-2xl">
-        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150">
+      <div className="flex w-full sm:max-w-lg flex-col rounded-3xl border border-white/10 bg-[#141418] p-6 shadow-2xl text-zinc-100 animate-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.06]">
           <div>
-            <h3 className="text-base font-bold text-stone-900">
-              Сохранить как шаблон изделия
+            <h3 className="text-base font-bold text-white">
+              Сохранить как шаблон
             </h3>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-zinc-400 mt-0.5">
               Шаблон можно будет применить в любом заказе в один клик
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-stone-400 hover:text-stone-700 text-lg"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
         {error && (
-          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+          <div className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSave} className="mt-4 flex flex-col gap-3.5 text-xs">
           <div>
-            <label className="block font-semibold text-stone-700 mb-1">
-              Название шаблона <span className="text-rose-600">*</span>
+            <label className="block font-semibold text-zinc-300 mb-1">
+              Название шаблона <span className="text-rose-400">*</span>
             </label>
             <input
               type="text"
               required
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="Например: Кухня стандарт 3 п.м."
-              className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+              placeholder="Например: Кухня стандарт 3.0м"
+              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-stone-700 mb-1">
+            <label className="block font-semibold text-zinc-300 mb-1">
               Описание (необязательно)
             </label>
             <textarea
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Базовый набор ЛДСП, кромки, петель и направляющих"
-              className="w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+              placeholder="Базовый набор ЛДСП Egger, кромки, петель и направляющих Blum"
+              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
             />
           </div>
 
           {/* Сводка состава шаблона */}
-          <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-stone-700">
-            <div className="font-semibold text-stone-900">
+          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-xs">
+            <div className="font-semibold text-white">
               Позиций в шаблоне: {grouped.templateLines.length}
             </div>
             {grouped.manualLinesCount > 0 && (
-              <div className="mt-1 text-[11px] text-amber-800">
-                ⚠️ Ручные позиции ({grouped.manualLinesCount}) не входят в шаблон и пропущены:{" "}
+              <div className="mt-1 text-[11px] text-amber-300">
+                ⚠️ Ручные позиции ({grouped.manualLinesCount}) не входят в шаблон:{" "}
                 <span className="italic">{grouped.skippedManualNames.join(", ")}</span>
               </div>
             )}
           </div>
 
-          <div className="mt-2 flex items-center justify-end gap-3 pt-2 border-t border-stone-100">
+          <div className="mt-2 flex items-center justify-end gap-2 pt-3 border-t border-white/[0.06]">
             <button
               type="button"
               onClick={onClose}
-              className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-full px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
             >
               Отмена
             </button>
             <button
               type="submit"
               disabled={saving || grouped.templateLines.length === 0}
-              className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+              className="rounded-full bg-white text-black font-semibold px-5 py-2 text-xs hover:bg-zinc-200 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
             >
               {saving ? "Сохранение…" : "Сохранить шаблон"}
             </button>

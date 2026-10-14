@@ -42,36 +42,36 @@ export function ItemModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
-      <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 shadow-xl">
-        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-          <h3 className="text-base font-bold text-stone-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#141418] p-6 shadow-2xl text-zinc-100 animate-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.06]">
+          <h3 className="text-base font-bold text-white">
             {editingItem ? "Редактировать изделие" : "Новое изделие"}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-stone-400 hover:text-stone-600 text-lg p-1"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
         {itemError && (
-          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+          <div className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
             {itemError}
           </div>
         )}
 
-        <form onSubmit={onSave} className="mt-3 flex flex-col gap-3 text-xs">
+        <form onSubmit={onSave} className="mt-4 flex flex-col gap-3.5 text-xs">
           <div>
-            <label className="block font-semibold text-stone-700 mb-1">
+            <label className="block font-semibold text-zinc-300 mb-1">
               Тип изделия
             </label>
             <select
               value={itemKind}
               onChange={(e) => setItemKind(e.target.value as OrderItemKind)}
-              className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20"
             >
               {ORDER_ITEM_KINDS.map((k) => (
                 <option key={k} value={k}>
@@ -82,8 +82,8 @@ export function ItemModal({
           </div>
 
           <div>
-            <label className="block font-semibold text-stone-700 mb-1">
-              Название изделия <span className="text-rose-600">*</span>
+            <label className="block font-semibold text-zinc-300 mb-1">
+              Название изделия <span className="text-rose-400">*</span>
             </label>
             <input
               type="text"
@@ -92,13 +92,13 @@ export function ItemModal({
               value={itemTitle}
               onChange={(e) => setItemTitle(e.target.value)}
               placeholder="Например: Кухня угловая"
-              className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
             />
           </div>
 
           {itemKind !== "other" && (
             <div>
-              <label className="block font-semibold text-stone-700 mb-1">
+              <label className="block font-semibold text-zinc-300 mb-1">
                 Погонные метры (м)
               </label>
               <input
@@ -108,13 +108,13 @@ export function ItemModal({
                 value={itemMeters}
                 onChange={(e) => setItemMeters(e.target.value)}
                 placeholder="3.0"
-                className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20 font-mono"
               />
             </div>
           )}
 
           <div>
-            <label className="block font-semibold text-stone-700 mb-1">
+            <label className="block font-semibold text-zinc-300 mb-1">
               Описание / габариты
             </label>
             <input
@@ -122,23 +122,23 @@ export function ItemModal({
               value={itemDesc}
               onChange={(e) => setItemDesc(e.target.value)}
               placeholder="2400 × 600 × 850"
-              className="min-h-11 w-full rounded-xl border border-stone-300 px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
             />
           </div>
 
-          <div className="mt-2 flex items-center justify-end gap-3 pt-2">
+          <div className="mt-3 flex items-center justify-end gap-2 pt-3 border-t border-white/[0.06]">
             <button
               type="button"
               onClick={onClose}
               disabled={itemSaving}
-              className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-full px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
             >
               Отмена
             </button>
             <button
               type="submit"
               disabled={itemSaving}
-              className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+              className="rounded-full bg-white text-black font-semibold px-5 py-2 text-xs hover:bg-zinc-200 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
             >
               {itemSaving ? "Сохранение…" : "Сохранить"}
             </button>

@@ -59,25 +59,25 @@ export function ContractStageCard({
   }
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-6 mb-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-stone-100 pb-3">
+    <div className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-2xl backdrop-blur-xl md:p-6 mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-white/[0.06] pb-4">
         <div>
-          <h2 className="text-lg font-bold text-stone-900">Этап «Договор»</h2>
-          <p className="text-xs text-stone-500">
+          <h2 className="text-base font-medium tracking-tight text-white">Этап «Договор»</h2>
+          <p className="text-xs text-zinc-400">
             Сверка согласованной цены договора с расчётной себестоимостью и целевой маржой
           </p>
         </div>
         {displayCalc?.isContractBaseline && (
-          <span className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900 border border-emerald-300">
+          <span className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400 border border-emerald-500/30">
             ✓ Опорная версия договора утверждена
           </span>
         )}
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {/* Поле ввода цены договора */}
-        <div className="flex flex-col gap-2 rounded-xl bg-stone-50 p-4 border border-stone-200/80">
-          <label className="text-xs font-bold uppercase tracking-wider text-stone-600">
+        <div className="flex flex-col gap-2.5 rounded-2xl bg-zinc-900/60 p-4 border border-white/[0.05]">
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
             Цена по договору (KZT)
           </label>
           <div className="flex items-center gap-2">
@@ -89,14 +89,14 @@ export function ContractStageCard({
               value={editingPrice}
               onChange={(e) => setEditingPrice(formatCurrencyInput(e.target.value))}
               placeholder="Например: 850 000"
-              className="min-h-12 flex-1 rounded-xl border border-stone-300 bg-white px-3.5 text-base font-bold text-stone-900 shadow-2xs focus:border-emerald-800"
+              className="min-h-12 flex-1 rounded-xl border border-white/10 bg-zinc-950 px-3.5 text-base font-semibold text-white shadow-inner focus:border-emerald-500/50 outline-none transition-colors"
             />
             {!locked && (
               <button
                 type="button"
                 disabled={isSavingPrice || locked}
                 onClick={() => void handleSavePrice()}
-                className="min-h-12 rounded-xl bg-stone-800 px-4 text-xs font-bold text-white hover:bg-stone-900 active:scale-98 disabled:opacity-50"
+                className="min-h-12 rounded-xl bg-white px-4 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-98 disabled:opacity-40 transition-all cursor-pointer"
               >
                 {isSavingPrice ? "…" : "Сохранить"}
               </button>
@@ -104,38 +104,38 @@ export function ContractStageCard({
           </div>
 
           {hasZeroWarning && (
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 font-medium">
+            <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 font-medium">
               ⚠️ Сумма сильно отличается от расчёта ({formatKzt(Math.round(estimatedPrice))} ₸). Проверьте количество нулей.
             </p>
           )}
 
           {contractPriceNum === null && (
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-zinc-500">
               Укажите согласованную с заказчиком цену договора для оценки фактической маржи.
             </p>
           )}
         </div>
 
         {/* Карточка вывода маржи и сравнения */}
-        <div className="flex flex-col justify-between rounded-xl bg-stone-50 p-4 border border-stone-200/80">
+        <div className="flex flex-col justify-between rounded-2xl bg-zinc-900/60 p-4 border border-white/[0.05]">
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-600 block mb-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block mb-2">
               Оценка прибыльности
             </span>
             {contractPriceNum !== null && displayCalc ? (
-              <div className="flex flex-col gap-1.5 text-sm">
+              <div className="flex flex-col gap-2 text-sm">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-stone-600">Договор:</span>
-                  <span className="text-base font-black text-stone-900">
+                  <span className="text-zinc-400 text-xs">Договор:</span>
+                  <span className="text-lg font-semibold tracking-tight text-white tabular-nums">
                     {formatKzt(contractPriceNum)} ₸
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-stone-600">Маржа:</span>
-                  <span className={`text-base font-black ${marginStyle.text}`}>
+                  <span className="text-zinc-400 text-xs">Маржа:</span>
+                  <span className={`text-base font-semibold tabular-nums ${marginStyle.text}`}>
                     {marginPct !== null ? formatPercent(marginPct) : "—"}{" "}
                     {marginPct !== null && (
-                      <span className="text-xs font-semibold">
+                      <span className="text-xs font-normal text-zinc-400">
                         {marginPct >= targetMarginPct
                           ? `(выше цели ${formatPercent(targetMarginPct)})`
                           : `(ниже цели ${formatPercent(targetMarginPct)})`}
@@ -143,29 +143,29 @@ export function ContractStageCard({
                     )}
                   </span>
                 </div>
-                <div className="flex items-baseline justify-between border-t border-stone-200/60 pt-1 text-xs text-stone-600">
-                  <span>Минимальная цена при {formatPercent(targetMarginPct)}:</span>
-                  <span className="font-bold text-stone-800">
+                <div className="flex items-baseline justify-between border-t border-white/[0.06] pt-2 text-xs text-zinc-400">
+                  <span>Мин. цена при {formatPercent(targetMarginPct)}:</span>
+                  <span className="font-semibold text-zinc-200 tabular-nums">
                     {formatKzt(displayCalc.minPriceForTargetMargin)} ₸
                   </span>
                 </div>
               </div>
             ) : (
-              <div className="text-xs text-stone-500 py-3">
+              <div className="text-xs text-zinc-500 py-3">
                 Введите цену договора слева, чтобы рассчитать процент маржи и сопоставить с минимальной ценой.
               </div>
             )}
           </div>
 
           {/* Кнопки действий */}
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-stone-200/60 pt-3">
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
             {!locked && (
               <>
                 <button
                   type="button"
                   disabled={calcSaving}
                   onClick={onSaveCalculation}
-                  className="flex min-h-11 items-center justify-center rounded-xl bg-emerald-900 px-4 text-xs font-bold text-white shadow-xs hover:bg-emerald-950 active:scale-98 disabled:opacity-50"
+                  className="flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-98 disabled:opacity-40 transition-all cursor-pointer"
                 >
                   {calcSaving ? "Сохранение…" : "Зафиксировать версию"}
                 </button>
@@ -173,7 +173,7 @@ export function ContractStageCard({
                   type="button"
                   onClick={onSetBaseline}
                   disabled={!displayCalc}
-                  className="flex min-h-11 items-center justify-center rounded-xl border border-emerald-700 bg-emerald-50 px-4 text-xs font-bold text-emerald-900 hover:bg-emerald-100 active:scale-98 disabled:opacity-50"
+                  className="flex min-h-11 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 active:scale-98 disabled:opacity-40 transition-all cursor-pointer"
                 >
                   ★ Сделать договорной
                 </button>

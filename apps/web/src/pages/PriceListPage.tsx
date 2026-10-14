@@ -335,56 +335,56 @@ export function PriceListPage() {
   const filteredItems = filterPriceItems(items, searchQuery, selectedCategory, showArchived);
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col px-4 py-6 pb-24 md:pb-12">
+    <main className="mx-auto flex w-full max-w-4xl flex-col px-4 py-8 pb-32 text-zinc-100">
       {/* Заголовок страницы и кнопка добавления */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900 tracking-tight">Справочник цен</h1>
-          <p className="text-xs text-stone-500 mt-1">
-            Прайс-лист материалов, работ цеха, фурнитуры и монтажа
+          <h1 className="text-3xl font-bold tracking-tight text-white">Каталог цен</h1>
+          <p className="text-xs text-zinc-400 mt-1">
+            Материалы, работы цеха, фурнитура и сборка
           </p>
         </div>
 
         <button
           type="button"
           onClick={() => setIsAddingNew(true)}
-          className="min-h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-800 active:scale-98 transition-all"
+          className="rounded-full bg-white text-black font-semibold px-5 py-2.5 text-xs hover:bg-zinc-200 shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
         >
-          <span className="text-base font-bold">+</span>
+          <span className="text-base leading-none">+</span>
           <span>Новая позиция</span>
         </button>
       </div>
 
       {/* Поиск и переключатели */}
-      <div className="mt-6 flex flex-col gap-3">
+      <div className="flex flex-col gap-3 mb-6">
         <div className="relative">
           <input
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск по названию, поставщику, примечанию…"
-            className="w-full min-h-11 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-emerald-700 focus:outline-hidden focus:ring-1 focus:ring-emerald-700"
+            className="w-full rounded-full bg-[#121215] border border-white/[0.08] px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20 transition-all"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 text-sm"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white p-1 text-xs cursor-pointer"
             >
               ✕
             </button>
           )}
         </div>
 
-        {/* Фильтр по категориям (горизонтальный скролл на мобильном) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-medium no-scrollbar">
+        {/* Фильтр по категориям */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 text-xs font-medium no-scrollbar">
           <button
             type="button"
             onClick={() => setSelectedCategory("all")}
-            className={`min-h-9 shrink-0 rounded-lg px-3 py-1.5 transition-colors ${
+            className={`rounded-full px-3.5 py-1.5 transition-all cursor-pointer whitespace-nowrap ${
               selectedCategory === "all"
-                ? "bg-stone-900 text-white"
-                : "bg-stone-200/80 text-stone-700 hover:bg-stone-300"
+                ? "bg-zinc-800 text-white font-semibold shadow-xs"
+                : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             Все ({items.length})
@@ -396,10 +396,10 @@ export function PriceListPage() {
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`min-h-9 shrink-0 rounded-lg px-3 py-1.5 transition-colors ${
+                className={`rounded-full px-3.5 py-1.5 transition-all cursor-pointer whitespace-nowrap ${
                   selectedCategory === cat
-                    ? "bg-stone-900 text-white"
-                    : "bg-stone-200/80 text-stone-700 hover:bg-stone-300"
+                    ? "bg-zinc-800 text-white font-semibold shadow-xs"
+                    : "text-zinc-500 hover:text-zinc-300"
                 }`}
               >
                 {CATEGORY_LABELS[cat]} ({count})
@@ -409,14 +409,14 @@ export function PriceListPage() {
         </div>
 
         {/* Переключатель показа архивных позиций */}
-        <div className="flex items-center justify-between text-xs text-stone-600 pt-1">
+        <div className="flex items-center justify-between text-xs text-zinc-500 pt-1">
           <span>Найдено позиций: {filteredItems.length}</span>
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={showArchived}
               onChange={(e) => setShowArchived(e.target.checked)}
-              className="h-4 w-4 rounded border-stone-300 text-emerald-800 focus:ring-emerald-700"
+              className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-0"
             />
             <span>Показать архивные</span>
           </label>
@@ -425,20 +425,20 @@ export function PriceListPage() {
 
       {/* Ошибки или индикатор загрузки */}
       {loading && (
-        <div className="mt-12 flex items-center justify-center text-sm text-stone-500">
-          Загрузка справочника цен…
+        <div className="mt-12 flex items-center justify-center text-xs text-zinc-500">
+          Загрузка каталога…
         </div>
       )}
 
       {error && (
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
           Ошибка: {error}
         </div>
       )}
 
       {/* Список позиций */}
       {!loading && !error && filteredItems.length === 0 && (
-        <div className="mt-10 rounded-2xl border border-dashed border-stone-300 bg-white/60 p-8 text-center text-sm text-stone-500">
+        <div className="mt-8 rounded-3xl border border-dashed border-white/10 bg-zinc-900/30 p-8 text-center text-xs text-zinc-500">
           Позиции не найдены. Попробуйте изменить поисковый запрос или категорию.
         </div>
       )}
@@ -451,10 +451,10 @@ export function PriceListPage() {
             return (
               <div
                 key={item.id}
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border bg-white p-3.5 transition-all shadow-2xs ${
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-3xl border p-4 transition-all shadow-md ${
                   item.active
-                    ? "border-stone-200/80 hover:border-stone-300"
-                    : "border-stone-200 bg-stone-100/70 opacity-75"
+                    ? "border-white/[0.07] bg-[#121215] hover:border-white/[0.18]"
+                    : "border-zinc-800/60 bg-zinc-950/60 opacity-60"
                 }`}
               >
                 {/* Левая часть: название, категория, бейджи */}
@@ -463,43 +463,43 @@ export function PriceListPage() {
                   onClick={() => handleOpenDetail(item)}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-stone-900 text-sm md:text-base leading-snug">
+                    <span className="font-semibold text-white text-sm md:text-base leading-snug">
                       {item.name}
                     </span>
-                    <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">
+                    <span className="rounded-full bg-white/[0.06] border border-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-zinc-400">
                       {CATEGORY_LABELS[item.category]}
                     </span>
                     {!item.active && (
-                      <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                      <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-amber-300">
                         Архив
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
                     <span>
-                      Ед.: <strong className="font-medium text-stone-700">{item.unit}</strong>
+                      Ед.: <strong className="font-medium text-zinc-300">{item.unit}</strong>
                     </span>
                     {item.supplier && (
                       <span>
                         Поставщик:{" "}
-                        <strong className="font-medium text-stone-700">{item.supplier}</strong>
+                        <strong className="font-medium text-zinc-300">{item.supplier}</strong>
                       </span>
                     )}
                     {item.waste_applicable && (
-                      <span className="text-emerald-700 font-medium">Отход: кромка</span>
+                      <span className="text-emerald-400 font-medium">Отход: кромка</span>
                     )}
                     {item.counts_for_technolog && (
-                      <span className="text-blue-700 font-medium">Для технолога</span>
+                      <span className="text-indigo-400 font-medium">Для технолога</span>
                     )}
                     {item.billable_qty_rounding === "ceil_to_unit" && (
-                      <span className="text-stone-600">Окр. вверх</span>
+                      <span className="text-zinc-400">Окр. вверх</span>
                     )}
                   </div>
                 </div>
 
                 {/* Правая часть: цена и инлайн-редактирование */}
-                <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-100">
+                <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-800/80">
                   {isEditing ? (
                     <div className="flex items-center gap-2">
                       <input
@@ -508,14 +508,14 @@ export function PriceListPage() {
                         value={inlinePriceInput}
                         onChange={(e) => setInlinePriceInput(e.target.value)}
                         placeholder="Цена"
-                        className="w-28 min-h-11 rounded-xl border border-emerald-700 bg-white px-3 text-right text-sm font-semibold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-700"
+                        className="w-28 min-h-10 rounded-xl border border-emerald-500 bg-zinc-950 px-3 text-right text-sm font-semibold text-white focus:outline-hidden"
                         autoFocus
                       />
                       <button
                         type="button"
                         onClick={() => void handleSaveInlinePrice(item)}
                         disabled={inlineSaving}
-                        className="min-h-11 min-w-11 rounded-xl bg-emerald-800 px-3 text-sm font-bold text-white hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
+                        className="min-h-10 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition-all cursor-pointer disabled:opacity-50"
                         title="Сохранить цену"
                       >
                         ✓
@@ -526,19 +526,19 @@ export function PriceListPage() {
                           setInlineEditingId(null);
                           setInlineError(null);
                         }}
-                        className="min-h-11 min-w-11 rounded-xl border border-stone-300 bg-stone-100 px-3 text-sm font-bold text-stone-600 hover:bg-stone-200 active:scale-95"
+                        className="min-h-10 px-3 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-bold text-zinc-400 hover:text-white cursor-pointer"
                         title="Отмена"
                       >
                         ✕
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <span className="text-base md:text-lg font-bold text-stone-900">
+                        <span className="text-base md:text-lg font-bold text-white tabular-nums">
                           {formatKzt(item.price)} ₸
                         </span>
-                        <span className="block text-[10px] text-stone-400">
+                        <span className="block text-[10px] text-zinc-500 font-mono">
                           за {item.unit}
                         </span>
                       </div>
@@ -550,16 +550,16 @@ export function PriceListPage() {
                           setInlinePriceInput(String(item.price));
                           setInlineError(null);
                         }}
-                        className="min-h-11 rounded-xl border border-stone-200 bg-stone-50 px-3 text-xs font-medium text-stone-700 hover:bg-stone-100 active:scale-95 transition-all"
+                        className="rounded-full bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
                         title="Быстро изменить цену"
                       >
-                        Изменить цену
+                        Изменить
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handleOpenDetail(item)}
-                        className="min-h-11 rounded-xl border border-stone-200 bg-white px-3 text-xs font-medium text-stone-600 hover:bg-stone-50 active:scale-95"
+                        className="h-8 w-8 rounded-full border border-zinc-800 bg-zinc-900 flex items-center justify-center text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
                         title="Подробнее"
                       >
                         ⋯
@@ -606,7 +606,7 @@ export function PriceListPage() {
 }
 
 // ==========================================
-// Модальное окно деталей и истории позиции
+// Модальное окно деталей и истории позиции (Luxury Dark)
 // ==========================================
 interface DetailModalProps {
   item: PriceItem;
@@ -660,23 +660,23 @@ function PriceItemDetailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-3xl bg-[#141418] border border-white/10 shadow-2xl overflow-hidden text-zinc-100 animate-in fade-in zoom-in-95 duration-150">
         {/* Шапка модалки */}
-        <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
           <div>
-            <h2 className="text-lg font-bold text-stone-900 leading-snug">
+            <h2 className="text-base font-bold text-white leading-snug">
               {item.name}
             </h2>
             <div className="mt-1 flex items-center gap-2">
-              <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+              <span className="rounded-full bg-white/[0.06] border border-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-zinc-400">
                 {CATEGORY_LABELS[item.category]}
               </span>
               <span
-                className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                   item.active
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-amber-100 text-amber-800"
+                    ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+                    : "bg-amber-500/15 border border-amber-500/30 text-amber-300"
                 }`}
               >
                 {item.active ? "Активна" : "В архиве"}
@@ -686,21 +686,21 @@ function PriceItemDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 text-lg font-bold"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
         {/* Вкладки Редактирование / История цены */}
-        <div className="flex border-b border-stone-200 bg-stone-50 px-6 text-sm font-medium">
+        <div className="flex border-b border-white/[0.06] bg-[#121215] px-6 text-xs font-medium">
           <button
             type="button"
             onClick={() => setTab("edit")}
-            className={`min-h-11 border-b-2 px-4 transition-colors ${
+            className={`py-3 px-3 border-b-2 transition-colors cursor-pointer ${
               tab === "edit"
-                ? "border-emerald-800 text-emerald-900 font-semibold"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-emerald-400 text-white font-semibold"
+                : "border-transparent text-zinc-500 hover:text-zinc-300"
             }`}
           >
             Редактирование
@@ -708,10 +708,10 @@ function PriceItemDetailModal({
           <button
             type="button"
             onClick={() => setTab("history")}
-            className={`min-h-11 border-b-2 px-4 transition-colors ${
+            className={`py-3 px-3 border-b-2 transition-colors cursor-pointer ${
               tab === "history"
-                ? "border-emerald-800 text-emerald-900 font-semibold"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+                ? "border-emerald-400 text-white font-semibold"
+                : "border-transparent text-zinc-500 hover:text-zinc-300"
             }`}
           >
             История цены ({history.length})
@@ -719,9 +719,9 @@ function PriceItemDetailModal({
         </div>
 
         {/* Содержимое вкладки */}
-        <div className="overflow-y-auto p-6 flex-1">
+        <div className="overflow-y-auto p-6 flex-1 text-xs">
           {error && (
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+            <div className="mb-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
               {error}
             </div>
           )}
@@ -729,23 +729,23 @@ function PriceItemDetailModal({
           {tab === "edit" ? (
             <form id="price-item-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-semibold text-stone-700">Название</label>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">Название</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm focus:border-emerald-800 focus:outline-hidden"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700">Категория</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Категория</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as PriceCategory)}
-                    className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm focus:border-emerald-800 focus:outline-hidden"
+                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20"
                   >
                     {ALL_CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -756,11 +756,11 @@ function PriceItemDetailModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700">Единица измерения</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Единица измерения</label>
                   <select
                     value={unit}
                     onChange={(e) => setUnit(e.target.value as PriceUnit)}
-                    className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm focus:border-emerald-800 focus:outline-hidden"
+                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20"
                   >
                     {PRICE_UNITS.map((u) => (
                       <option key={u} value={u}>
@@ -773,7 +773,7 @@ function PriceItemDetailModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700">
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">
                     Цена в тенге (KZT)
                   </label>
                   <input
@@ -782,36 +782,36 @@ function PriceItemDetailModal({
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     required
-                    className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold focus:border-emerald-800 focus:outline-hidden"
+                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs font-semibold text-white focus:outline-hidden focus:border-white/20"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700">Поставщик</label>
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Поставщик</label>
                   <input
                     type="text"
                     value={supplier}
                     onChange={(e) => setSupplier(e.target.value)}
                     placeholder="Например: Крона, Blum"
-                    className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm focus:border-emerald-800 focus:outline-hidden"
+                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
                   />
                 </div>
               </div>
 
               {/* Чекбоксы правил */}
-              <div className="space-y-3 rounded-2xl bg-stone-50 p-4 border border-stone-200">
+              <div className="space-y-3 rounded-2xl bg-zinc-950/60 p-4 border border-zinc-800/80">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={wasteApplicable}
                     onChange={(e) => setWasteApplicable(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-stone-300 text-emerald-800 focus:ring-emerald-700"
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-0"
                   />
                   <div>
-                    <span className="block text-xs font-semibold text-stone-800">
+                    <span className="block text-xs font-semibold text-zinc-200">
                       Применять плановый отход кромки (waste_applicable)
                     </span>
-                    <span className="block text-[11px] text-stone-500">
+                    <span className="block text-[11px] text-zinc-500">
                       Автоматически добавляет процент отхода кромки из параметров.
                     </span>
                   </div>
@@ -822,26 +822,26 @@ function PriceItemDetailModal({
                     type="checkbox"
                     checked={countsForTechnolog}
                     onChange={(e) => setCountsForTechnolog(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-stone-300 text-emerald-800 focus:ring-emerald-700"
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-0"
                   />
                   <div>
-                    <span className="block text-xs font-semibold text-stone-800">
+                    <span className="block text-xs font-semibold text-zinc-200">
                       Учитывать для технолога (Базис)
                     </span>
-                    <span className="block text-[11px] text-stone-500">
+                    <span className="block text-[11px] text-zinc-500">
                       Учитывается при расчёте оплаты технологу за листы ЛДСП.
                     </span>
                   </div>
                 </label>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-800">
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">
                     Округление оплачиваемого количества
                   </label>
                   <select
                     value={rounding}
                     onChange={(e) => setRounding(e.target.value as BillableQtyRounding)}
-                    className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 bg-white px-3 text-xs focus:border-emerald-800 focus:outline-hidden"
+                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 text-xs text-white focus:outline-hidden focus:border-white/20"
                   >
                     <option value="none">Без округления (none)</option>
                     <option value="ceil_to_unit">Округлять вверх до целого (ceil_to_unit)</option>
@@ -850,25 +850,25 @@ function PriceItemDetailModal({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-stone-700">Примечание</label>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">Примечание</label>
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   rows={2}
-                  className="mt-1 w-full rounded-xl border border-stone-300 p-3 text-xs focus:border-emerald-800 focus:outline-hidden"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
                 />
               </div>
             </form>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
               {historyLoading && (
-                <div className="py-6 text-center text-xs text-stone-500">
+                <div className="py-6 text-center text-xs text-zinc-500">
                   Загрузка истории изменений цены…
                 </div>
               )}
 
               {!historyLoading && history.length === 0 && (
-                <div className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-xs text-stone-500">
+                <div className="rounded-2xl border border-dashed border-zinc-800 p-6 text-center text-xs text-zinc-500">
                   История изменения цен пока пуста. При первом изменении цены здесь появится запись.
                 </div>
               )}
@@ -886,18 +886,18 @@ function PriceItemDetailModal({
                   return (
                     <div
                       key={record.id}
-                      className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs"
+                      className="flex items-center justify-between rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-xs"
                     >
                       <div>
-                        <span className="block font-medium text-stone-800">{dateStr}</span>
-                        <span className="text-[11px] text-stone-500">
+                        <span className="block font-medium text-zinc-200">{dateStr}</span>
+                        <span className="text-[11px] text-zinc-500">
                           {record.old_price !== null
                             ? `Старая: ${formatKzt(record.old_price)} ₸`
                             : "Первоначальное добавление"}
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="text-sm font-bold text-emerald-900">
+                        <span className="text-sm font-bold text-white tabular-nums">
                           {formatKzt(record.new_price)} ₸
                         </span>
                       </div>
@@ -909,24 +909,24 @@ function PriceItemDetailModal({
         </div>
 
         {/* Подвал модалки с кнопками действий */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-stone-200 bg-stone-50 px-6 py-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/[0.06] bg-[#121215] px-6 py-4">
           <button
             type="button"
             onClick={() => void onToggleActive(item)}
-            className={`min-h-11 w-full sm:w-auto rounded-xl border px-4 text-xs font-semibold transition-colors ${
+            className={`w-full sm:w-auto rounded-full border px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
               item.active
-                ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
             }`}
           >
-            {item.active ? "Перенести в архив" : "Восстановить из архива"}
+            {item.active ? "В архив" : "Восстановить из архива"}
           </button>
 
           <div className="flex w-full sm:w-auto items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="min-h-11 flex-1 sm:flex-initial rounded-xl border border-stone-300 bg-white px-4 text-xs font-medium text-stone-700 hover:bg-stone-100"
+              className="rounded-full px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
             >
               Закрыть
             </button>
@@ -935,7 +935,7 @@ function PriceItemDetailModal({
                 type="submit"
                 form="price-item-form"
                 disabled={saving}
-                className="min-h-11 flex-1 sm:flex-initial rounded-xl bg-emerald-900 px-5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-800 disabled:opacity-50"
+                className="rounded-full bg-white text-black font-semibold px-5 py-2 text-xs hover:bg-zinc-200 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
               >
                 {saving ? "Сохранение…" : "Сохранить"}
               </button>
@@ -948,7 +948,7 @@ function PriceItemDetailModal({
 }
 
 // ==========================================
-// Модальное окно добавления новой позиции
+// Модальное окно добавления новой позиции (Luxury Dark)
 // ==========================================
 interface NewItemModalProps {
   onClose: () => void;
@@ -1000,30 +1000,30 @@ function NewPriceItemModal({ onClose, onCreate }: NewItemModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-stone-900 leading-snug">
-            Новая позиция справочника
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-3xl bg-[#141418] border border-white/10 shadow-2xl overflow-hidden text-zinc-100 animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+          <h2 className="text-base font-bold text-white leading-snug">
+            Новая позиция каталога
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 text-lg font-bold"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto p-6 flex flex-col gap-4 flex-1">
+        <form onSubmit={handleSubmit} className="overflow-y-auto p-6 flex flex-col gap-4 flex-1 text-xs">
           {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-stone-700">
+            <label className="block text-xs font-semibold text-zinc-300 mb-1">
               Название позиции *
             </label>
             <input
@@ -1032,17 +1032,17 @@ function NewPriceItemModal({ onClose, onCreate }: NewItemModalProps) {
               onChange={(e) => setName(e.target.value)}
               placeholder="Например: ЛДСП Дуб Галифакс"
               required
-              className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm focus:border-emerald-800 focus:outline-hidden"
+              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-stone-700">Категория *</label>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Категория *</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as PriceCategory)}
-                className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm focus:border-emerald-800 focus:outline-hidden"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20"
               >
                 {ALL_CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
@@ -1053,11 +1053,11 @@ function NewPriceItemModal({ onClose, onCreate }: NewItemModalProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-700">Единица *</label>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Единица *</label>
               <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value as PriceUnit)}
-                className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm focus:border-emerald-800 focus:outline-hidden"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20"
               >
                 {PRICE_UNITS.map((u) => (
                   <option key={u} value={u}>
@@ -1070,7 +1070,7 @@ function NewPriceItemModal({ onClose, onCreate }: NewItemModalProps) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-stone-700">
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">
                 Цена в KZT *
               </label>
               <input
@@ -1080,35 +1080,35 @@ function NewPriceItemModal({ onClose, onCreate }: NewItemModalProps) {
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="Например: 24000"
                 required
-                className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold focus:border-emerald-800 focus:outline-hidden"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs font-semibold text-white focus:outline-hidden focus:border-white/20"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-700">Поставщик</label>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">Поставщик</label>
               <input
                 type="text"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
                 placeholder="Опционально"
-                className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 px-3 text-sm focus:border-emerald-800 focus:outline-hidden"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
               />
             </div>
           </div>
 
-          <div className="space-y-3 rounded-2xl bg-stone-50 p-4 border border-stone-200">
+          <div className="space-y-3 rounded-2xl bg-zinc-950/60 p-4 border border-zinc-800/80">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={wasteApplicable}
                 onChange={(e) => setWasteApplicable(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-emerald-800 focus:ring-emerald-700"
+                className="mt-0.5 h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-0"
               />
               <div>
-                <span className="block text-xs font-semibold text-stone-800">
+                <span className="block text-xs font-semibold text-zinc-200">
                   Применять отход кромки (edge)
                 </span>
-                <span className="block text-[11px] text-stone-500">
+                <span className="block text-[11px] text-zinc-500">
                   Будет автоматически начисляться процент отхода из параметров.
                 </span>
               </div>
@@ -1119,26 +1119,26 @@ function NewPriceItemModal({ onClose, onCreate }: NewItemModalProps) {
                 type="checkbox"
                 checked={countsForTechnolog}
                 onChange={(e) => setCountsForTechnolog(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-emerald-800 focus:ring-emerald-700"
+                className="mt-0.5 h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-0"
               />
               <div>
-                <span className="block text-xs font-semibold text-stone-800">
+                <span className="block text-xs font-semibold text-zinc-200">
                   Учитывать для технолога (Базис)
                 </span>
-                <span className="block text-[11px] text-stone-500">
+                <span className="block text-[11px] text-zinc-500">
                   Включается в подсчёт листов ЛДСП для оплаты технологу.
                 </span>
               </div>
             </label>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-800">
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">
                 Округление оплачиваемого количества
               </label>
               <select
                 value={rounding}
                 onChange={(e) => setRounding(e.target.value as BillableQtyRounding)}
-                className="mt-1 w-full min-h-11 rounded-xl border border-stone-300 bg-white px-3 text-xs focus:border-emerald-800 focus:outline-hidden"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 text-xs text-white focus:outline-hidden focus:border-white/20"
               >
                 <option value="none">Без округления (none)</option>
                 <option value="ceil_to_unit">Округлять вверх до целого (ceil_to_unit)</option>
@@ -1147,28 +1147,28 @@ function NewPriceItemModal({ onClose, onCreate }: NewItemModalProps) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-stone-700">Примечание</label>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1">Примечание</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               placeholder="Дополнительные сведения…"
-              className="mt-1 w-full rounded-xl border border-stone-300 p-3 text-xs focus:border-emerald-800 focus:outline-hidden"
+              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
             />
           </div>
 
-          <div className="mt-4 flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+          <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-white/[0.06]">
             <button
               type="button"
               onClick={onClose}
-              className="min-h-11 rounded-xl border border-stone-300 px-4 text-xs font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-full px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
             >
               Отмена
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="min-h-11 rounded-xl bg-emerald-900 px-5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-800 disabled:opacity-50"
+              className="rounded-full bg-white text-black font-semibold px-5 py-2 text-xs hover:bg-zinc-200 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
             >
               {saving ? "Добавление…" : "Добавить позицию"}
             </button>

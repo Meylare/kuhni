@@ -32,34 +32,34 @@ export function PriceDiffModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/40 backdrop-blur-xs p-0 sm:p-4">
-      <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-          <h3 className="text-base font-bold text-stone-900">Обновление цен из справочника</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150">
+      <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#141418] p-6 shadow-2xl max-h-[90vh] overflow-y-auto text-zinc-100 animate-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.06]">
+          <h3 className="text-base font-bold text-white">Обновление цен из каталога</h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-stone-400 hover:text-stone-600 text-lg p-1"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
-        <p className="mt-2 text-xs text-stone-600 leading-relaxed">
-          В актуальном справочнике цен изменились цены для {priceDiff.lines.length} поз. из этого заказа.
+        <p className="mt-3 text-xs text-zinc-400 leading-relaxed">
+          В каталоге изменились цены для {priceDiff.lines.length} поз. из этого заказа.
           Ознакомьтесь с изменениями перед подтверждением:
         </p>
 
-        <div className="mt-3 max-h-56 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 divide-y divide-stone-200 text-xs">
+        <div className="mt-3.5 max-h-56 overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950/60 divide-y divide-zinc-900 text-xs">
           {priceDiff.lines.map((item) => (
             <div key={item.lineId} className="p-3">
-              <div className="font-bold text-stone-900">{item.name}</div>
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[11px] text-stone-600">
+              <div className="font-semibold text-zinc-200">{item.name}</div>
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[11px] text-zinc-400">
                 <span>
                   {item.qty} шт: {formatKzt(item.oldUnitPrice)} ₸ ➔{" "}
-                  <strong className="text-emerald-900">{formatKzt(item.newUnitPrice)} ₸</strong>
+                  <strong className="text-white font-mono">{formatKzt(item.newUnitPrice)} ₸</strong>
                 </span>
-                <span className={item.diff > 0 ? "text-rose-700 font-bold" : "text-emerald-700 font-bold"}>
+                <span className={`font-mono font-bold ${item.diff > 0 ? "text-rose-400" : "text-emerald-400"}`}>
                   {item.diff > 0 ? "+" : ""}
                   {formatKzt(item.diff)} ₸
                 </span>
@@ -69,11 +69,11 @@ export function PriceDiffModal({
         </div>
 
         {/* Сводка разницы */}
-        <div className="mt-3 rounded-xl border border-stone-200 bg-stone-100 p-3 text-xs flex justify-between items-center">
-          <span className="font-medium text-stone-700">Разница общей стоимости:</span>
+        <div className="mt-3 rounded-2xl border border-zinc-800 bg-[#121215] p-3 text-xs flex justify-between items-center">
+          <span className="font-medium text-zinc-400">Разница общей стоимости:</span>
           <span
-            className={`text-sm font-extrabold ${
-              priceDiff.totalDiff > 0 ? "text-rose-800" : "text-emerald-800"
+            className={`text-sm font-bold font-mono ${
+              priceDiff.totalDiff > 0 ? "text-rose-400" : "text-emerald-400"
             }`}
           >
             {priceDiff.totalDiff > 0 ? "+" : ""}
@@ -81,12 +81,12 @@ export function PriceDiffModal({
           </span>
         </div>
 
-        <div className="mt-4 flex items-center justify-end gap-3 pt-2">
+        <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-white/[0.06]">
           <button
             type="button"
             onClick={onClose}
             disabled={isUpdating}
-            className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+            className="rounded-full px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
           >
             Отмена
           </button>
@@ -94,9 +94,9 @@ export function PriceDiffModal({
             type="button"
             disabled={isUpdating}
             onClick={() => void onConfirm()}
-            className="min-h-11 rounded-xl bg-amber-800 px-5 text-sm font-semibold text-white shadow-xs hover:bg-amber-900 disabled:opacity-50"
+            className="rounded-full bg-white text-black font-semibold px-5 py-2 text-xs hover:bg-zinc-200 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
           >
-            {isUpdating ? "Обновление…" : "Подтвердить обновление цен"}
+            {isUpdating ? "Обновление…" : "Подтвердить обновление"}
           </button>
         </div>
       </div>

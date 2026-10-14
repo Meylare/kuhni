@@ -267,33 +267,33 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
 
   if (loading) {
     return (
-      <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center py-20 text-stone-500">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-900 border-t-transparent" />
-        <span className="mt-3 text-sm">Загрузка данных заказа…</span>
+      <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center py-28 text-zinc-400">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+        <span className="mt-3 text-xs font-medium">Загрузка данных заказа…</span>
       </div>
     );
   }
 
   if (error || !order) {
     return (
-      <div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-8 text-zinc-100">
         <button
           type="button"
           onClick={onBack}
-          className="self-start min-h-11 rounded-xl border border-stone-300 bg-white/70 px-4 text-sm font-medium text-stone-700 hover:bg-white"
+          className="self-start min-h-10 rounded-xl border border-white/10 bg-white/[0.05] px-4 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
         >
-          ← К списку заказов
+          ← К проектам
         </button>
-        <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-800">
-          <h2 className="text-base font-bold">Не удалось открыть заказ</h2>
-          <p className="mt-1 text-sm">{error || "Заказ не найден"}</p>
+        <div className="mt-6 rounded-3xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-300">
+          <h2 className="text-base font-semibold">Не удалось открыть заказ</h2>
+          <p className="mt-1 text-xs text-rose-400">{error || "Заказ не найден"}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-4 pb-48 md:pb-32 lg:pb-12">
+    <>
       {/* 1. Инновационный режим Кокпита (Cockpit Luxury UI) */}
       {displayMode === "cockpit" && currentStage !== "fact" ? (
         <CockpitView
@@ -320,7 +320,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         />
       ) : (
         /* 2. Классический подробный режим таблицы / этапа Факт */
-        <>
+        <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-4 pb-48 md:pb-32 lg:pb-12">
           {currentStage !== "fact" && (
             <div className="flex items-center justify-between mb-3">
               <button
@@ -494,7 +494,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
               onSetShowLivePreview={orderCalcs.setShowLivePreview}
             />
           )}
-        </>
+        </div>
       )}
 
       {/* Модальные окна заказа */}
@@ -528,6 +528,6 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           onDismiss={flushPending}
         />
       )}
-    </div>
+    </>
   );
 }

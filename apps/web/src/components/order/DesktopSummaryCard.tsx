@@ -44,42 +44,42 @@ export function DesktopSummaryCard({
   const marginStyle = getMarginColor(displayCalc?.marginPct, targetMarginPct);
 
   return (
-    <aside className="sticky top-20 hidden lg:flex flex-col gap-4 rounded-3xl border border-stone-200/90 bg-white p-5 shadow-sm w-[360px] shrink-0">
+    <aside className="sticky top-20 hidden lg:flex flex-col gap-4 rounded-3xl border border-white/[0.08] bg-[#121215] p-5 shadow-2xl backdrop-blur-xl w-[360px] shrink-0 text-zinc-100">
       {/* Шапка пульта */}
-      <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+      <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
         <div className="flex items-center gap-2">
-          <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <h3 className="text-sm font-black text-stone-900 tracking-tight">
+          <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+          <h3 className="text-sm font-medium text-white tracking-tight">
             Финансовый пульт
           </h3>
         </div>
-        <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-[10px] font-bold text-stone-600">
+        <span className="rounded-full bg-white/[0.05] border border-white/[0.08] px-2.5 py-0.5 text-[10px] font-medium text-zinc-400">
           {calcMode === "quote" ? "Смета • Quote" : "Договор • Contract"}
         </span>
       </div>
 
       {/* Ошибка расчёта */}
       {!displayCalc && calcOutcome && !calcOutcome.ok && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
           <strong>Ошибка расчёта:</strong> {formatCalculationOutcomeError(calcOutcome.error)}
         </div>
       )}
 
       {/* Предупреждения расчёта */}
       {displayCalc && displayCalc.warnings.length > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900 font-medium">
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-300 font-medium">
           ⚠️ {displayCalc.warnings.join("; ")}
         </div>
       )}
 
       {displayCalc?.contractPriceMismatch && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-950 font-bold">
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-200 font-semibold">
           ⚠️ Цена договора в заказе ({formatKzt(displayCalc.contractPriceMismatch.current)} ₸) отличается от сохранённой версии №{displayCalc.version} ({formatKzt(displayCalc.contractPriceMismatch.snapshot)} ₸).
         </div>
       )}
 
       {calcSaveSuccess && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-bold text-emerald-900 animate-pulse">
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/15 p-2.5 text-xs font-semibold text-emerald-300 animate-pulse">
           ✓ {calcSaveSuccess}
         </div>
       )}
@@ -87,76 +87,76 @@ export function DesktopSummaryCard({
       {displayCalc && (
         <>
           {/* Главная карточка с итоговой ценой и маржой */}
-          <div className="rounded-2xl bg-gradient-to-br from-stone-900 to-stone-950 p-4 text-white shadow-md">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+          <div className="rounded-2xl bg-zinc-950/80 p-4 text-white border border-white/[0.06] shadow-lg">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">
               {calcMode === "quote" ? "Рекомендуемая стоимость" : "Согласованная цена"}
             </span>
 
-            <div className="mt-1 text-3xl font-black tracking-tight tabular-nums">
+            <div className="mt-1 text-3xl font-light tracking-tight text-white tabular-nums">
               {formatKzt(displayCalc.priceTotal)} ₸
             </div>
 
-            <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-stone-800 pt-3 text-xs">
+            <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-3 text-xs">
               <div>
-                <span className="text-[10px] text-stone-400 block font-medium">Себестоимость</span>
-                <span className="font-bold text-stone-200 tabular-nums">
+                <span className="text-[10px] text-zinc-400 block font-medium">Себестоимость</span>
+                <span className="font-semibold text-zinc-200 tabular-nums">
                   {formatKzt(displayCalc.costTotal)} ₸
                 </span>
               </div>
               <div>
-                <span className="text-[10px] text-stone-400 block font-medium">Чистая прибыль</span>
-                <span className="font-bold text-emerald-400 tabular-nums">
+                <span className="text-[10px] text-zinc-400 block font-medium">Чистая прибыль</span>
+                <span className="font-semibold text-emerald-400 tabular-nums">
                   +{formatKzt(displayCalc.margin)} ₸
                 </span>
               </div>
             </div>
 
-            <div className="mt-2.5 flex items-center justify-between border-t border-stone-800/60 pt-2">
-              <span className="text-[11px] text-stone-400 font-medium">Маржинальность:</span>
-              <span className={`rounded-lg px-2 py-0.5 text-xs font-black ${marginStyle.badge}`}>
+            <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.06] pt-2">
+              <span className="text-[11px] text-zinc-400 font-medium">Маржинальность:</span>
+              <span className={`rounded-lg px-2 py-0.5 text-xs font-semibold ${marginStyle.badge}`}>
                 {displayCalc.marginPct !== null ? formatMarginPercent(displayCalc.marginPct) : "—"}
               </span>
             </div>
           </div>
 
           {/* Детализация себестоимости */}
-          <div className="rounded-2xl border border-stone-200/80 bg-stone-50/60 p-3.5 text-xs">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-2">
+          <div className="rounded-2xl border border-white/[0.05] bg-zinc-900/40 p-3.5 text-xs">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block mb-2">
               Структура затрат
             </span>
 
             <div className="flex flex-col gap-1.5">
-              <div className="flex justify-between py-1 border-b border-stone-200/50">
-                <span className="text-stone-600">Материалы и работы:</span>
-                <span className="font-bold text-stone-900 tabular-nums">
+              <div className="flex justify-between py-1 border-b border-white/[0.04]">
+                <span className="text-zinc-400">Материалы и работы:</span>
+                <span className="font-semibold text-zinc-200 tabular-nums">
                   {formatKzt(displayCalc.fixedCost)} ₸
                 </span>
               </div>
 
-              <div className="flex justify-between py-1 border-b border-stone-200/50">
-                <span className="text-stone-600">Сборка и монтаж:</span>
-                <span className="font-bold text-stone-900 tabular-nums">
+              <div className="flex justify-between py-1 border-b border-white/[0.04]">
+                <span className="text-zinc-400">Сборка и монтаж:</span>
+                <span className="font-semibold text-zinc-200 tabular-nums">
                   {formatKzt(displayCalc.assembly)} ₸
                 </span>
               </div>
 
-              <div className="flex justify-between py-1 border-b border-stone-200/50">
-                <span className="text-stone-600">Услуги технолога:</span>
-                <span className="font-bold text-stone-900 tabular-nums">
+              <div className="flex justify-between py-1 border-b border-white/[0.04]">
+                <span className="text-zinc-400">Услуги технолога:</span>
+                <span className="font-semibold text-zinc-200 tabular-nums">
                   {formatKzt(displayCalc.technolog)} ₸
                 </span>
               </div>
 
-              <div className="flex justify-between py-1 border-b border-stone-200/50">
-                <span className="text-stone-600">Резерв на риски:</span>
-                <span className="font-bold text-stone-900 tabular-nums">
+              <div className="flex justify-between py-1 border-b border-white/[0.04]">
+                <span className="text-zinc-400">Резерв на риски:</span>
+                <span className="font-semibold text-zinc-200 tabular-nums">
                   {formatKzt(displayCalc.riskReserve)} ₸
                 </span>
               </div>
 
               <div className="flex justify-between pt-1">
-                <span className="text-stone-600 font-medium">Мин. цена для целевой маржи:</span>
-                <span className="font-black text-stone-900 tabular-nums">
+                <span className="text-zinc-400 font-medium">Мин. цена для целевой маржи:</span>
+                <span className="font-semibold text-white tabular-nums">
                   {formatKzt(displayCalc.minPriceForTargetMargin)} ₸
                 </span>
               </div>
@@ -169,7 +169,7 @@ export function DesktopSummaryCard({
               type="button"
               disabled={calcSaving || Boolean(networkError)}
               onClick={onSaveCalculation}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-900 px-4 text-xs font-bold text-white shadow-sm hover:bg-emerald-950 active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-98 transition-all disabled:opacity-40 cursor-pointer shadow-lg"
             >
               <span>💾</span>
               <span>{calcSaving ? "Сохранение…" : "Зафиксировать версию сметы"}</span>
@@ -178,7 +178,7 @@ export function DesktopSummaryCard({
             <button
               type="button"
               onClick={onOpenUnlockModal}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-amber-900 px-4 text-xs font-bold text-white shadow-sm hover:bg-amber-950 active:scale-98 transition-all cursor-pointer"
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 active:scale-98 transition-all cursor-pointer"
             >
               <span>🔒</span>
               <span>Открыть заказ для правок</span>
@@ -188,14 +188,14 @@ export function DesktopSummaryCard({
           {/* Индикатор статуса синхронизации версии */}
           {syncStatus && (
             <div
-              className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold ${
+              className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium ${
                 syncStatus.badgeColor === "warning"
-                  ? "bg-amber-100 text-amber-900 border border-amber-300"
-                  : "bg-stone-100 text-stone-600"
+                  ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                  : "bg-white/[0.05] text-zinc-400 border border-white/[0.05]"
               }`}
             >
               {syncStatus.badgeColor === "warning" && (
-                <span className="h-2 w-2 rounded-full bg-amber-600 inline-block animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 inline-block animate-pulse" />
               )}
               <span>{syncStatus.label}</span>
             </div>
@@ -203,7 +203,7 @@ export function DesktopSummaryCard({
 
           {/* Переключатель живого превью */}
           {calculations.length > 0 && (
-            <div className="flex items-center justify-between text-xs text-stone-500 pt-1 border-t border-stone-100">
+            <div className="flex items-center justify-between text-xs text-zinc-400 pt-1 border-t border-white/[0.06]">
               <span className="font-medium">
                 {displayCalc.source === "saved"
                   ? `Показана версия №${displayCalc.version}`
@@ -214,7 +214,7 @@ export function DesktopSummaryCard({
                 <button
                   type="button"
                   onClick={() => onSetShowLivePreview(true)}
-                  className="font-bold text-emerald-900 hover:underline cursor-pointer"
+                  className="font-medium text-emerald-400 hover:underline cursor-pointer"
                 >
                   Показать актуальный →
                 </button>
@@ -222,7 +222,7 @@ export function DesktopSummaryCard({
                 <button
                   type="button"
                   onClick={() => onSetShowLivePreview(false)}
-                  className="font-bold text-stone-600 hover:underline cursor-pointer"
+                  className="font-medium text-zinc-400 hover:text-zinc-200 hover:underline cursor-pointer"
                 >
                   К версии №{getPlanCalculation(calculations)?.version ?? calculations[0]?.version}
                 </button>

@@ -1,6 +1,5 @@
 import { useMemo, useState, useRef, useEffect, type TouchEvent, type MouseEvent } from "react";
 import { formatKzt } from "../../lib/money";
-import { formatPercent } from "../../lib/parameters";
 import { getMarginColor } from "../../lib/margin-colors";
 import type {
   Order,
@@ -48,27 +47,27 @@ export function CockpitView({
   displayCalc,
   calcOutcome: _calcOutcome,
   locked,
-  currentStage,
-  onSelectStage,
+  currentStage: _currentStage,
+  onSelectStage: _onSelectStage,
   onUpdateContractPrice,
   onStepLineQty,
   onStepPriceItem,
   onDeleteLine,
   onOpenPricePicker,
-  onSaveCalculation,
-  onOpenVersionsModal,
+  onSaveCalculation: _onSaveCalculation,
+  onOpenVersionsModal: _onOpenVersionsModal,
   onBack,
   onToggleTableMode,
 }: CockpitViewProps) {
-  // Режим экрана: "deal" (для владельца: маржа, прибыль, линейка) | "client" (для показа заказчику: только солидные группы)
+  // Режим экрана: "deal" (для владельца: маржа, прибыль, линейка) | "client" (для заказчика: чистые солидные категории)
   const [viewMode, setViewMode] = useState<"deal" | "client">("deal");
 
-  // Раскрытые капсулы категорий
+  // Раскрытая капсула для редактирования состава
   const [expandedCapsule, setExpandedCapsule] = useState<string | null>(null);
 
-  // Быстрый поиск внизу
-  const [quickInput, setQuickInput] = useState("");
+  // Быстрый поиск материалов внизу
   const [isQuickInputOpen, setIsQuickInputOpen] = useState(false);
+  const [quickInput, setQuickInput] = useState("");
 
   // Рекомендуемая цена без скидки и себестоимость
   const recommendedPrice = useMemo(() => {
@@ -79,12 +78,11 @@ export function CockpitView({
     return displayCalc?.costTotal || 980000;
   }, [displayCalc]);
 
-  // Текущая цена договора (или рекомендация, если договор не задан)
+  // Текущая цена договора
   const [currentPrice, setCurrentPrice] = useState<number>(() => {
     return order.contract_price ?? recommendedPrice;
   });
 
-  // Синхронизация при внешнем изменении
   useEffect(() => {
     if (order.contract_price !== null) {
       setCurrentPrice(order.contract_price);
@@ -96,11 +94,14 @@ export function CockpitView({
   // Расчёт чистой прибыли и маржи
   const netProfit = Math.max(0, currentPrice - costTotal);
   const marginPct = currentPrice > 0 ? netProfit / currentPrice : 0;
-  const discountPct = recommendedPrice > 0 && currentPrice < recommendedPrice
-    ? Math.round(((recommendedPrice - currentPrice) / recommendedPrice) * 100)
-    : 0;
+  const discountPct =
+    recommendedPrice > 0 && currentPrice < recommendedPrice
+      ? Math.round(((recommendedPrice - currentPrice) / recommendedPrice) * 100)
+      : 0;
 
-  // Цвет кругового индикатора маржи
+  // Форматирование процентов строго по референсу (например, "14.2%" без лишних хвостов)
+  const marginPctString = `${(marginPct * 100).toFixed(1).replace(/\.0$/, "")}%`;
+
   const marginColor = getMarginColor(marginPct, 0.28);
   const dotColor =
     marginColor.status === "success"
@@ -142,32 +143,48 @@ export function CockpitView({
   }, [lines]);
 
   // Суммарные блоки для Deal Mode
-  const workshopAndTechTotal = categoryGroups.workshop.total + categoryGroups.technolog.total + (displayCalc?.technolog || 0);
-  const materialsAndWasteTotal = categoryGroups.materials.total + categoryGroups.facades.total + categoryGroups.hardware.total;
-  const laborAndLogisticsTotal = categoryGroups.transport.total + categoryGroups.labor.total + (displayCalc?.assembly || 0);
+  const workshopAndTechTotal =
+    categoryGroups.workshop.total +
+    categoryGroups.technolog.total +
+    (displayCalc?.technolog || 0);
 
-  // Заметные материалы для Client Mode
+  const materialsAndWasteTotal =
+    categoryGroups.materials.total +
+    categoryGroups.facades.total +
+    categoryGroups.hardware.total;
+
+  const workshopPctString = `${(
+    (currentPrice > 0 ? workshopAndTechTotal / currentPrice : 0) * 100
+  )
+    .toFixed(1)
+    .replace(/\.0$/, "")}%`;
+
+  // Категории для Client Mode
+  const corpusTotal = categoryGroups.materials.total;
+  const facadesTotal = categoryGroups.facades.total;
+  const hardwareTotal = categoryGroups.hardware.total;
+  const countertopTotal = useMemo(() => {
+    return lines
+      .filter((l) => l.name.toLowerCase().includes("столешниц") || l.name.toLowerCase().includes("кварц"))
+      .reduce((sum, l) => sum + l.qty * l.unit_price, 0);
+  }, [lines]);
+
   const mainCorpusName = useMemo(() => {
     const l = lines.find((x) => x.category === "materials" && !x.name.includes("Столешница"));
-    return l ? l.name.replace("ЛДСП ", "").replace("18мм ", "") : "Egger 18мм";
+    return l ? l.name.replace("ЛДСП ", "").slice(0, 16) : "Egger 16mm";
   }, [lines]);
 
   const mainFacadeName = useMemo(() => {
     const l = lines.find((x) => x.category === "facades");
-    return l ? l.name.replace("МДФ ", "") : "MDF Soft-Touch";
+    return l ? l.name.replace("МДФ ", "").slice(0, 16) : "MDF Soft-Touch";
   }, [lines]);
 
-  const mainHardwareName = useMemo(() => {
-    const hasBlum = lines.some((x) => x.category === "hardware" && x.name.toLowerCase().includes("blum"));
-    if (hasBlum) return "Blum Austria";
-    const hasBoyard = lines.some((x) => x.category === "hardware" && x.name.toLowerCase().includes("boyard"));
-    if (hasBoyard) return "Boyard Pro";
-    return "Фурнитура с доводчиками";
-  }, [lines]);
+  const hasBlum = lines.some((x) => x.category === "hardware" && x.name.toLowerCase().includes("blum"));
+  const mainHardwareName = hasBlum ? "Blum Austria" : "Boyard Pro";
 
   const mainCountertopName = useMemo(() => {
-    const l = lines.find((x) => x.name.toLowerCase().includes("столешница") || x.name.toLowerCase().includes("кварц"));
-    return l ? l.name.replace("Столешница ", "") : "Влагостойкая HPL";
+    const l = lines.find((x) => x.name.toLowerCase().includes("столешниц") || x.name.toLowerCase().includes("кварц"));
+    return l ? l.name.replace("Столешница ", "").slice(0, 16) : "HPL Compact";
   }, [lines]);
 
   // Линейка цен: диапазон от minMargin (10%) до basePrice + 15%
@@ -176,7 +193,6 @@ export function CockpitView({
   const rulerRef = useRef<HTMLDivElement>(null);
   const [isDraggingRuler, setIsDraggingRuler] = useState(false);
 
-  // Обновление цены при сдвиге линейки
   const applyRulerPosition = (clientX: number) => {
     if (!rulerRef.current) return;
     const rect = rulerRef.current.getBoundingClientRect();
@@ -213,13 +229,16 @@ export function CockpitView({
       window.removeEventListener("touchmove", handleMove);
       window.removeEventListener("touchend", handleUp);
     };
-  }, [isDraggingRuler, currentPrice, rulerMin, rulerMax]);
+  }, [isDraggingRuler, currentPrice]);
 
-  // Пресеты в 1 клик
-  const handleApplyPreset = async (type: "min_margin" | "reset" | "discount_5" | "discount_10" | "swap_hardware") => {
+  // Позиция стрелочки на линейке (0..100%)
+  const rulerRatio = Math.max(0, Math.min(100, ((currentPrice - rulerMin) / (rulerMax - rulerMin)) * 100));
+
+  // Пресеты сценариев в 1 клик
+  const handleApplyPreset = async (type: "min_margin" | "reset" | "discount_5" | "swap_hardware") => {
     if (locked) return;
     if (type === "min_margin") {
-      const minPrice = Math.round((costTotal / (1 - 0.14)) / 10000) * 10000;
+      const minPrice = Math.round((costTotal / (1 - 0.12)) / 10000) * 10000;
       setCurrentPrice(minPrice);
       await onUpdateContractPrice(minPrice);
     } else if (type === "reset") {
@@ -229,23 +248,17 @@ export function CockpitView({
       const p = Math.round((recommendedPrice * 0.95) / 10000) * 10000;
       setCurrentPrice(p);
       await onUpdateContractPrice(p);
-    } else if (type === "discount_10") {
-      const p = Math.round((recommendedPrice * 0.9) / 10000) * 10000;
-      setCurrentPrice(p);
-      await onUpdateContractPrice(p);
     } else if (type === "swap_hardware") {
-      // Быстрая смена Blum ⇄ Boyard
-      const hasBlum = lines.some((l) => l.category === "hardware" && l.name.includes("Blum"));
+      // Быстрая замена Blum ⇄ Boyard
       for (const line of lines.filter((l) => l.category === "hardware")) {
-        if (hasBlum && line.name.includes("Blum")) {
-          // Ищем аналог Boyard
-          const boyardItem = priceItems.find((p) => p.name.includes("Boyard"));
+        if (hasBlum && line.name.toLowerCase().includes("blum")) {
+          const boyardItem = priceItems.find((p) => p.name.toLowerCase().includes("boyard"));
           if (boyardItem) {
-            onStepLineQty(line.id, -line.qty); // убираем Blum
+            onStepLineQty(line.id, -line.qty);
             onStepPriceItem(boyardItem, line.qty, line.order_item_id);
           }
-        } else if (!hasBlum && line.name.includes("Boyard")) {
-          const blumItem = priceItems.find((p) => p.name.includes("Blum Clip Top"));
+        } else if (!hasBlum && line.name.toLowerCase().includes("boyard")) {
+          const blumItem = priceItems.find((p) => p.name.toLowerCase().includes("blum"));
           if (blumItem) {
             onStepLineQty(line.id, -line.qty);
             onStepPriceItem(blumItem, line.qty, line.order_item_id);
@@ -255,356 +268,431 @@ export function CockpitView({
     }
   };
 
-  // Позиция стрелочки на линейке (0..100%)
-  const rulerRatio = Math.max(0, Math.min(100, ((currentPrice - rulerMin) / (rulerMax - rulerMin)) * 100));
-
-  // Кольцо маржи SVG
-  const ringRadius = 14;
+  // Радиус кругового кольца маржи
+  const ringRadius = 10;
   const ringCircumference = 2 * Math.PI * ringRadius;
-  const ringOffset = ringCircumference - (Math.min(1, Math.max(0, marginPct / 0.4))) * ringCircumference;
+  const ringProgress = Math.min(1, Math.max(0, marginPct / 0.28));
+  const ringOffset = ringCircumference - ringProgress * ringCircumference;
 
   return (
-    <div className="relative mx-auto flex w-full max-w-md flex-col min-h-[90vh] bg-[#09090b] text-white px-5 py-6 pb-28 select-none transition-colors">
-      {/* 1. Верхний переключатель режимов (Deal Mode ⇄ Client Mode) */}
-      <header className="flex items-center justify-between pb-6 text-xs font-semibold text-zinc-400">
+    <div className="mx-auto w-full max-w-md px-4 py-6 sm:py-8 flex flex-col min-h-screen text-zinc-100 select-none">
+      {/* 1. Верхний минималистичный бар */}
+      <header className="mb-8 flex items-center justify-between text-xs font-medium">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer"
+          title="Назад к проектам"
+        >
+          ←
+        </button>
+
+        {/* Индикатор режима: • Deal Mode или • Margin 18% */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors cursor-pointer mr-1"
-            title="Назад к заказам"
-          >
-            ←
-          </button>
           <span
-            className="h-2 w-2 rounded-full transition-colors shadow-xs"
+            className="h-2 w-2 rounded-full transition-colors"
             style={{ backgroundColor: dotColor, boxShadow: `0 0 8px ${dotColor}` }}
           />
-          <span className="tracking-wide text-zinc-200">
-            {viewMode === "deal" ? "Deal Mode" : "Client View"}
+          <span className="tracking-wide text-zinc-300">
+            {viewMode === "deal" ? "Deal Mode" : `Margin ${marginPctString}`}
           </span>
-          {viewMode === "deal" && (
-            <span className="text-[11px] text-zinc-500 font-mono">
-              • {formatPercent(marginPct)}
-            </span>
-          )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* Переключатель: 🔒 Hide Margin / Client */}
+        <div className="flex items-center gap-2">
           {onToggleTableMode && (
             <button
               type="button"
               onClick={onToggleTableMode}
-              className="flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-bold bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer"
-              title="Переключить в режим подробной таблицы"
+              className="hidden sm:inline-block text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer mr-1"
+              title="Переключить на классическую таблицу"
             >
-              <span>📋</span>
-              <span className="hidden sm:inline">Таблица</span>
+              Таблица
             </button>
           )}
-
-          {/* Кнопка переключения режима */}
           <button
             type="button"
             onClick={() => setViewMode((prev) => (prev === "deal" ? "client" : "deal"))}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all cursor-pointer ${
-              viewMode === "client"
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs"
-                : "bg-zinc-800/70 text-zinc-400 border border-zinc-700/60 hover:text-white"
-            }`}
+            className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-pointer text-xs"
           >
             <span>🔒</span>
-            <span>{viewMode === "deal" ? "Hide Margin" : "Client Mode"}</span>
+            <span>{viewMode === "deal" ? "Hide Margin" : "Client"}</span>
           </button>
         </div>
       </header>
 
-      {/* Переключатель этапов: Смета / Договор / Факт */}
-      <div className="mb-4 flex items-center justify-center gap-1 rounded-full bg-zinc-900/90 p-1 border border-zinc-800/80">
-        <button
-          type="button"
-          onClick={() => onSelectStage("quote")}
-          className={`flex-1 rounded-full py-1 text-center text-[11px] font-bold transition-all cursor-pointer ${
-            currentStage === "quote"
-              ? "bg-zinc-800 text-white shadow-xs"
-              : "text-zinc-500 hover:text-zinc-300"
-          }`}
-        >
-          1. Смета
-        </button>
-        <button
-          type="button"
-          onClick={() => onSelectStage("contract")}
-          className={`flex-1 rounded-full py-1 text-center text-[11px] font-bold transition-all cursor-pointer ${
-            currentStage === "contract"
-              ? "bg-zinc-800 text-white shadow-xs"
-              : "text-zinc-500 hover:text-zinc-300"
-          }`}
-        >
-          2. Договор
-        </button>
-        <button
-          type="button"
-          onClick={() => onSelectStage("fact")}
-          className={`flex-1 rounded-full py-1 text-center text-[11px] font-bold transition-all cursor-pointer ${
-            currentStage === "fact"
-              ? "bg-zinc-800 text-white shadow-xs"
-              : "text-zinc-500 hover:text-zinc-300"
-          }`}
-        >
-          3. Факт
-        </button>
-      </div>
-
-      {/* 2. Подзаголовок и гигантская сумма */}
-      <div className="flex flex-col items-center justify-center text-center pt-2 pb-4">
-        <span className="text-[11px] font-bold tracking-widest uppercase text-zinc-500">
+      {/* 2. Подзаголовок и цена (Hero Price) */}
+      <div className="flex flex-col items-center justify-center text-center mb-6">
+        <span className="text-[11px] font-semibold tracking-widest uppercase text-zinc-500">
           {viewMode === "deal" ? (
             discountPct > 0 ? (
               <>
-                CONTRACT PRICE · DISCOUNT{" "}
-                <span className="text-amber-400">-{discountPct}%</span>
+                CONTRACT PRICE · DISCOUNT <span className="text-amber-400">-{discountPct}%</span>
               </>
             ) : (
-              "RECOMMENDED CONTRACT PRICE"
+              "CONTRACT PRICE"
             )
           ) : (
-            `ORDER #${order.name.slice(0, 10)} · ${totalLinearMeters} M`
+            `ORDER #${order.name.slice(0, 8)} · ${totalLinearMeters} M`
           )}
         </span>
 
-        {/* Главная цифра цены */}
-        <h1 className="mt-2 text-4xl sm:text-5xl font-black tracking-tight text-white tabular-nums drop-shadow-sm">
-          {formatKzt(currentPrice)} <span className="font-light text-zinc-300">₸</span>
+        <h1 className="mt-2 text-5xl sm:text-6xl font-bold tracking-tight text-white tabular-nums">
+          {formatKzt(currentPrice)} <span className="font-light text-zinc-400">₸</span>
         </h1>
       </div>
 
-      {/* 3. Тактильная интерактивная линейка (Ruler Slider) */}
-      <div className="mt-2 mb-6 px-1">
-        <div className="flex items-center justify-between text-[10px] font-mono font-bold text-zinc-500 px-1 mb-1">
-          <span>{(rulerMin / 1000000).toFixed(1)}M</span>
-          <span>{((rulerMin + rulerMax) / 2000000).toFixed(1)}M</span>
-          <span>{(rulerMax / 1000000).toFixed(1)}M</span>
-        </div>
-
-        {/* Шкала с делениями */}
-        <div
-          ref={rulerRef}
-          onMouseDown={handlePointerDown}
-          onTouchStart={handlePointerDown}
-          className="relative h-10 w-full flex items-center justify-between px-2 cursor-pointer bg-zinc-900/60 rounded-xl border border-zinc-800/80 overflow-hidden active:border-zinc-700"
-        >
-          {/* Деления линейки */}
-          <div className="absolute inset-0 flex items-center justify-between px-3 pointer-events-none opacity-40">
-            {Array.from({ length: 33 }).map((_, idx) => {
-              const isMajor = idx % 8 === 0;
-              const isMedium = idx % 4 === 0;
-              return (
-                <div
-                  key={idx}
-                  className={`w-[1px] bg-zinc-400 transition-all ${
-                    isMajor ? "h-6 bg-zinc-200" : isMedium ? "h-4" : "h-2"
-                  }`}
-                />
-              );
-            })}
+      {/* 3. Тактильная интерактивная линейка (Price Ruler) — только в Deal Mode */}
+      {viewMode === "deal" && (
+        <div className="mb-8 px-2">
+          {/* Метки диапазона: 1.2M слева, 1.6M справа */}
+          <div className="flex justify-between text-[11px] font-mono text-zinc-600 mb-2 px-1">
+            <span>{(rulerMin / 1000000).toFixed(1)}M</span>
+            <span>{(rulerMax / 1000000).toFixed(1)}M</span>
           </div>
 
-          {/* Стрелка-индикатор текущей цены */}
+          {/* Дорожка с тонкими засечками */}
           <div
-            className="absolute top-0 bottom-0 pointer-events-none transition-all duration-75 flex flex-col items-center justify-between"
-            style={{ left: `${rulerRatio}%`, transform: "translateX(-50%)" }}
+            ref={rulerRef}
+            onMouseDown={handlePointerDown}
+            onTouchStart={handlePointerDown}
+            className="relative h-12 flex flex-col justify-center cursor-pointer py-2"
           >
-            <div className="w-0.5 h-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-            <span className="text-[10px] text-emerald-400 font-bold -mb-1">▲</span>
+            {/* Тонкие вертикальные засечки */}
+            <div className="flex justify-between items-center w-full px-1 pointer-events-none">
+              {Array.from({ length: 33 }).map((_, i) => {
+                const isMajor = i % 8 === 0;
+                const isMid = i % 4 === 0 && !isMajor;
+                return (
+                  <div
+                    key={i}
+                    className={`w-[1px] transition-all rounded-full ${
+                      isMajor
+                        ? "h-5 bg-zinc-600"
+                        : isMid
+                        ? "h-3.5 bg-zinc-750"
+                        : "h-2 bg-zinc-850"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Аккуратная стрелка указателя (Needle) без цветных полос */}
+            <div
+              className="absolute bottom-0 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-75"
+              style={{ left: `${rulerRatio}%` }}
+            >
+              <span className="text-[10px] text-zinc-400 font-mono mb-0.5 leading-none">▲</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 4. Пропорциональные капсульные бары (Capsule Progress Pills) */}
+      {/* 4. Пропорциональные капсулы со световой заливкой (Capsule Bars) */}
       <div className="flex flex-col gap-3">
         {viewMode === "deal" ? (
           <>
             {/* Net Profit Capsule */}
-            <div className="relative overflow-hidden rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-sm backdrop-blur-md">
+            <div
+              onClick={() => setExpandedCapsule((p) => (p === "profit" ? null : "profit"))}
+              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
+            >
+              {/* Полупрозрачная световая заливка доли */}
               <div
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500/15 via-emerald-500/25 to-emerald-400/30 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, marginPct * 100 * 2.2)}%` }}
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 border-r border-emerald-500/30 rounded-full transition-all duration-300 pointer-events-none"
+                style={{ width: `${Math.min(100, Math.max(12, marginPct * 100 * 2.2))}%` }}
               />
-              <div className="relative flex items-center justify-between px-4 py-2.5 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-zinc-200">Net Profit</span>
-                  <span className="text-zinc-500 font-mono">• {formatPercent(marginPct)}</span>
-                </div>
 
-                <div className="flex items-center gap-2.5">
-                  {/* SVG кольцо маржи */}
-                  <div className="relative h-7 w-7 flex items-center justify-center">
-                    <svg className="h-7 w-7 -rotate-90 transform">
-                      <circle
-                        cx="14"
-                        cy="14"
-                        r={ringRadius}
-                        stroke="rgba(255,255,255,0.1)"
-                        strokeWidth="2.5"
-                        fill="transparent"
-                      />
-                      <circle
-                        cx="14"
-                        cy="14"
-                        r={ringRadius}
-                        stroke={dotColor}
-                        strokeWidth="2.5"
-                        strokeDasharray={ringCircumference}
-                        strokeDashoffset={ringOffset}
-                        strokeLinecap="round"
-                        fill="transparent"
-                        className="transition-all duration-500"
-                      />
-                    </svg>
-                  </div>
-                  <span className="font-bold text-white tabular-nums text-sm">
+              <div className="relative z-10 flex items-center justify-between w-full text-xs">
+                <span className="font-medium text-zinc-200">
+                  Net Profit · {marginPctString}
+                </span>
+
+                <div className="flex items-center gap-3">
+                  {/* SVG круговой индикатор */}
+                  <svg className="w-6 h-6 -rotate-90" viewBox="0 0 28 28">
+                    <circle
+                      cx="14"
+                      cy="14"
+                      r={ringRadius}
+                      stroke="rgba(255,255,255,0.12)"
+                      strokeWidth="2.5"
+                      fill="none"
+                    />
+                    <circle
+                      cx="14"
+                      cy="14"
+                      r={ringRadius}
+                      stroke={dotColor}
+                      strokeWidth="2.5"
+                      strokeDasharray={ringCircumference}
+                      strokeDashoffset={ringOffset}
+                      strokeLinecap="round"
+                      fill="none"
+                      className="transition-all duration-500"
+                    />
+                  </svg>
+
+                  <span className="font-medium text-white tabular-nums text-sm">
                     {formatKzt(netProfit)} ₸
                   </span>
                 </div>
               </div>
             </div>
 
+            {/* Раскрывающийся состав по тапу на Net Profit */}
+            {expandedCapsule === "profit" && (
+              <div className="rounded-3xl bg-[#141418]/90 border border-white/[0.07] backdrop-blur-xl p-4 text-xs space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex justify-between text-zinc-400">
+                  <span>Себестоимость производства:</span>
+                  <span className="text-zinc-200 font-medium">{formatKzt(costTotal)} ₸</span>
+                </div>
+                <div className="flex justify-between text-zinc-400">
+                  <span>Выручка по договору:</span>
+                  <span className="text-white font-medium">{formatKzt(currentPrice)} ₸</span>
+                </div>
+                <div className="flex justify-between border-t border-zinc-800 pt-2 text-emerald-400 font-bold">
+                  <span>Чистая маржа:</span>
+                  <span>{formatKzt(netProfit)} ₸ ({marginPctString})</span>
+                </div>
+              </div>
+            )}
+
             {/* Workshop & Tech Capsule */}
             <div
-              onClick={() => setExpandedCapsule((prev) => (prev === "workshop" ? null : "workshop"))}
-              className="relative overflow-hidden rounded-full border border-zinc-800/80 bg-zinc-900/60 p-1 shadow-sm backdrop-blur-md cursor-pointer hover:border-zinc-700 transition-colors"
+              onClick={() => setExpandedCapsule((p) => (p === "workshop" ? null : "workshop"))}
+              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
             >
               <div
-                className="absolute inset-y-0 left-0 bg-zinc-800/60 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, (workshopAndTechTotal / currentPrice) * 100 * 1.5)}%` }}
+                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.max(12, (workshopAndTechTotal / currentPrice) * 100 * 1.6)
+                  )}%`,
+                }}
               />
-              <div className="relative flex items-center justify-between px-4 py-2.5 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-zinc-300">Workshop & Tech</span>
-                  <span className="text-zinc-500 font-mono">
-                    • {formatPercent(currentPrice > 0 ? workshopAndTechTotal / currentPrice : 0)}
-                  </span>
-                </div>
-                <span className="font-bold text-zinc-200 tabular-nums">
+
+              <div className="relative z-10 flex items-center justify-between w-full text-xs">
+                <span className="font-medium text-zinc-200">
+                  Workshop & Tech · {workshopPctString}
+                </span>
+                <span className="font-medium text-white tabular-nums text-sm">
                   {formatKzt(workshopAndTechTotal)} ₸
                 </span>
               </div>
             </div>
 
+            {/* Раскрывающийся состав Workshop & Tech */}
+            {expandedCapsule === "workshop" && (
+              <div className="rounded-3xl bg-[#141418]/90 border border-white/[0.07] backdrop-blur-xl p-4 text-xs space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex justify-between text-zinc-400">
+                  <span>Сборка и монтаж:</span>
+                  <span className="text-zinc-200">{formatKzt(displayCalc?.assembly || 0)} ₸</span>
+                </div>
+                <div className="flex justify-between text-zinc-400">
+                  <span>Услуги технолога (Базис):</span>
+                  <span className="text-zinc-200">{formatKzt(displayCalc?.technolog || 0)} ₸</span>
+                </div>
+                <div className="flex justify-between text-zinc-400">
+                  <span>Цеховые работы:</span>
+                  <span className="text-zinc-200">{formatKzt(categoryGroups.workshop.total)} ₸</span>
+                </div>
+              </div>
+            )}
+
             {/* Materials & Waste Capsule */}
             <div
-              onClick={() => setExpandedCapsule((prev) => (prev === "materials" ? null : "materials"))}
-              className="relative overflow-hidden rounded-full border border-zinc-800/80 bg-zinc-900/60 p-1 shadow-sm backdrop-blur-md cursor-pointer hover:border-zinc-700 transition-colors"
+              onClick={() => setExpandedCapsule((p) => (p === "materials" ? null : "materials"))}
+              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
             >
               <div
-                className="absolute inset-y-0 left-0 bg-zinc-800/70 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, (materialsAndWasteTotal / currentPrice) * 100)}%` }}
+                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.max(12, (materialsAndWasteTotal / currentPrice) * 100)
+                  )}%`,
+                }}
               />
-              <div className="relative flex items-center justify-between px-4 py-2.5 text-xs">
-                <span className="font-semibold text-zinc-300">Materials & Waste</span>
-                <span className="font-bold text-zinc-200 tabular-nums">
+
+              <div className="relative z-10 flex items-center justify-between w-full text-xs">
+                <span className="font-medium text-zinc-200">Materials & Waste</span>
+                <span className="font-medium text-white tabular-nums text-sm">
                   {formatKzt(materialsAndWasteTotal)} ₸
                 </span>
               </div>
             </div>
 
-            {/* Labor & Logistics Capsule */}
-            <div
-              onClick={() => setExpandedCapsule((prev) => (prev === "labor" ? null : "labor"))}
-              className="relative overflow-hidden rounded-full border border-zinc-800/80 bg-zinc-900/60 p-1 shadow-sm backdrop-blur-md cursor-pointer hover:border-zinc-700 transition-colors"
-            >
-              <div
-                className="absolute inset-y-0 left-0 bg-zinc-800/40 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, (laborAndLogisticsTotal / currentPrice) * 100 * 2)}%` }}
-              />
-              <div className="relative flex items-center justify-between px-4 py-2.5 text-xs">
-                <span className="font-semibold text-zinc-300">Assembly & Delivery</span>
-                <span className="font-bold text-zinc-200 tabular-nums">
-                  {formatKzt(laborAndLogisticsTotal)} ₸
-                </span>
+            {/* Раскрывающийся состав по тапу на Materials & Waste (счётчики, удаление, добавление) */}
+            {expandedCapsule === "materials" && (
+              <div className="rounded-3xl bg-[#141418]/90 border border-white/[0.07] backdrop-blur-xl p-4 text-xs space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between text-zinc-400 font-semibold mb-1">
+                  <span>Позиции спецификации</span>
+                  <span>{lines.length} шт</span>
+                </div>
+
+                <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
+                  {lines.map((l) => (
+                    <div
+                      key={l.id}
+                      className="flex items-center justify-between rounded-xl bg-zinc-900/80 border border-zinc-800/60 p-2.5 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0 mr-3">
+                        <div className="font-medium text-zinc-200 truncate">{l.name}</div>
+                        <div className="text-[11px] text-zinc-500 font-mono">
+                          {formatKzt(l.unit_price)} ₸ / {l.unit}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Счётчик кол-ва [-] [qty] [+] */}
+                        <div className="flex items-center rounded-lg bg-zinc-950 border border-zinc-800 p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => onStepLineQty(l.id, -1)}
+                            className="h-6 w-6 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer font-bold"
+                          >
+                            −
+                          </button>
+                          <span className="min-w-[28px] text-center font-mono font-semibold text-white text-[11px]">
+                            {l.qty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onStepLineQty(l.id, 1)}
+                            className="h-6 w-6 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer font-bold"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {/* Удаление */}
+                        <button
+                          type="button"
+                          onClick={() => onDeleteLine(l.id)}
+                          className="h-7 w-7 rounded-lg flex items-center justify-center text-zinc-600 hover:text-rose-400 hover:bg-rose-950/20 transition-colors cursor-pointer"
+                          title="Удалить позицию"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onOpenPricePicker}
+                  className="w-full rounded-2xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 py-2.5 text-center text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer"
+                >
+                  + Добавить позицию из каталога
+                </button>
               </div>
-            </div>
+            )}
           </>
         ) : (
-          /* Client Mode Grouped Capsules */
+          /* Client Mode (Photo 2) */
           <>
             {/* Corpus */}
             <div
-              onClick={() => setExpandedCapsule((prev) => (prev === "corpus" ? null : "corpus"))}
-              className="relative overflow-hidden rounded-full border border-zinc-800/80 bg-zinc-900/60 p-1 shadow-sm backdrop-blur-md cursor-pointer hover:border-zinc-700 transition-colors"
+              onClick={() => setExpandedCapsule((p) => (p === "corpus" ? null : "corpus"))}
+              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
             >
               <div
-                className="absolute inset-y-0 left-0 bg-zinc-800/60 rounded-full transition-all duration-500"
-                style={{ width: "45%" }}
+                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
+                style={{ width: `${Math.min(100, Math.max(12, (corpusTotal / currentPrice) * 100))}%` }}
               />
-              <div className="relative flex items-center justify-between px-4 py-2.5 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-zinc-200">Corpus</span>
-                  <span className="text-zinc-500">• {mainCorpusName}</span>
-                </div>
-                <span className="font-bold text-white tabular-nums">
-                  {formatKzt(categoryGroups.materials.total)} ₸
+              <div className="relative z-10 flex items-center justify-between w-full text-xs">
+                <span className="font-medium text-zinc-200">
+                  Corpus · {mainCorpusName}
+                </span>
+                <span className="font-medium text-white tabular-nums text-sm">
+                  {formatKzt(corpusTotal)} ₸
                 </span>
               </div>
             </div>
 
             {/* Facades */}
             <div
-              onClick={() => setExpandedCapsule((prev) => (prev === "facades" ? null : "facades"))}
-              className="relative overflow-hidden rounded-full border border-zinc-800/80 bg-zinc-900/60 p-1 shadow-sm backdrop-blur-md cursor-pointer hover:border-zinc-700 transition-colors"
+              onClick={() => setExpandedCapsule((p) => (p === "facades" ? null : "facades"))}
+              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
             >
               <div
-                className="absolute inset-y-0 left-0 bg-zinc-800/60 rounded-full transition-all duration-500"
-                style={{ width: "55%" }}
+                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
+                style={{ width: `${Math.min(100, Math.max(12, (facadesTotal / currentPrice) * 100))}%` }}
               />
-              <div className="relative flex items-center justify-between px-4 py-2.5 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-zinc-200">Facades</span>
-                  <span className="text-zinc-500">• {mainFacadeName}</span>
-                </div>
-                <span className="font-bold text-white tabular-nums">
-                  {formatKzt(categoryGroups.facades.total)} ₸
+              <div className="relative z-10 flex items-center justify-between w-full text-xs">
+                <span className="font-medium text-zinc-200">
+                  Facades · {mainFacadeName}
+                </span>
+                <span className="font-medium text-white tabular-nums text-sm">
+                  {formatKzt(facadesTotal)} ₸
                 </span>
               </div>
             </div>
 
             {/* Hardware */}
             <div
-              onClick={() => setExpandedCapsule((prev) => (prev === "hardware" ? null : "hardware"))}
-              className="relative overflow-hidden rounded-full border border-zinc-800/80 bg-zinc-900/60 p-1 shadow-sm backdrop-blur-md cursor-pointer hover:border-zinc-700 transition-colors"
+              onClick={() => setExpandedCapsule((p) => (p === "hardware" ? null : "hardware"))}
+              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
             >
               <div
-                className="absolute inset-y-0 left-0 bg-zinc-800/60 rounded-full transition-all duration-500"
-                style={{ width: "35%" }}
+                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
+                style={{ width: `${Math.min(100, Math.max(12, (hardwareTotal / currentPrice) * 100))}%` }}
               />
-              <div className="relative flex items-center justify-between px-4 py-2.5 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-zinc-200">Hardware</span>
-                  <span className="text-zinc-500">• {mainHardwareName}</span>
-                </div>
-                <span className="font-bold text-white tabular-nums">
-                  {formatKzt(categoryGroups.hardware.total)} ₸
+              <div className="relative z-10 flex items-center justify-between w-full text-xs">
+                <span className="font-medium text-zinc-200">
+                  Hardware · {mainHardwareName}
+                </span>
+                <span className="font-medium text-white tabular-nums text-sm">
+                  {formatKzt(hardwareTotal)} ₸
                 </span>
               </div>
             </div>
 
+            {/* Раскрывающийся состав Hardware с переключением Blum ⇄ Boyard */}
+            {expandedCapsule === "hardware" && (
+              <div className="rounded-3xl bg-[#141418]/90 border border-white/[0.07] backdrop-blur-xl p-4 text-xs space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between text-zinc-400">
+                  <span>Фурнитурная комплектация</span>
+                  <button
+                    type="button"
+                    onClick={() => void handleApplyPreset("swap_hardware")}
+                    className="text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer underline"
+                  >
+                    {hasBlum ? "⇄ Сменить на Boyard" : "⇄ Сменить на Blum"}
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  {lines
+                    .filter((l) => l.category === "hardware")
+                    .map((l) => (
+                      <div key={l.id} className="flex justify-between text-zinc-300">
+                        <span className="truncate mr-2">{l.name} ({l.qty} шт)</span>
+                        <span className="font-mono tabular-nums">{formatKzt(l.qty * l.unit_price)} ₸</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
             {/* Countertop */}
             <div
-              onClick={() => setExpandedCapsule((prev) => (prev === "countertop" ? null : "countertop"))}
-              className="relative overflow-hidden rounded-full border border-zinc-800/80 bg-zinc-900/60 p-1 shadow-sm backdrop-blur-md cursor-pointer hover:border-zinc-700 transition-colors"
+              onClick={() => setExpandedCapsule((p) => (p === "countertop" ? null : "countertop"))}
+              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
             >
               <div
-                className="absolute inset-y-0 left-0 bg-zinc-800/60 rounded-full transition-all duration-500"
-                style={{ width: "30%" }}
+                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
+                style={{ width: `${Math.min(100, Math.max(12, (countertopTotal / currentPrice) * 100))}%` }}
               />
-              <div className="relative flex items-center justify-between px-4 py-2.5 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-zinc-200">Countertop</span>
-                  <span className="text-zinc-500">• {mainCountertopName}</span>
-                </div>
-                <span className="font-bold text-white tabular-nums">
-                  {formatKzt(lines.filter((l) => l.name.includes("Столешница")).reduce((a, b) => a + b.qty * b.unit_price, 0) || 185000)} ₸
+              <div className="relative z-10 flex items-center justify-between w-full text-xs">
+                <span className="font-medium text-zinc-200">
+                  Countertop · {mainCountertopName}
+                </span>
+                <span className="font-medium text-white tabular-nums text-sm">
+                  {formatKzt(countertopTotal || 238000)} ₸
                 </span>
               </div>
             </div>
@@ -612,105 +700,23 @@ export function CockpitView({
         )}
       </div>
 
-      {/* Выпадающий список позиций при клике на капсулу */}
-      {expandedCapsule && (
-        <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900/90 p-3.5 text-xs backdrop-blur-lg animate-in fade-in duration-200">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80 mb-2">
-            <span className="font-bold text-zinc-300 capitalize">
-              Позиции: {expandedCapsule}
-            </span>
-            <button
-              type="button"
-              onClick={() => setExpandedCapsule(null)}
-              className="text-zinc-500 hover:text-zinc-300 text-xs cursor-pointer"
-            >
-              ✕ закрыть
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1">
-            {lines
-              .filter((l) => {
-                if (expandedCapsule === "corpus") return l.category === "materials" && !l.name.includes("Столешница");
-                if (expandedCapsule === "facades") return l.category === "facades";
-                if (expandedCapsule === "hardware") return l.category === "hardware";
-                if (expandedCapsule === "countertop") return l.name.includes("Столешница");
-                if (expandedCapsule === "materials") return l.category === "materials" || l.category === "facades";
-                if (expandedCapsule === "workshop") return l.category === "workshop" || l.category === "technolog";
-                if (expandedCapsule === "labor") return l.category === "transport" || l.category === "labor" || l.category === "assembly";
-                return true;
-              })
-              .map((line) => (
-                <div
-                  key={line.id}
-                  className="flex items-center justify-between rounded-xl bg-zinc-800/50 p-2 border border-zinc-700/40 gap-2"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-zinc-200 truncate">{line.name}</div>
-                    <div className="text-[11px] text-zinc-500">
-                      {formatKzt(line.unit_price)} ₸ / {line.unit}
-                    </div>
-                  </div>
-
-                  {!locked && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => onStepLineQty(line.id, -1)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-700 text-zinc-200 hover:bg-zinc-600 font-bold active:scale-95 cursor-pointer"
-                      >
-                        −
-                      </button>
-                      <span className="w-8 text-center font-bold text-white text-xs">
-                        {line.qty}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onStepLineQty(line.id, 1)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-700 text-white hover:bg-emerald-600 font-bold active:scale-95 cursor-pointer"
-                      >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteLine(line.id)}
-                        className="text-zinc-500 hover:text-rose-400 px-1 cursor-pointer"
-                        title="Удалить строку"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* 5. Быстрые сценарии в 1 клик (Scenario Pills) */}
-      <div className="mt-5 flex items-center justify-center gap-2 flex-wrap">
+      {/* 5. Чипы быстрых сценариев (Scenario Chips) */}
+      <div className="mt-8 flex items-center justify-center gap-3">
         {viewMode === "deal" ? (
           <>
             <button
               type="button"
               onClick={() => void handleApplyPreset("min_margin")}
-              className="rounded-full border border-zinc-800 bg-zinc-900/90 px-3.5 py-1.5 text-[11px] font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white transition-all cursor-pointer"
+              className="rounded-full bg-[#16161a] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white px-4 py-2 text-xs font-medium transition-all shadow-sm cursor-pointer"
             >
-              Min Margin 14%
+              Min Margin 12%
             </button>
             <button
               type="button"
               onClick={() => void handleApplyPreset("reset")}
-              className="rounded-full border border-zinc-800 bg-zinc-900/90 px-3.5 py-1.5 text-[11px] font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white transition-all cursor-pointer"
+              className="rounded-full bg-[#16161a] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white px-4 py-2 text-xs font-medium transition-all shadow-sm cursor-pointer"
             >
               Reset to {(recommendedPrice / 1000000).toFixed(2)}M
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleApplyPreset("discount_5")}
-              className="rounded-full border border-zinc-800 bg-zinc-900/90 px-3.5 py-1.5 text-[11px] font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white transition-all cursor-pointer"
-            >
-              Discount -5%
             </button>
           </>
         ) : (
@@ -718,14 +724,14 @@ export function CockpitView({
             <button
               type="button"
               onClick={() => void handleApplyPreset("swap_hardware")}
-              className="rounded-full border border-zinc-800 bg-zinc-900/90 px-3.5 py-1.5 text-[11px] font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white transition-all cursor-pointer flex items-center gap-1"
+              className="rounded-full bg-[#16161a] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white px-4 py-2 text-xs font-medium transition-all shadow-sm cursor-pointer"
             >
-              <span>Blum ⇄ Boyard</span>
+              Blum ⇄ Boyard
             </button>
             <button
               type="button"
               onClick={() => void handleApplyPreset("discount_5")}
-              className="rounded-full border border-zinc-800 bg-zinc-900/90 px-3.5 py-1.5 text-[11px] font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white transition-all cursor-pointer"
+              className="rounded-full bg-[#16161a] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white px-4 py-2 text-xs font-medium transition-all shadow-sm cursor-pointer"
             >
               Discount -5%
             </button>
@@ -733,67 +739,47 @@ export function CockpitView({
         )}
       </div>
 
-      {/* Кнопка сохранения версии сметы */}
-      <div className="mt-4 flex items-center justify-center gap-2">
-        <button
-          type="button"
-          onClick={onSaveCalculation}
-          className="flex items-center gap-2 rounded-full bg-zinc-800 hover:bg-zinc-700 px-4 py-2 text-xs font-bold text-white transition-all shadow-xs cursor-pointer border border-zinc-700"
+      {/* 6. Нижний командный бар (Command Bar) */}
+      <div className="mt-auto pt-8">
+        <div
+          onClick={() => setIsQuickInputOpen(true)}
+          className="rounded-full bg-[#16161a]/95 border border-white/[0.08] backdrop-blur-2xl px-5 py-3.5 text-xs text-zinc-400 flex items-center justify-between shadow-2xl hover:border-white/20 transition-all cursor-pointer"
         >
-          <span>💾 Зафиксировать версию</span>
-        </button>
-        <button
-          type="button"
-          onClick={onOpenVersionsModal}
-          className="rounded-full bg-zinc-900 border border-zinc-800 hover:border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
-          title="История версий"
-        >
-          История версий
-        </button>
-      </div>
-
-      {/* 6. Нижний смарт-док / быстрый ввод (Voice/Command Bar) */}
-      <div className="fixed bottom-4 left-4 right-4 mx-auto max-w-md z-40">
-        <div className="flex items-center justify-between rounded-full border border-zinc-800/90 bg-zinc-900/95 px-4 py-2.5 shadow-2xl backdrop-blur-xl transition-all focus-within:border-emerald-500/60">
-          <input
-            type="text"
-            value={quickInput}
-            onChange={(e) => setQuickInput(e.target.value)}
-            onFocus={() => setIsQuickInputOpen(true)}
-            placeholder={
-              viewMode === "deal"
-                ? "Fit into 1.35M without losing margin..."
-                : "Ask or type: 3.6m, Blum, Enamel..."
-            }
-            className="w-full bg-transparent text-xs text-white placeholder-zinc-500 focus:outline-hidden"
-          />
-          <button
-            type="button"
-            onClick={onOpenPricePicker}
-            className="ml-2 flex h-7 w-7 items-center justify-center rounded-full bg-zinc-800 text-zinc-300 hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer shrink-0"
-            title="Открыть каталог материалов"
-          >
-            <span className="text-xs">⚡</span>
-          </button>
+          <span className="truncate mr-3">
+            {viewMode === "deal"
+              ? "Fit into 1.35M without losing margin..."
+              : "Ask or type: 3.6m, Blum, Enamel..."}
+          </span>
+          <span className="text-zinc-500 hover:text-zinc-300">🎙️</span>
         </div>
 
-        {/* Быстрое автодополнение при вводе в док */}
-        {isQuickInputOpen && quickInput.trim().length > 0 && (
-          <div className="mt-2 rounded-2xl border border-zinc-800 bg-zinc-900/95 p-3 shadow-2xl backdrop-blur-xl text-xs">
-            <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800 text-[11px] text-zinc-500 font-bold uppercase">
-              <span>Каталог материалов:</span>
+        {/* Выдвижная шторка быстрого добавления материала */}
+        {isQuickInputOpen && (
+          <div className="mt-3 rounded-3xl bg-[#18181c] border border-white/[0.1] p-4 text-xs shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+              <span className="font-semibold text-zinc-200">Быстрый поиск материала</span>
               <button
                 type="button"
                 onClick={() => {
-                  setQuickInput("");
                   setIsQuickInputOpen(false);
+                  setQuickInput("");
                 }}
-                className="hover:text-zinc-300 cursor-pointer"
+                className="text-zinc-500 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
             </div>
-            <div className="flex flex-col gap-1.5 mt-2 max-h-40 overflow-y-auto">
+
+            <input
+              type="text"
+              autoFocus
+              value={quickInput}
+              onChange={(e) => setQuickInput(e.target.value)}
+              placeholder="Начните вводить: Egger, петли, профиль Gola..."
+              className="mt-3 w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
+            />
+
+            <div className="flex flex-col gap-1.5 mt-2 max-h-48 overflow-y-auto">
               {priceItems
                 .filter((p) => p.name.toLowerCase().includes(quickInput.toLowerCase()))
                 .slice(0, 5)
@@ -806,10 +792,10 @@ export function CockpitView({
                       setQuickInput("");
                       setIsQuickInputOpen(false);
                     }}
-                    className="flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left hover:bg-zinc-800 text-zinc-200 cursor-pointer transition-colors"
+                    className="flex items-center justify-between rounded-xl px-2.5 py-2 text-left hover:bg-zinc-800/80 text-zinc-200 cursor-pointer transition-colors"
                   >
                     <span className="truncate">{p.name}</span>
-                    <span className="text-emerald-400 font-bold shrink-0 ml-2">
+                    <span className="text-emerald-400 font-bold shrink-0 ml-2 font-mono">
                       +{formatKzt(p.price)} ₸
                     </span>
                   </button>

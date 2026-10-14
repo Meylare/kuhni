@@ -106,9 +106,7 @@ export function ApplyTemplateModal({
       // Сохраняем новые позиции в базу данных
       const supabase = getSupabase();
 
-      // Находим строки, которых ещё нет в БД (новые сгенерированные строки с temp- id)
       const newLinesToInsert = applyRes.nextLines.filter((l) => l.id.startsWith("temp-"));
-      // И обновленные существующие строки
       const updatedLines = applyRes.nextLines.filter((l) => !l.id.startsWith("temp-"));
 
       if (newLinesToInsert.length > 0) {
@@ -143,7 +141,6 @@ export function ApplyTemplateModal({
         }
       }
 
-      // Перезагружаем актуальный список строк из базы
       const { data: refreshedLines, error: refErr } = await supabase
         .from("order_lines")
         .select("*")
@@ -175,28 +172,28 @@ export function ApplyTemplateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-xs p-0 sm:p-4">
-      <div className="flex w-full sm:max-w-lg flex-col rounded-t-3xl sm:rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150">
+      <div className="flex w-full sm:max-w-lg flex-col rounded-3xl border border-white/10 bg-[#141418] p-6 shadow-2xl max-h-[90vh] overflow-y-auto text-zinc-100 animate-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.06]">
           <div>
-            <h3 className="text-base font-bold text-stone-900">
-              Добавить из шаблона изделия
+            <h3 className="text-base font-bold text-white">
+              Применить шаблон изделия
             </h3>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-zinc-400 mt-0.5">
               В заказ будут добавлены позиции шаблона по актуальным ценам
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-xl text-stone-400 hover:text-stone-700 text-lg"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 text-sm cursor-pointer"
           >
             ✕
           </button>
         </div>
 
         {error && (
-          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+          <div className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
             {error}
           </div>
         )}
@@ -204,13 +201,13 @@ export function ApplyTemplateModal({
         <div className="mt-4 flex flex-col gap-3.5 text-xs">
           {items.length > 0 && (
             <div>
-              <label className="block font-semibold text-stone-700 mb-1">
+              <label className="block font-semibold text-zinc-300 mb-1">
                 Куда применить шаблон (изделие)
               </label>
               <select
                 value={targetItemId}
                 onChange={(e) => setTargetItemId(e.target.value)}
-                className="min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20"
               >
                 <option value="">Без привязки (общий заказ)</option>
                 {items.map((it) => (
@@ -223,16 +220,16 @@ export function ApplyTemplateModal({
           )}
 
           <div>
-            <label className="block font-semibold text-stone-700 mb-1">
+            <label className="block font-semibold text-zinc-300 mb-1">
               Выберите шаблон изделия
             </label>
             {loading ? (
-              <div className="py-8 text-center text-stone-500">
+              <div className="py-8 text-center text-zinc-500">
                 Загрузка шаблонов…
               </div>
             ) : templates.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-stone-500">
-                Шаблонов пока нет. Вы можете сохранить текущий заказ как шаблон кнопкой «Сохранить как шаблон».
+              <div className="rounded-2xl border border-dashed border-zinc-800 p-6 text-center text-zinc-500">
+                Шаблонов пока нет. Вы можете сохранить готовый заказ кнопкой «Сохранить как шаблон».
               </div>
             ) : (
               <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
@@ -241,22 +238,22 @@ export function ApplyTemplateModal({
                     key={tpl.id}
                     type="button"
                     onClick={() => setSelectedTemplate(tpl)}
-                    className={`flex flex-col text-left rounded-xl p-3 border transition-colors ${
+                    className={`flex flex-col text-left rounded-2xl p-3 border transition-colors cursor-pointer ${
                       selectedTemplate?.id === tpl.id
-                        ? "border-emerald-800 bg-emerald-50/50"
-                        : "border-stone-200 bg-stone-50 hover:bg-stone-100"
+                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
+                        : "border-white/[0.07] bg-[#121215] text-zinc-300 hover:border-white/20"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-stone-900 text-sm">
+                      <span className="font-semibold text-sm">
                         {tpl.name}
                       </span>
-                      <span className="text-[11px] font-semibold text-stone-500">
+                      <span className="text-[11px] font-mono text-zinc-400">
                         {tpl.lines?.length ?? 0} поз.
                       </span>
                     </div>
                     {tpl.description && (
-                      <p className="mt-1 text-[11px] text-stone-600 line-clamp-2">
+                      <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
                         {tpl.description}
                       </p>
                     )}
@@ -266,11 +263,11 @@ export function ApplyTemplateModal({
             )}
           </div>
 
-          <div className="mt-2 flex items-center justify-end gap-3 pt-2 border-t border-stone-100">
+          <div className="mt-2 flex items-center justify-end gap-2 pt-3 border-t border-white/[0.06]">
             <button
               type="button"
               onClick={onClose}
-              className="min-h-11 rounded-xl border border-stone-300 px-4 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-full px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
             >
               Отмена
             </button>
@@ -278,7 +275,7 @@ export function ApplyTemplateModal({
               type="button"
               disabled={applying || !selectedTemplate || locked}
               onClick={() => void handleApply()}
-              className="min-h-11 rounded-xl bg-emerald-900 px-5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+              className="rounded-full bg-white text-black font-semibold px-5 py-2 text-xs hover:bg-zinc-200 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
             >
               {applying ? "Применение…" : "Применить к заказу"}
             </button>

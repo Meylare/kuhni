@@ -15,10 +15,8 @@ import {
   sortOrders,
   validateOrderInput,
 } from "../lib/orders";
-import { formatPercent } from "../lib/parameters";
 import { getSupabase } from "../lib/supabase";
 import {
-  ORDER_STATUS_COLORS,
   ORDER_STATUS_LABELS,
   ORDER_STATUSES,
   type OrderStatus,
@@ -34,32 +32,9 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Вид отображения: карточки (cards) или таблица (table)
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-
-  // Поиск, фильтры и сортировка
-  const [selectedStatus, setSelectedStatus] = useState<OrderStatus | "all">(() => {
-    try {
-      const saved = localStorage.getItem("kuhni_orders_filter_status");
-      if (saved && (saved === "all" || ORDER_STATUSES.includes(saved as OrderStatus))) {
-        return saved as OrderStatus | "all";
-      }
-    } catch {
-      // ignore
-    }
-    return "all";
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("kuhni_orders_filter_status", selectedStatus);
-    } catch {
-      // ignore
-    }
-  }, [selectedStatus]);
-
+  // Поиск и фильтры
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortDirection, setSortDirection] = useState<"newest" | "oldest">("newest");
 
   // Модалка создания заказа
   const [isCreating, setIsCreating] = useState(false);
@@ -109,38 +84,22 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
     setCreatePreset(preset);
     setCreateName(
       preset === "kitchen"
-        ? "Кухня для нового клиента"
+        ? "Кухня на заказ"
         : preset === "wardrobe"
-        ? "Шкаф-купе в прихожую"
+        ? "Шкаф-купе в спальню"
         : ""
     );
     setCreateClient("");
     setCreateContractPrice("");
     setCreateNote(
       preset === "kitchen"
-        ? "Комплектация: ЛДСП корпус, фасады AGT, фурнитура Blum"
+        ? "Комплектация: Egger 18мм, фасады MDF Soft-Touch, фурнитура Blum"
         : preset === "wardrobe"
-        ? "Комплектация: ЛДСП корпус, профиль Modus, ящики Boyard"
+        ? "Комплектация: Egger 18мм, профиль Modus, ящики Boyard"
         : ""
     );
     setCreateError(null);
     setIsCreating(true);
-  }
-
-  // Быстрое создание тестового заказа за 1 клик
-  function handleQuickCreate(preset: "kitchen" | "wardrobe") {
-    if (isDemoModeActive()) {
-      const title = preset === "kitchen" ? `Кухня на заказ • ${new Date().toLocaleDateString("ru-RU")}` : `Шкаф-купе • ${new Date().toLocaleDateString("ru-RU")}`;
-      const created = demoCreateOrder({
-        name: title,
-        client_name: "Новый клиент",
-        note: preset === "kitchen" ? "Быстрый расчет кухни" : "Быстрый расчет шкафа",
-        preset,
-      });
-      onSelectOrder(created.id);
-    } else {
-      handleOpenCreateModal(preset);
-    }
   }
 
   async function handleCreateOrder(e: React.FormEvent) {
@@ -208,228 +167,104 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
 
   // Фильтрация и сортировка
   const filteredOrders = filterOrders(orders, searchQuery, selectedStatus);
-  const displayedOrders = sortOrders(filteredOrders, sortDirection);
+  const displayedOrders = sortOrders(filteredOrders, "newest");
 
-  // Метрики дашборда
+  // Метрики
   const metrics = useMemo(() => {
     let totalGMV = 0;
-    let inProductionCount = 0;
-    let draftCount = 0;
-    let completedCount = 0;
-
     for (const o of orders) {
-      if (o.status === "in_production") inProductionCount++;
-      if (o.status === "draft" || o.status === "quoted") draftCount++;
-      if (o.status === "done") completedCount++;
-
       const latest = getLatestCalculation(o);
       const price = o.contract_price ?? latest?.price_total ?? 0;
       totalGMV += price;
     }
-
     return {
       total: orders.length,
-      inProductionCount,
-      draftCount,
-      completedCount,
       totalGMV,
     };
   }, [orders]);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-6 pb-28 md:pb-16">
-      {/* Верхний заголовок и кнопки создания */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mx-auto flex w-full max-w-5xl flex-col px-4 py-8 pb-32 text-zinc-100">
+      {/* 1. Верхний минималистичный заголовок */}
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black tracking-tight text-white md:text-3xl">
-              Проекты и заказы
-            </h1>
-            <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-300 border border-zinc-700/60">
-              {orders.length}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-zinc-400 font-medium md:text-sm">
-            Калькуляция себестоимости, управление маржой и договоры
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => handleQuickCreate("kitchen")}
-            className="flex min-h-11 items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 active:scale-98 transition-all cursor-pointer shadow-xs"
-            title="Создать типовой проект кухни"
-          >
-            <span>🍳</span>
-            <span>+ Кухня</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickCreate("wardrobe")}
-            className="flex min-h-11 items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 text-xs font-bold text-zinc-300 hover:bg-zinc-800 hover:text-white active:scale-98 transition-all cursor-pointer shadow-xs"
-            title="Создать типовой проект шкафа"
-          >
-            <span>🚪</span>
-            <span>+ Шкаф</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleOpenCreateModal("empty")}
-            className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-950/40 active:scale-98 transition-all cursor-pointer"
-          >
-            <span className="text-base leading-none">+</span>
-            <span>Новый проект</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Аналитический дашборд / KPI Кокпит */}
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-3.5 shadow-xs backdrop-blur-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-            Всего проектов
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-white">{metrics.total}</span>
-            <span className="text-xs text-zinc-500 font-medium">заказов</span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-amber-900/40 bg-amber-950/20 p-3.5 shadow-xs backdrop-blur-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
-            В расчёте / Смета
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-amber-300">{metrics.draftCount}</span>
-            <span className="text-xs text-amber-500 font-medium">на согласовании</span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-indigo-900/40 bg-indigo-950/20 p-3.5 shadow-xs backdrop-blur-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
-            В производстве
-          </span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-indigo-300">{metrics.inProductionCount}</span>
-            <span className="text-xs text-indigo-400/80 font-medium">в цеху</span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-emerald-900/40 bg-emerald-950/20 p-3.5 shadow-xs backdrop-blur-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-            Общий оборот
-          </span>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-lg sm:text-xl font-black text-emerald-300 truncate">
-              {formatKzt(metrics.totalGMV)} ₸
+          <h1 className="text-3xl font-bold tracking-tight text-white">Сделки</h1>
+          <div className="flex items-center gap-2 mt-1 text-xs text-zinc-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <span>
+              {metrics.total} активных проекта · {formatKzt(metrics.totalGMV)} ₸
             </span>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => handleOpenCreateModal("kitchen")}
+          className="rounded-full bg-white text-black font-semibold px-5 py-2.5 text-xs hover:bg-zinc-200 shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+        >
+          <span className="text-base leading-none">+</span>
+          <span>Новый проект</span>
+        </button>
       </div>
 
       {/* Ошибка загрузки */}
       {error && (
-        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs sm:text-sm text-rose-800">
-          <div className="font-bold">Ошибка загрузки заказов</div>
-          <p className="mt-1 text-rose-700">{error}</p>
+        <div className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
+          <p>{error}</p>
           <button
             type="button"
             onClick={() => void loadOrders()}
-            className="mt-2 text-xs font-bold underline hover:no-underline cursor-pointer"
+            className="mt-2 font-bold underline hover:no-underline cursor-pointer"
           >
             Повторить попытку
           </button>
         </div>
       )}
 
-      {/* Панель фильтров, поиска и переключателя вида */}
-      <div className="mt-6 flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          {/* Поле поиска с мгновенной очисткой */}
-          <div className="relative flex-1">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
-              🔍
-            </span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск по названию или клиенту…"
-              className="min-h-11 w-full rounded-2xl border border-zinc-800 bg-zinc-900/90 pr-10 pl-9 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-hidden shadow-xs transition-colors"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-md text-xs text-zinc-400 hover:text-white cursor-pointer"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Переключатель вида (Cards / Table) и сортировка */}
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            <div className="flex items-center rounded-xl bg-zinc-900 p-1 border border-zinc-800">
-              <button
-                type="button"
-                onClick={() => setViewMode("cards")}
-                className={`min-h-8 rounded-lg px-2.5 text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === "cards" ? "bg-zinc-800 text-white shadow-xs" : "text-zinc-400 hover:text-white"
-                }`}
-                title="Отображение карточками"
-              >
-                Карточки
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("table")}
-                className={`min-h-8 rounded-lg px-2.5 text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === "table" ? "bg-zinc-800 text-white shadow-xs" : "text-zinc-400 hover:text-white"
-                }`}
-                title="Отображение списком"
-              >
-                Таблица
-              </button>
-            </div>
-
+      {/* 2. Поиск и переключатель фильтров */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Поиск проекта или клиента..."
+            className="w-full rounded-full bg-[#121215] border border-white/[0.08] px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20 transition-all"
+          />
+          {searchQuery && (
             <button
               type="button"
-              onClick={() => setSortDirection((d) => (d === "newest" ? "oldest" : "newest"))}
-              className="flex min-h-10 items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 cursor-pointer shadow-xs"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs cursor-pointer"
             >
-              <span>{sortDirection === "newest" ? "↓ Свежие" : "↑ Старые"}</span>
+              ✕
             </button>
-          </div>
+          )}
         </div>
 
-        {/* Фильтры по статусам (Горизонтальные таблетки) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setSelectedStatus("all")}
-            className={`min-h-8.5 whitespace-nowrap rounded-xl px-3.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+            className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
               selectedStatus === "all"
-                ? "bg-zinc-800 text-white shadow-xs border border-zinc-700"
-                : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800/80"
+                ? "bg-zinc-800 text-white shadow-xs font-semibold"
+                : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             Все ({orders.length})
           </button>
-          {ORDER_STATUSES.map((st) => {
+          {ORDER_STATUSES.slice(0, 4).map((st) => {
             const count = orders.filter((o) => o.status === st).length;
             return (
               <button
                 key={st}
                 type="button"
                 onClick={() => setSelectedStatus(st)}
-                className={`min-h-8.5 whitespace-nowrap rounded-xl px-3.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
                   selectedStatus === st
-                    ? "bg-zinc-800 text-white shadow-xs border border-zinc-700"
-                    : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800/80"
+                    ? "bg-zinc-800 text-white shadow-xs font-semibold"
+                    : "text-zinc-500 hover:text-zinc-300"
                 }`}
               >
                 {ORDER_STATUS_LABELS[st]} {count > 0 ? `(${count})` : ""}
@@ -439,63 +274,65 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
         </div>
       </div>
 
-      {/* Список или сетка заказов */}
+      {/* 3. Сетка сделок (Luxury Glass Cards) */}
       {loading ? (
-        <div className="mt-12 flex flex-col items-center justify-center py-12 text-zinc-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-          <span className="mt-3 text-xs font-medium">Загрузка заказов…</span>
+        <div className="mt-16 flex flex-col items-center justify-center py-12 text-zinc-500">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+          <span className="mt-3 text-xs font-medium">Загрузка сделок…</span>
         </div>
       ) : displayedOrders.length === 0 ? (
-        <div className="mt-8 rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/40 p-12 text-center backdrop-blur-xs">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-800 text-2xl border border-zinc-700">
-            📋
-          </div>
-          <h3 className="mt-3 text-base font-bold text-white">
-            {searchQuery ? "Ничего не найдено" : "Заказов пока нет"}
+        <div className="mt-8 rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/30 p-12 text-center">
+          <h3 className="text-sm font-semibold text-white">
+            {searchQuery ? "Ничего не найдено" : "Сделок пока нет"}
           </h3>
-          <p className="mt-1 text-xs text-zinc-400 max-w-sm mx-auto">
+          <p className="mt-1 text-xs text-zinc-500">
             {searchQuery
-              ? "Попробуйте изменить поисковый запрос или сбросить фильтр по статусу."
-              : "Создайте свой первый мебельный заказ, чтобы рассчитать себестоимость и маржу."}
+              ? "Попробуйте изменить поисковый запрос."
+              : "Создайте свой первый мебельный заказ, чтобы рассчитать смету."}
           </p>
-          <div className="mt-4 flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickCreate("kitchen")}
-              className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-sm cursor-pointer"
-            >
-              + Создать тестовую кухню
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => handleOpenCreateModal("kitchen")}
+            className="mt-4 rounded-full bg-white text-black px-4 py-2 text-xs font-semibold hover:bg-zinc-200 cursor-pointer"
+          >
+            + Создать тестовую кухню
+          </button>
         </div>
-      ) : viewMode === "cards" ? (
-        /* Сетка карточек заказов (Card View) */
-        <div className="mt-5 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {displayedOrders.map((ord) => {
-            const statusCfg = ORDER_STATUS_COLORS[ord.status] ?? ORDER_STATUS_COLORS.draft;
-            const statusTxt = ORDER_STATUS_LABELS[ord.status] ?? ord.status;
             const latestCalc = getLatestCalculation(ord);
-            const marginStyle = getMarginColor(latestCalc?.margin_pct ?? null, 0.28);
-
             const displayPrice = ord.contract_price !== null ? ord.contract_price : latestCalc?.price_total;
+            const margin = latestCalc?.margin_pct ?? 0.18;
+            const marginStyle = getMarginColor(margin, 0.28);
+            const marginString = `${(margin * 100).toFixed(1).replace(/\.0$/, "")}%`;
+
+            const dotBg =
+              marginStyle.status === "success"
+                ? "#10b981"
+                : marginStyle.status === "warning"
+                ? "#f59e0b"
+                : marginStyle.status === "danger"
+                ? "#ef4444"
+                : "#71717a";
 
             return (
               <div
                 key={ord.id}
                 onClick={() => onSelectOrder(ord.id)}
-                className="group relative flex flex-col justify-between rounded-3xl border border-zinc-800/80 bg-zinc-900/60 p-5 shadow-lg hover:border-zinc-700 hover:bg-zinc-900/90 transition-all cursor-pointer backdrop-blur-xs"
+                className="relative rounded-3xl bg-[#121215] border border-white/[0.07] hover:border-white/[0.18] p-5 transition-all cursor-pointer shadow-lg active:scale-[0.99] group flex flex-col justify-between"
               >
                 <div>
                   {/* Верхняя строка карточки: статус и дата */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot}`} />
-                      {statusTxt}
+                  <div className="flex items-center justify-between text-[11px] mb-3">
+                    <span className="flex items-center gap-1.5 text-zinc-400">
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: dotBg }}
+                      />
+                      <span>{ORDER_STATUS_LABELS[ord.status] ?? ord.status}</span>
                     </span>
-
-                    <span className="text-[11px] text-zinc-500 font-medium">
+                    <span className="text-zinc-600 font-mono">
                       {new Date(ord.created_at).toLocaleDateString("ru-RU", {
                         day: "numeric",
                         month: "short",
@@ -504,145 +341,59 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                   </div>
 
                   {/* Название и клиент */}
-                  <h3 className="mt-3 text-base font-bold text-white group-hover:text-emerald-400 transition-colors line-clamp-2 leading-snug">
+                  <h2 className="text-base font-semibold text-white group-hover:text-emerald-400 transition-colors line-clamp-2 leading-snug">
                     {ord.name}
-                  </h3>
+                  </h2>
 
-                  <div className="mt-1 flex items-center gap-2 text-xs text-zinc-400 font-medium">
-                    {ord.client_label ? (
-                      <span className="truncate">👤 {ord.client_label}</span>
-                    ) : (
-                      <span className="text-zinc-600 italic">Клиент не указан</span>
-                    )}
+                  <div className="mt-1 text-xs text-zinc-400 truncate">
+                    {ord.client_label ? ord.client_label : <span className="text-zinc-600 italic">Клиент не указан</span>}
                   </div>
 
-                  {ord.note ? (
-                    <p className="mt-2 text-xs text-zinc-400 line-clamp-1 italic bg-zinc-950/60 border border-zinc-800/60 rounded-lg px-2 py-1">
+                  {ord.note && (
+                    <p className="mt-2 text-xs text-zinc-500 line-clamp-1 italic">
                       {ord.note}
                     </p>
-                  ) : null}
+                  )}
                 </div>
 
-                {/* Нижняя часть карточки: финансовый показатель и маржа */}
-                <div className="mt-4 border-t border-zinc-800/80 pt-3">
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                        {ord.contract_price !== null ? "Договорная цена" : "Смета (расчёт)"}
-                      </span>
-                      <span className="text-lg font-black text-white tabular-nums">
-                        {displayPrice !== undefined && displayPrice !== null
-                          ? `${formatKzt(displayPrice)} ₸`
-                          : "Расчёт не сохранён"}
-                      </span>
-                    </div>
+                {/* Нижняя часть карточки: цена и маржа */}
+                <div className="mt-6 pt-3 border-t border-white/[0.06] flex items-center justify-between">
+                  <div className="text-xl font-bold text-white tabular-nums tracking-tight">
+                    {displayPrice !== undefined && displayPrice !== null
+                      ? `${formatKzt(displayPrice)} ₸`
+                      : "Расчёт не сохранён"}
+                  </div>
 
-                    {latestCalc?.margin_pct !== null && latestCalc?.margin_pct !== undefined ? (
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-black ${marginStyle.badge}`}
-                        title="Маржинальность проекта"
-                      >
-                        <span>{formatPercent(latestCalc.margin_pct)}</span>
-                      </span>
-                    ) : (
-                      <span className="rounded-lg bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-400">
-                        Новый
-                      </span>
-                    )}
+                  <div className="rounded-full bg-white/[0.06] border border-white/[0.08] px-2.5 py-1 text-xs font-semibold text-emerald-400 font-mono">
+                    {marginString}
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
-      ) : (
-        /* Табличный вид (Table View) */
-        <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/60 shadow-xs backdrop-blur-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-zinc-800 bg-zinc-950/80 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                <tr>
-                  <th className="px-4 py-3">Проект / Клиент</th>
-                  <th className="px-4 py-3">Статус</th>
-                  <th className="px-4 py-3 text-right">Сумма (KZT)</th>
-                  <th className="px-4 py-3 text-center">Маржа</th>
-                  <th className="px-4 py-3 text-right">Дата</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/70">
-                {displayedOrders.map((ord) => {
-                  const statusCfg = ORDER_STATUS_COLORS[ord.status] ?? ORDER_STATUS_COLORS.draft;
-                  const statusTxt = ORDER_STATUS_LABELS[ord.status] ?? ord.status;
-                  const latestCalc = getLatestCalculation(ord);
-                  const marginStyle = getMarginColor(latestCalc?.margin_pct ?? null, 0.28);
-                  const displayPrice = ord.contract_price !== null ? ord.contract_price : latestCalc?.price_total;
-
-                  return (
-                    <tr
-                      key={ord.id}
-                      onClick={() => onSelectOrder(ord.id)}
-                      className="hover:bg-zinc-800/50 transition-colors cursor-pointer"
-                    >
-                      <td className="px-4 py-3.5">
-                        <div className="font-bold text-white text-sm leading-tight">{ord.name}</div>
-                        <div className="text-zinc-400 mt-0.5">{ord.client_label || "—"}</div>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot}`} />
-                          {statusTxt}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-right font-black text-white text-sm tabular-nums">
-                        {displayPrice !== undefined && displayPrice !== null
-                          ? `${formatKzt(displayPrice)} ₸`
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-3.5 text-center">
-                        {latestCalc?.margin_pct !== null && latestCalc?.margin_pct !== undefined ? (
-                          <span className={`inline-block rounded-lg px-2 py-0.5 text-xs font-bold ${marginStyle.badge}`}>
-                            {formatPercent(latestCalc.margin_pct)}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-500">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-right text-zinc-500 font-medium">
-                        {new Date(ord.created_at).toLocaleDateString("ru-RU")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
       )}
 
-      {/* Модальное окно создания заказа */}
+      {/* 4. Модальное окно создания заказа (Clean Bottom-Sheet / Modal) */}
       {isCreating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
-          <div className="w-full max-w-lg rounded-3xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl text-zinc-100">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-              <h2 className="text-lg font-black text-white">
-                Новый проект мебели
-              </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="w-full max-w-md rounded-3xl border border-white/[0.1] bg-[#141418] p-6 shadow-2xl text-zinc-100">
+            <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+              <h2 className="text-base font-bold text-white">Новый проект</h2>
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-800 hover:text-white text-base cursor-pointer"
+                className="text-zinc-500 hover:text-white text-base cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleCreateOrder} className="mt-4 flex flex-col gap-3.5 text-xs">
-              {/* Выбор готового шаблона */}
+              {/* Пресет шаблона */}
               <div>
-                <label className="block font-bold text-zinc-300 mb-1.5">
-                  Тип изделия (стартовый шаблон)
+                <label className="block font-medium text-zinc-400 mb-1.5">
+                  Тип изделия
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
@@ -651,14 +402,14 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                       setCreatePreset("kitchen");
                       if (!createName || createName.includes("Шкаф")) setCreateName("Кухня на заказ");
                     }}
-                    className={`flex flex-col items-center justify-center rounded-2xl border p-2.5 transition-all cursor-pointer ${
+                    className={`rounded-2xl border p-2.5 transition-all cursor-pointer text-center ${
                       createPreset === "kitchen"
-                        ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300 font-bold shadow-xs"
-                        : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-semibold"
+                        : "border-white/[0.06] bg-zinc-900/60 text-zinc-400 hover:text-white"
                     }`}
                   >
-                    <span className="text-xl">🍳</span>
-                    <span className="mt-1 text-xs">Кухня</span>
+                    <span className="text-lg block">🍳</span>
+                    <span className="text-[11px] mt-1 block">Кухня</span>
                   </button>
 
                   <button
@@ -667,34 +418,34 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                       setCreatePreset("wardrobe");
                       if (!createName || createName.includes("Кухня")) setCreateName("Шкаф-купе в спальню");
                     }}
-                    className={`flex flex-col items-center justify-center rounded-2xl border p-2.5 transition-all cursor-pointer ${
+                    className={`rounded-2xl border p-2.5 transition-all cursor-pointer text-center ${
                       createPreset === "wardrobe"
-                        ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300 font-bold shadow-xs"
-                        : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-semibold"
+                        : "border-white/[0.06] bg-zinc-900/60 text-zinc-400 hover:text-white"
                     }`}
                   >
-                    <span className="text-xl">🚪</span>
-                    <span className="mt-1 text-xs">Шкаф-купе</span>
+                    <span className="text-lg block">🚪</span>
+                    <span className="text-[11px] mt-1 block">Шкаф</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setCreatePreset("empty")}
-                    className={`flex flex-col items-center justify-center rounded-2xl border p-2.5 transition-all cursor-pointer ${
+                    className={`rounded-2xl border p-2.5 transition-all cursor-pointer text-center ${
                       createPreset === "empty"
-                        ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300 font-bold shadow-xs"
-                        : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-semibold"
+                        : "border-white/[0.06] bg-zinc-900/60 text-zinc-400 hover:text-white"
                     }`}
                   >
-                    <span className="text-xl">📄</span>
-                    <span className="mt-1 text-xs">С нуля</span>
+                    <span className="text-lg block">📄</span>
+                    <span className="text-[11px] mt-1 block">С нуля</span>
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-zinc-300 mb-1">
-                  Название проекта <span className="text-rose-500">*</span>
+                <label className="block font-medium text-zinc-400 mb-1">
+                  Название сделки
                 </label>
                 <input
                   type="text"
@@ -702,26 +453,26 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                   value={createName}
                   onChange={(e) => setCreateName(e.target.value)}
                   placeholder="Например: Кухня угловая • ЖК Highvill"
-                  className="min-h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-hidden"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-zinc-300 mb-1">
-                  Имя клиента / телефон
+                <label className="block font-medium text-zinc-400 mb-1">
+                  Клиент / Телефон
                 </label>
                 <input
                   type="text"
                   value={createClient}
                   onChange={(e) => setCreateClient(e.target.value)}
-                  placeholder="Например: Айгерим (+7 701 123 45 67)"
-                  className="min-h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-hidden"
+                  placeholder="Айгерим (+7 701 123 45 67)"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-zinc-300 mb-1">
-                  Согласованная цена договора (если уже известна, ₸)
+                <label className="block font-medium text-zinc-400 mb-1">
+                  Договорная цена (₸)
                 </label>
                 <input
                   type="text"
@@ -729,20 +480,20 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                   value={createContractPrice}
                   onChange={(e) => setCreateContractPrice(formatCurrencyInput(e.target.value))}
                   placeholder="Оставьте пустым для расчета по смете"
-                  className="min-h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-hidden"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-zinc-300 mb-1">
-                  Заметки / Особенности помещения
+                <label className="block font-medium text-zinc-400 mb-1">
+                  Заметки
                 </label>
                 <textarea
                   rows={2}
                   value={createNote}
                   onChange={(e) => setCreateNote(e.target.value)}
-                  placeholder="Высота потолков 2.8м, вентканал справа, подсветка врезная…"
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-hidden"
+                  placeholder="Высота 2.8м, вентканал справа, подсветка..."
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
                 />
               </div>
 
@@ -752,20 +503,20 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                 </div>
               )}
 
-              <div className="mt-3 flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+              <div className="mt-3 flex items-center justify-end gap-2 pt-3 border-t border-white/[0.06]">
                 <button
                   type="button"
                   onClick={() => setIsCreating(false)}
-                  className="min-h-11 rounded-xl border border-zinc-800 bg-zinc-950 px-4 text-xs font-semibold text-zinc-300 hover:bg-zinc-800 hover:text-white cursor-pointer"
+                  className="rounded-full px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={createSaving}
-                  className="min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 text-xs font-bold text-white shadow-sm active:scale-98 disabled:opacity-50 cursor-pointer"
+                  className="rounded-full bg-white text-black px-5 py-2 text-xs font-semibold hover:bg-zinc-200 active:scale-95 disabled:opacity-50 cursor-pointer shadow-md"
                 >
-                  {createSaving ? "Создание…" : "Создать и перейти к смете →"}
+                  {createSaving ? "Создание…" : "Открыть кокпит →"}
                 </button>
               </div>
             </form>

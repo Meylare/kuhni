@@ -302,16 +302,16 @@ export function FactTab({
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-4">
+    <div className="mt-4 flex flex-col gap-4 text-zinc-100">
       {/* Подсказка */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 text-xs text-blue-800">
+      <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3.5 text-xs text-sky-300 font-medium">
         💡 Сюда вносятся только расходы по этому заказу. Личные траты не вносить.
       </div>
 
       {/* ========== СВОДКА ПЛАН / ФАКТ ========== */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-bold text-stone-900">
+      <div className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-2xl backdrop-blur-xl md:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/[0.06] pb-3">
+          <h2 className="text-base font-medium tracking-tight text-white">
             📊 {planCalc
               ? planCalc.is_contract_baseline
                 ? `План: версия №${planCalc.version} (договорная)`
@@ -320,42 +320,42 @@ export function FactTab({
           </h2>
         </div>
         {!planCalc ? (
-          <p className="mt-2 text-xs text-stone-500">
+          <p className="mt-3 text-xs text-zinc-500">
             Нет сохранённых версий расчёта. Сохраните расчёт на вкладке «Расчёт», чтобы увидеть сравнение план/факт.
           </p>
         ) : (
-          <div className="mt-3 flex flex-col gap-0">
+          <div className="mt-4 flex flex-col gap-0">
             {/* Таблица по категориям */}
-            <div className="overflow-x-auto rounded-xl border border-stone-200">
+            <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-zinc-900/30">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-stone-50 text-left text-[11px] font-semibold text-stone-500 uppercase tracking-wide">
-                    <th className="px-3 py-2">Категория</th>
-                    <th className="px-3 py-2 text-right">План</th>
-                    <th className="px-3 py-2 text-right">Факт</th>
-                    <th className="px-3 py-2 text-right">Разница</th>
+                  <tr className="bg-zinc-950/60 text-left text-[11px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-white/[0.06]">
+                    <th className="px-3.5 py-2.5">Категория</th>
+                    <th className="px-3.5 py-2.5 text-right">План</th>
+                    <th className="px-3.5 py-2.5 text-right">Факт</th>
+                    <th className="px-3.5 py-2.5 text-right">Разница</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100">
+                <tbody className="divide-y divide-white/[0.04]">
                   {planFactRows.map((row) => (
-                    <tr key={row.key} className="hover:bg-stone-50/50">
-                      <td className="px-3 py-2 font-medium text-stone-800">
+                    <tr key={row.key} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-3.5 py-2.5 font-medium text-zinc-200">
                         {row.label}
                       </td>
-                      <td className="px-3 py-2 text-right text-stone-600">
+                      <td className="px-3.5 py-2.5 text-right text-zinc-400 tabular-nums">
                         {row.plan > 0 ? `${formatKzt(row.plan)} ₸` : "—"}
                       </td>
-                      <td className="px-3 py-2 text-right font-semibold text-stone-900">
+                      <td className="px-3.5 py-2.5 text-right font-medium text-white tabular-nums">
                         {row.fact !== null && row.fact > 0 ? `${formatKzt(row.fact)} ₸` : "—"}
                       </td>
-                      <td className={`px-3 py-2 text-right font-semibold ${
+                      <td className={`px-3.5 py-2.5 text-right font-semibold tabular-nums ${
                         row.diff !== null
                           ? row.diff > 0
-                            ? "text-rose-700"
+                            ? "text-rose-400"
                             : row.diff < 0
-                            ? "text-emerald-700"
-                            : "text-stone-400"
-                          : "text-stone-400"
+                            ? "text-emerald-400"
+                            : "text-zinc-500"
+                          : "text-zinc-500"
                       }`}>
                         {row.diff !== null && (row.fact! > 0 || row.plan > 0)
                           ? `${row.diff > 0 ? "+" : ""}${formatKzt(row.diff)} ₸`
@@ -364,30 +364,30 @@ export function FactTab({
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="border-t-2 border-stone-300 bg-stone-50/80 text-xs font-bold">
+                <tfoot className="border-t border-white/[0.08] bg-zinc-950/80 text-xs font-semibold text-white">
                   <tr>
-                    <td className="px-3 py-2 text-stone-900">
+                    <td className="px-3.5 py-2.5 text-white">
                       Итого расходы
                       {riskReservePlan > 0 && (
-                        <span className="block text-[11px] font-normal text-stone-500">
+                        <span className="block text-[10px] font-normal text-zinc-400">
                           в плане учтён резерв {formatKzt(riskReservePlan)} ₸
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right text-stone-700">
+                    <td className="px-3.5 py-2.5 text-right text-zinc-300 tabular-nums">
                       {formatKzt(planCostTotal)} ₸
                     </td>
-                    <td className="px-3 py-2 text-right text-stone-900">
+                    <td className="px-3.5 py-2.5 text-right text-white tabular-nums">
                       {financialSummary.totalExpenses > 0
                         ? `${formatKzt(financialSummary.totalExpenses)} ₸`
                         : "—"}
                     </td>
-                    <td className={`px-3 py-2 text-right ${
+                    <td className={`px-3.5 py-2.5 text-right tabular-nums ${
                       financialSummary.totalExpenses - planCostTotal > 0
-                        ? "text-rose-700"
+                        ? "text-rose-400 font-semibold"
                         : financialSummary.totalExpenses - planCostTotal < 0
-                        ? "text-emerald-700"
-                        : "text-stone-400"
+                        ? "text-emerald-400 font-semibold"
+                        : "text-zinc-500"
                     }`}>
                       {financialSummary.totalExpenses > 0
                         ? `${financialSummary.totalExpenses - planCostTotal > 0 ? "+" : ""}${formatKzt(financialSummary.totalExpenses - planCostTotal)} ₸`
@@ -400,22 +400,22 @@ export function FactTab({
 
             {/* Переделки отдельной информационной строкой (Q4) */}
             {financialSummary.reworkTotal > 0 && (
-              <div className="mt-2 flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+              <div className="mt-2.5 flex items-center justify-between rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3.5 py-2 text-xs text-zinc-300">
                 <span>из них переделки:</span>
-                <span className="font-semibold text-rose-700">
+                <span className="font-semibold text-rose-400 tabular-nums">
                   {formatKzt(financialSummary.reworkTotal)} ₸
                 </span>
               </div>
             )}
 
             {/* Финансовые карточки (Q4): Договор, Оплачено клиентом, Остаток долга, Фактическая прибыль, Кассовый баланс */}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="mt-3.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
               {/* 1. Договор */}
-              <div className="rounded-xl bg-stone-100 px-3 py-2.5 text-center">
-                <span className="block text-[10px] uppercase tracking-wide text-stone-500">
+              <div className="rounded-2xl bg-zinc-900/60 border border-white/[0.05] px-3.5 py-3 text-center">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                   Договор
                 </span>
-                <span className="mt-0.5 block text-sm font-extrabold text-stone-900">
+                <span className="mt-1 block text-sm font-semibold tracking-tight text-white tabular-nums">
                   {financialSummary.contractPrice > 0
                     ? `${formatKzt(financialSummary.contractPrice)} ₸`
                     : "—"}
@@ -423,11 +423,11 @@ export function FactTab({
               </div>
 
               {/* 2. Оплачено клиентом */}
-              <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5 text-center">
-                <span className="block text-[10px] uppercase tracking-wide text-emerald-600">
+              <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-3 text-center">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
                   Оплачено клиентом
                 </span>
-                <span className="mt-0.5 block text-sm font-extrabold text-emerald-900">
+                <span className="mt-1 block text-sm font-semibold tracking-tight text-emerald-300 tabular-nums">
                   {financialSummary.paymentsTotal > 0
                     ? `${formatKzt(financialSummary.paymentsTotal)} ₸`
                     : "—"}
@@ -435,22 +435,22 @@ export function FactTab({
               </div>
 
               {/* 3. Остаток долга */}
-              <div className={`rounded-xl px-3 py-2.5 text-center border ${
+              <div className={`rounded-2xl px-3.5 py-3 text-center border ${
                 financialSummary.contractPrice > 0 && financialSummary.paymentRemaining > 0
-                  ? "bg-amber-50 border-amber-200"
+                  ? "bg-amber-500/10 border-amber-500/20"
                   : financialSummary.contractPrice > 0 && financialSummary.paymentRemaining <= 0
-                  ? "bg-emerald-50 border-emerald-200"
-                  : "bg-stone-100 border-stone-200"
+                  ? "bg-emerald-500/10 border-emerald-500/20"
+                  : "bg-zinc-900/60 border-white/[0.05]"
               }`}>
-                <span className="block text-[10px] uppercase tracking-wide text-stone-500">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                   Остаток долга
                 </span>
-                <span className={`mt-0.5 block text-sm font-extrabold ${
+                <span className={`mt-1 block text-sm font-semibold tracking-tight tabular-nums ${
                   financialSummary.contractPrice > 0 && financialSummary.paymentRemaining > 0
-                    ? "text-amber-900"
+                    ? "text-amber-300"
                     : financialSummary.contractPrice > 0 && financialSummary.paymentRemaining <= 0
-                    ? "text-emerald-900"
-                    : "text-stone-900"
+                    ? "text-emerald-300"
+                    : "text-white"
                 }`}>
                   {financialSummary.contractPrice > 0
                     ? `${formatKzt(financialSummary.paymentRemaining)} ₸`
@@ -459,29 +459,29 @@ export function FactTab({
               </div>
 
               {/* 4. Фактическая прибыль */}
-              <div className={`rounded-xl px-3 py-2.5 text-center border ${
+              <div className={`rounded-2xl px-3.5 py-3 text-center border ${
                 financialSummary.contractPrice > 0 && financialSummary.actualProfit >= 0
-                  ? "bg-emerald-50 border-emerald-200"
+                  ? "bg-emerald-500/10 border-emerald-500/20"
                   : financialSummary.contractPrice > 0 && financialSummary.actualProfit < 0
-                  ? "bg-rose-50 border-rose-200"
-                  : "bg-stone-100 border-stone-200"
+                  ? "bg-rose-500/10 border-rose-500/20"
+                  : "bg-zinc-900/60 border-white/[0.05]"
               }`}>
-                <span className="block text-[10px] uppercase tracking-wide text-stone-500">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                   Фактическая прибыль
                 </span>
-                <span className={`mt-0.5 block text-sm font-extrabold ${
+                <span className={`mt-1 block text-sm font-semibold tracking-tight tabular-nums ${
                   financialSummary.contractPrice > 0 && financialSummary.actualProfit >= 0
-                    ? "text-emerald-900"
+                    ? "text-emerald-300"
                     : financialSummary.contractPrice > 0 && financialSummary.actualProfit < 0
-                    ? "text-rose-900"
-                    : "text-stone-900"
+                    ? "text-rose-300"
+                    : "text-white"
                 }`}>
                   {financialSummary.contractPrice > 0 ? (
                     <>
                       {financialSummary.actualProfit > 0 ? "+" : ""}
                       {formatKzt(financialSummary.actualProfit)} ₸
                       {financialSummary.profitMarginPct !== null && (
-                        <span className="text-xs font-semibold ml-1">
+                        <span className="text-xs font-normal ml-1 opacity-80">
                           ({formatPercent(financialSummary.profitMarginPct)})
                         </span>
                       )}
@@ -493,18 +493,18 @@ export function FactTab({
               </div>
 
               {/* 5. Кассовый баланс */}
-              <div className={`rounded-xl px-3 py-2.5 text-center border ${
+              <div className={`rounded-2xl px-3.5 py-3 text-center border ${
                 financialSummary.cashBalance >= 0
-                  ? "bg-emerald-50 border-emerald-200"
-                  : "bg-rose-50 border-rose-200"
+                  ? "bg-emerald-500/10 border-emerald-500/20"
+                  : "bg-rose-500/10 border-rose-500/20"
               }`}>
-                <span className="block text-[10px] uppercase tracking-wide text-stone-500">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                   Кассовый баланс
                 </span>
-                <span className={`mt-0.5 block text-sm font-extrabold ${
+                <span className={`mt-1 block text-sm font-semibold tracking-tight tabular-nums ${
                   financialSummary.cashBalance >= 0
-                    ? "text-emerald-900"
-                    : "text-rose-900"
+                    ? "text-emerald-300"
+                    : "text-rose-300"
                 }`}>
                   {financialSummary.cashBalance > 0 ? "+" : ""}
                   {formatKzt(financialSummary.cashBalance)} ₸
@@ -516,11 +516,11 @@ export function FactTab({
       </div>
 
       {/* ========== РАСХОДЫ ========== */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
-        <div className="flex items-center justify-between">
+      <div className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-2xl backdrop-blur-xl md:p-6">
+        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
           <div>
-            <h2 className="text-base font-bold text-stone-900">💸 Расходы</h2>
-            <p className="text-xs text-stone-500">
+            <h2 className="text-base font-medium tracking-tight text-white">💸 Расходы</h2>
+            <p className="text-xs text-zinc-400">
               Фактические расходы по заказу
             </p>
           </div>
@@ -530,7 +530,7 @@ export function FactTab({
               resetExpenseForm();
               setIsExpenseFormOpen(true);
             }}
-            className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98"
+            className="flex min-h-10 items-center gap-1.5 rounded-xl bg-white px-3.5 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-98 transition-all cursor-pointer shadow-md"
           >
             <span>+</span>
             <span>Добавить расход</span>
@@ -541,37 +541,37 @@ export function FactTab({
         {isExpenseFormOpen && (
           <form
             onSubmit={(e) => void handleSaveExpense(e)}
-            className="mt-3 rounded-xl border border-stone-200 bg-stone-50/60 p-4 flex flex-col gap-3"
+            className="mt-4 rounded-2xl border border-white/[0.08] bg-zinc-900/60 p-4 flex flex-col gap-3 text-zinc-100"
           >
             {expError && (
-              <div className="rounded-lg border border-rose-300 bg-rose-50 p-2 text-xs text-rose-800">
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-300">
                 {expError}
               </div>
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-zinc-300 mb-1">
                   Дата расхода
                 </label>
                 <input
                   type="date"
                   value={expDate}
                   onChange={(e) => setExpDate(e.target.value)}
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                  className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-zinc-300 mb-1">
                   Категория
                 </label>
                 <select
                   value={expCategory}
                   onChange={(e) => setExpCategory(e.target.value as PriceCategory)}
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                  className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none transition-colors"
                 >
                   {ALL_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
+                    <option key={cat} value={cat} className="bg-zinc-900 text-white">
                       {CATEGORY_LABELS[cat]}
                     </option>
                   ))}
@@ -580,7 +580,7 @@ export function FactTab({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-700 mb-1">
+              <label className="block text-xs font-medium text-zinc-300 mb-1">
                 Название
               </label>
               <input
@@ -588,12 +588,12 @@ export function FactTab({
                 value={expName}
                 onChange={(e) => setExpName(e.target.value)}
                 placeholder="Например: ЛДСП Egger 18мм"
-                className="min-h-11 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-700 mb-1">
+              <label className="block text-xs font-medium text-zinc-300 mb-1">
                 Сумма (₸)
               </label>
               <input
@@ -602,7 +602,7 @@ export function FactTab({
                 value={expAmount}
                 onChange={(e) => setExpAmount(e.target.value)}
                 placeholder="15 000"
-                className="min-h-11 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
               />
             </div>
 
@@ -613,15 +613,15 @@ export function FactTab({
                   type="checkbox"
                   checked={expIsRework}
                   onChange={(e) => setExpIsRework(e.target.checked)}
-                  className="h-5 w-5 rounded border-stone-300 text-rose-600 focus:ring-rose-500"
+                  className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-rose-500 focus:ring-rose-500"
                 />
-                <span className="text-xs font-semibold text-stone-700">
+                <span className="text-xs font-medium text-zinc-300">
                   🔧 Переделка
                 </span>
               </label>
               {expIsRework && (
                 <div>
-                  <label className="block text-xs font-semibold text-rose-700 mb-1">
+                  <label className="block text-xs font-medium text-rose-300 mb-1">
                     Причина переделки *
                   </label>
                   <input
@@ -629,14 +629,14 @@ export function FactTab({
                     value={expReworkReason}
                     onChange={(e) => setExpReworkReason(e.target.value)}
                     placeholder="Обязательно укажите причину"
-                    className="min-h-11 w-full rounded-xl border border-rose-300 bg-rose-50/50 px-3 py-2 text-sm text-stone-900 focus:border-rose-600"
+                    className="min-h-11 w-full rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-white placeholder-rose-400 focus:border-rose-500 outline-none"
                   />
                 </div>
               )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-700 mb-1">
+              <label className="block text-xs font-medium text-zinc-300 mb-1">
                 Примечание
               </label>
               <input
@@ -644,23 +644,23 @@ export function FactTab({
                 value={expNote}
                 onChange={(e) => setExpNote(e.target.value)}
                 placeholder="Дополнительная информация"
-                className="min-h-11 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-1">
+            <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setIsExpenseFormOpen(false)}
                 disabled={expSaving}
-                className="min-h-10 rounded-xl border border-stone-300 px-4 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                className="min-h-10 rounded-xl border border-white/10 px-4 text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.05] transition-colors"
               >
                 Отмена
               </button>
               <button
                 type="submit"
                 disabled={expSaving}
-                className="min-h-10 rounded-xl bg-emerald-900 px-5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+                className="min-h-10 rounded-xl bg-white px-5 text-xs font-semibold text-black hover:bg-zinc-200 disabled:opacity-40 transition-all cursor-pointer shadow-md"
               >
                 {expSaving ? "Сохранение…" : "Добавить расход"}
               </button>
@@ -670,11 +670,11 @@ export function FactTab({
 
         {/* Список расходов */}
         {expenses.length === 0 ? (
-          <div className="mt-3 rounded-xl border border-dashed border-stone-200 bg-stone-50/50 p-6 text-center text-xs text-stone-500">
+          <div className="mt-4 rounded-2xl border border-dashed border-white/[0.08] bg-zinc-900/20 p-6 text-center text-xs text-zinc-500">
             Пока нет фактических расходов по этому заказу.
           </div>
         ) : (
-          <div className="mt-3 divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white overflow-hidden">
+          <div className="mt-4 divide-y divide-white/[0.04] rounded-2xl border border-white/[0.06] bg-zinc-900/30 overflow-hidden">
             {expenses.map((exp) => {
               const dateStr = new Date(exp.expense_date).toLocaleDateString("ru-RU", {
                 day: "2-digit",
@@ -683,46 +683,46 @@ export function FactTab({
               return (
                 <div
                   key={exp.id}
-                  className={`flex items-center justify-between p-3 text-xs ${
-                    exp.is_rework ? "bg-rose-50/50" : ""
+                  className={`flex items-center justify-between p-3.5 text-xs ${
+                    exp.is_rework ? "bg-rose-500/5" : ""
                   }`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-stone-900 truncate">
+                      <span className="font-medium text-white truncate">
                         {exp.name}
                       </span>
-                      <span className="rounded-md bg-stone-200 px-1.5 py-0.5 text-[10px] font-medium text-stone-600">
+                      <span className="rounded-md bg-white/[0.06] border border-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
                         {CATEGORY_LABELS[exp.category]}
                       </span>
                       {exp.is_rework && (
-                        <span className="rounded-md bg-rose-200 px-1.5 py-0.5 text-[10px] font-bold text-rose-800">
+                        <span className="rounded-md bg-rose-500/20 border border-rose-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
                           🔧 Переделка
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5 text-stone-500 flex items-center gap-2 flex-wrap">
+                    <div className="mt-0.5 text-zinc-500 flex items-center gap-2 flex-wrap">
                       <span>{dateStr}</span>
                       {exp.is_rework && exp.rework_reason && (
-                        <span className="text-rose-700 italic">
+                        <span className="text-rose-400 italic">
                           Причина: {exp.rework_reason}
                         </span>
                       )}
                       {exp.note && (
-                        <span className="text-stone-400 italic">{exp.note}</span>
+                        <span className="text-zinc-500 italic">{exp.note}</span>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 ml-2">
-                    <span className={`font-extrabold whitespace-nowrap ${
-                      exp.is_rework ? "text-rose-900" : "text-stone-900"
+                  <div className="flex items-center gap-3 ml-3">
+                    <span className={`font-semibold tabular-nums whitespace-nowrap ${
+                      exp.is_rework ? "text-rose-300" : "text-white"
                     }`}>
                       {formatKzt(exp.amount)} ₸
                     </span>
                     <button
                       type="button"
                       onClick={() => void handleDeleteExpense(exp.id)}
-                      className="rounded-lg p-1 text-stone-400 hover:bg-rose-50 hover:text-rose-600"
+                      className="rounded-lg p-1 text-zinc-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors cursor-pointer"
                       title="Удалить"
                     >
                       ✕
@@ -732,11 +732,11 @@ export function FactTab({
               );
             })}
             {/* Итого расходов */}
-            <div className="flex items-center justify-between bg-stone-50 px-3 py-2.5 text-xs font-bold">
-              <span className="text-stone-700">
+            <div className="flex items-center justify-between bg-zinc-950/60 px-3.5 py-2.5 text-xs font-semibold border-t border-white/[0.06]">
+              <span className="text-zinc-400">
                 Итого расходов: {expenses.length}
               </span>
-              <span className="text-stone-900">
+              <span className="text-white tabular-nums">
                 {formatKzt(financialSummary.totalExpenses)} ₸
               </span>
             </div>
@@ -745,11 +745,11 @@ export function FactTab({
       </div>
 
       {/* ========== ПОСТУПЛЕНИЯ ========== */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs md:p-5">
-        <div className="flex items-center justify-between">
+      <div className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-2xl backdrop-blur-xl md:p-6">
+        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
           <div>
-            <h2 className="text-base font-bold text-stone-900">💰 Поступления</h2>
-            <p className="text-xs text-stone-500">
+            <h2 className="text-base font-medium tracking-tight text-white">💰 Поступления</h2>
+            <p className="text-xs text-zinc-400">
               Оплаты от клиента
             </p>
           </div>
@@ -759,7 +759,7 @@ export function FactTab({
               resetPaymentForm();
               setIsPaymentFormOpen(true);
             }}
-            className="flex min-h-10 items-center gap-1 rounded-xl bg-stone-100 px-3 text-xs font-semibold text-stone-800 hover:bg-stone-200 active:scale-98"
+            className="flex min-h-10 items-center gap-1.5 rounded-xl bg-white px-3.5 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-98 transition-all cursor-pointer shadow-md"
           >
             <span>+</span>
             <span>Добавить поступление</span>
@@ -770,28 +770,28 @@ export function FactTab({
         {isPaymentFormOpen && (
           <form
             onSubmit={(e) => void handleSavePayment(e)}
-            className="mt-3 rounded-xl border border-stone-200 bg-stone-50/60 p-4 flex flex-col gap-3"
+            className="mt-4 rounded-2xl border border-white/[0.08] bg-zinc-900/60 p-4 flex flex-col gap-3 text-zinc-100"
           >
             {payError && (
-              <div className="rounded-lg border border-rose-300 bg-rose-50 p-2 text-xs text-rose-800">
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-300">
                 {payError}
               </div>
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-zinc-300 mb-1">
                   Дата поступления
                 </label>
                 <input
                   type="date"
                   value={payDate}
                   onChange={(e) => setPayDate(e.target.value)}
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                  className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label className="block text-xs font-medium text-zinc-300 mb-1">
                   Сумма (₸)
                 </label>
                 <input
@@ -800,13 +800,13 @@ export function FactTab({
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
                   placeholder="300 000"
-                  className="min-h-11 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                  className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-700 mb-1">
+              <label className="block text-xs font-medium text-zinc-300 mb-1">
                 Примечание
               </label>
               <input
@@ -814,23 +814,23 @@ export function FactTab({
                 value={payNote}
                 onChange={(e) => setPayNote(e.target.value)}
                 placeholder="Например: Предоплата 50%"
-                className="min-h-11 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-emerald-800"
+                className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-1">
+            <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setIsPaymentFormOpen(false)}
                 disabled={paySaving}
-                className="min-h-10 rounded-xl border border-stone-300 px-4 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                className="min-h-10 rounded-xl border border-white/10 px-4 text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.05] transition-colors"
               >
                 Отмена
               </button>
               <button
                 type="submit"
                 disabled={paySaving}
-                className="min-h-10 rounded-xl bg-emerald-900 px-5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+                className="min-h-10 rounded-xl bg-white px-5 text-xs font-semibold text-black hover:bg-zinc-200 disabled:opacity-40 transition-all cursor-pointer shadow-md"
               >
                 {paySaving ? "Сохранение…" : "Добавить поступление"}
               </button>
@@ -840,11 +840,11 @@ export function FactTab({
 
         {/* Список поступлений */}
         {payments.length === 0 ? (
-          <div className="mt-3 rounded-xl border border-dashed border-stone-200 bg-stone-50/50 p-6 text-center text-xs text-stone-500">
+          <div className="mt-4 rounded-2xl border border-dashed border-white/[0.08] bg-zinc-900/20 p-6 text-center text-xs text-zinc-500">
             Пока нет оплат от клиента.
           </div>
         ) : (
-          <div className="mt-3 divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white overflow-hidden">
+          <div className="mt-4 divide-y divide-white/[0.04] rounded-2xl border border-white/[0.06] bg-zinc-900/30 overflow-hidden">
             {payments.map((pay) => {
               const dateStr = new Date(pay.paid_at).toLocaleDateString("ru-RU", {
                 day: "2-digit",
@@ -853,29 +853,29 @@ export function FactTab({
               return (
                 <div
                   key={pay.id}
-                  className="flex items-center justify-between p-3 text-xs"
+                  className="flex items-center justify-between p-3.5 text-xs"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-emerald-900">
+                      <span className="font-semibold text-emerald-400">
                         Оплата
                       </span>
-                      <span className="text-stone-500">{dateStr}</span>
+                      <span className="text-zinc-500">{dateStr}</span>
                     </div>
                     {pay.note && (
-                      <div className="mt-0.5 text-stone-400 italic truncate">
+                      <div className="mt-0.5 text-zinc-500 italic truncate">
                         {pay.note}
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 ml-2">
-                    <span className="font-extrabold text-emerald-900 whitespace-nowrap">
+                  <div className="flex items-center gap-3 ml-3">
+                    <span className="font-semibold text-emerald-400 tabular-nums whitespace-nowrap">
                       +{formatKzt(pay.amount)} ₸
                     </span>
                     <button
                       type="button"
                       onClick={() => void handleDeletePayment(pay.id)}
-                      className="rounded-lg p-1 text-stone-400 hover:bg-rose-50 hover:text-rose-600"
+                      className="rounded-lg p-1 text-zinc-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors cursor-pointer"
                       title="Удалить"
                     >
                       ✕
@@ -885,11 +885,11 @@ export function FactTab({
               );
             })}
             {/* Итого поступлений */}
-            <div className="flex items-center justify-between bg-stone-50 px-3 py-2.5 text-xs font-bold">
-              <span className="text-stone-700">
+            <div className="flex items-center justify-between bg-zinc-950/60 px-3.5 py-2.5 text-xs font-semibold border-t border-white/[0.06]">
+              <span className="text-zinc-400">
                 Итого поступлений: {payments.length}
               </span>
-              <span className="text-emerald-900">
+              <span className="text-emerald-400 tabular-nums">
                 {formatKzt(financialSummary.paymentsTotal)} ₸
               </span>
             </div>

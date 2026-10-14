@@ -96,7 +96,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {activeDialog && (
         <div
           role="presentation"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 backdrop-blur-xs p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-150"
           onClick={() => {
             if (activeDialog.type === "confirm") {
               activeDialog.resolve(false);
@@ -108,29 +108,29 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           <div
             role="dialog"
             aria-modal="true"
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl border border-stone-200 flex flex-col gap-3"
+            className="w-full max-w-sm rounded-3xl bg-[#141418] p-6 shadow-2xl border border-white/[0.1] flex flex-col gap-3.5 text-zinc-100 animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {activeDialog.type === "alert" && (
                 <span className="text-xl">
                   {activeDialog.variant === "error" ? "⚠️" : "ℹ️"}
                 </span>
               )}
-              <h3 className="text-base font-semibold text-stone-900">
+              <h3 className="text-base font-bold text-white tracking-tight">
                 {activeDialog.title}
               </h3>
             </div>
-            <p className="text-sm text-stone-600 leading-relaxed whitespace-pre-wrap">
+            <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap">
               {activeDialog.message}
             </p>
-            <div className="flex gap-2 justify-end mt-2">
+            <div className="flex gap-2 justify-end mt-2 pt-3 border-t border-white/[0.06]">
               {activeDialog.type === "confirm" && (
                 <>
                   <button
                     type="button"
                     onClick={() => activeDialog.resolve(false)}
-                    className="px-4 py-2 rounded-xl border border-stone-300 text-sm font-medium text-stone-700 hover:bg-stone-50 transition-colors"
+                    className="px-4 py-2 rounded-full border border-white/[0.08] bg-zinc-900 text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
                   >
                     {activeDialog.cancelLabel}
                   </button>
@@ -138,10 +138,10 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                     type="button"
                     autoFocus
                     onClick={() => activeDialog.resolve(true)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors ${
+                    className={`px-4 py-2 rounded-full text-xs font-semibold text-white transition-all cursor-pointer shadow-md ${
                       activeDialog.destructive
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "bg-emerald-700 hover:bg-emerald-800"
+                        ? "bg-rose-600 hover:bg-rose-500"
+                        : "bg-emerald-600 hover:bg-emerald-500"
                     }`}
                   >
                     {activeDialog.confirmLabel}
@@ -153,7 +153,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   type="button"
                   autoFocus
                   onClick={() => activeDialog.resolve()}
-                  className="w-full sm:w-auto px-5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-sm font-medium text-white transition-colors"
+                  className="w-full sm:w-auto px-5 py-2 rounded-full bg-white hover:bg-zinc-200 text-xs font-semibold text-black transition-all cursor-pointer shadow-md"
                 >
                   {activeDialog.buttonLabel}
                 </button>

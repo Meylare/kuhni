@@ -70,32 +70,32 @@ export function OrderParametersAccordion({
   );
 
   return (
-    <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-4 shadow-xs">
+    <div className="mt-5 rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-lg text-zinc-100">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between text-left text-xs font-bold text-stone-800 gap-2 flex-wrap"
+        className="flex w-full items-center justify-between text-left text-xs font-semibold text-zinc-300 gap-2 flex-wrap cursor-pointer"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <span>⚙️ Дополнительно (параметры)</span>
+          <span>⚙️ Индивидуальные параметры сделки</span>
           {isCustomized ? (
-            <span className="rounded-md bg-amber-100 text-amber-900 px-2 py-0.5 text-[11px] font-semibold border border-amber-300">
+            <span className="rounded-full bg-amber-500/15 text-amber-300 px-2.5 py-0.5 text-[11px] font-semibold border border-amber-500/30">
               изменены{customMargin ? `: маржа ${customMargin}%` : ""}
             </span>
           ) : (
-            <span className="rounded-md bg-stone-100 text-stone-600 px-2 py-0.5 text-[11px] font-normal">
-              используются общие параметры
+            <span className="rounded-full bg-white/[0.06] text-zinc-400 px-2.5 py-0.5 text-[11px]">
+              общие нормативы
             </span>
           )}
         </div>
-        <span>{isOpen ? "▲ Скрыть" : "▼ Настроить"}</span>
+        <span className="text-zinc-500">{isOpen ? "▲ Скрыть" : "▼ Настроить"}</span>
       </button>
 
       {isOpen && (
-        <div className="mt-4 flex flex-col gap-3 border-t border-stone-100 pt-3">
-          <div className="grid gap-3 sm:grid-cols-2 text-xs">
+        <div className="mt-4 flex flex-col gap-3.5 border-t border-white/[0.06] pt-4 animate-in fade-in duration-200">
+          <div className="grid gap-3.5 sm:grid-cols-2 text-xs">
             <div>
-              <label className="block font-semibold text-stone-700 mb-1">
+              <label className="block font-semibold text-zinc-300 mb-1">
                 Целевая маржа (по умолч. {formatPercent(globalParams.target_margin_pct)})
               </label>
               <input
@@ -104,28 +104,28 @@ export function OrderParametersAccordion({
                 value={customMargin}
                 onChange={(e) => setCustomMargin(e.target.value)}
                 disabled={locked}
-                className="min-h-10 w-full rounded-xl border border-stone-300 px-3 py-1.5 focus:border-emerald-800"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20 font-mono"
               />
               {!locked && (
                 <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setCustomMargin("20")}
-                    className="rounded-lg bg-stone-100 hover:bg-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-700 cursor-pointer"
+                    className="rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-2.5 py-1 text-[10px] font-semibold text-zinc-300 cursor-pointer"
                   >
                     20% Эконом
                   </button>
                   <button
                     type="button"
                     onClick={() => setCustomMargin("28")}
-                    className="rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold cursor-pointer"
+                    className="rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/25 px-2.5 py-1 text-[10px] font-semibold cursor-pointer"
                   >
                     28% Стандарт
                   </button>
                   <button
                     type="button"
                     onClick={() => setCustomMargin("35")}
-                    className="rounded-lg bg-stone-100 hover:bg-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-700 cursor-pointer"
+                    className="rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-2.5 py-1 text-[10px] font-semibold text-zinc-300 cursor-pointer"
                   >
                     35% Премиум
                   </button>
@@ -134,7 +134,7 @@ export function OrderParametersAccordion({
             </div>
 
             <div>
-              <label className="block font-semibold text-stone-700 mb-1">
+              <label className="block font-semibold text-zinc-300 mb-1">
                 Режим сборки
               </label>
               <select
@@ -145,7 +145,7 @@ export function OrderParametersAccordion({
                   )
                 }
                 disabled={locked}
-                className="min-h-10 w-full rounded-xl border border-stone-300 bg-white px-3 py-1.5 focus:border-emerald-800"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20"
               >
                 <option value="default">
                   По умолчанию ({globalParams.assembly_mode === "percent" ? "Процент" : "За метр"})
@@ -156,20 +156,20 @@ export function OrderParametersAccordion({
             </div>
 
             {isPerMeter ? (
-              <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50/70 p-3 flex flex-col gap-3">
+              <div className="sm:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3.5 flex flex-col gap-3">
                 {itemsWithMeters.length > 0 ? (
-                  <div className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-xs text-sky-900">
+                  <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-xs text-sky-300">
                     <p className="font-semibold">ℹ️ Метраж берётся из изделий заказа</p>
-                    <p className="mt-0.5 text-stone-600">
-                      Всего в карточках изделий: <span className="font-bold">{totalItemsMeters.toFixed(2)} м</span>
+                    <p className="mt-0.5 text-zinc-400">
+                      Всего в карточках изделий: <span className="font-bold text-white font-mono">{totalItemsMeters.toFixed(2)} м</span>
                     </p>
                   </div>
                 ) : (
                   <>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="block font-semibold text-stone-700 mb-1">
-                          Погонные метры изделия (м)
+                        <label className="block font-semibold text-zinc-300 mb-1">
+                          Погонные метры (м)
                         </label>
                         <input
                           type="text"
@@ -177,12 +177,12 @@ export function OrderParametersAccordion({
                           value={customLinearMeters}
                           onChange={(e) => setCustomLinearMeters?.(e.target.value)}
                           disabled={locked}
-                          className="min-h-10 w-full rounded-xl border border-stone-300 bg-white px-3 py-1.5 focus:border-emerald-800"
+                          className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-xs text-white focus:outline-hidden focus:border-white/20 font-mono"
                         />
                       </div>
 
                       <div>
-                        <label className="block font-semibold text-stone-700 mb-1">
+                        <label className="block font-semibold text-zinc-300 mb-1">
                           Тип изделия для сборки
                         </label>
                         <select
@@ -191,7 +191,7 @@ export function OrderParametersAccordion({
                             setCustomOrderKind?.(e.target.value as "kitchen" | "wardrobe")
                           }
                           disabled={locked}
-                          className="min-h-10 w-full rounded-xl border border-stone-300 bg-white px-3 py-1.5 focus:border-emerald-800"
+                          className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 text-xs text-white focus:outline-hidden focus:border-white/20"
                         >
                           <option value="kitchen">
                             Кухня ({formatKzt(globalParams.assembly_per_meter_kitchen || 35000)} ₸/м)
@@ -207,7 +207,7 @@ export function OrderParametersAccordion({
                       const parsedMeters = Number(customLinearMeters.replace(/,/g, ".").trim());
                       if (!Number.isFinite(parsedMeters) || parsedMeters <= 0) {
                         return (
-                          <p className="text-amber-800 text-xs bg-amber-50 border border-amber-200 rounded-lg p-2 font-medium">
+                          <p className="text-amber-300 text-xs bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 font-medium">
                             ⚠️ Укажите погонные метры, иначе сборка = 0 ₸
                           </p>
                         );
@@ -218,11 +218,11 @@ export function OrderParametersAccordion({
                           : (globalParams.assembly_per_meter_kitchen || 35000);
                       const estAssembly = Math.round(parsedMeters * rate);
                       return (
-                        <div className="flex items-center justify-between text-xs text-stone-700 bg-white border border-stone-200 rounded-lg px-3 py-2">
+                        <div className="flex items-center justify-between text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
                           <span>
                             Расчёт сборки: <strong>{parsedMeters} м</strong> × {formatKzt(rate)} ₸
                           </span>
-                          <span className="font-bold text-emerald-800">
+                          <span className="font-bold text-emerald-400 font-mono">
                             {formatKzt(estAssembly)} ₸
                           </span>
                         </div>
@@ -233,7 +233,7 @@ export function OrderParametersAccordion({
               </div>
             ) : (
               <div>
-                <label className="block font-semibold text-stone-700 mb-1">
+                <label className="block font-semibold text-zinc-300 mb-1">
                   Сборка, % (по умолч. {formatPercent(globalParams.assembly_pct)})
                 </label>
                 <input
@@ -242,13 +242,13 @@ export function OrderParametersAccordion({
                   value={customAssemblyPct}
                   onChange={(e) => setCustomAssemblyPct(e.target.value)}
                   disabled={locked}
-                  className="min-h-10 w-full rounded-xl border border-stone-300 px-3 py-1.5 focus:border-emerald-800"
+                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20 font-mono"
                 />
               </div>
             )}
 
             <div>
-              <label className="block font-semibold text-stone-700 mb-1">
+              <label className="block font-semibold text-zinc-300 mb-1">
                 Технолог, % (по умолч. {formatPercent(globalParams.technolog_pct)})
               </label>
               <input
@@ -257,7 +257,7 @@ export function OrderParametersAccordion({
                 value={customTechnologPct}
                 onChange={(e) => setCustomTechnologPct(e.target.value)}
                 disabled={locked}
-                className="min-h-10 w-full rounded-xl border border-stone-300 px-3 py-1.5 focus:border-emerald-800"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white focus:outline-hidden focus:border-white/20 font-mono"
               />
             </div>
           </div>
@@ -267,9 +267,9 @@ export function OrderParametersAccordion({
               type="button"
               disabled={paramsSaving}
               onClick={onSaveOrderSettings}
-              className="self-end min-h-10 rounded-xl bg-emerald-900 px-4 text-xs font-semibold text-white shadow-xs hover:bg-emerald-950 disabled:opacity-50"
+              className="self-end rounded-full bg-white text-black font-semibold px-5 py-2 text-xs hover:bg-zinc-200 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
             >
-              {paramsSaving ? "Сохранение…" : "Применить параметры к заказу"}
+              {paramsSaving ? "Сохранение…" : "Применить параметры"}
             </button>
           )}
         </div>

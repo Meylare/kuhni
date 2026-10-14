@@ -93,7 +93,7 @@ function MainApp() {
       <Navigation
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        hideMobileNav={activeTab === "orders" && Boolean(selectedOrderId)}
+        hidden={activeTab === "orders" && Boolean(selectedOrderId)}
       />
       <div className="flex-1">
         <Suspense fallback={<PageSkeleton />}>
