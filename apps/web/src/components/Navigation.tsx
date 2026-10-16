@@ -10,6 +10,13 @@ interface NavigationProps {
   hidden?: boolean;
 }
 
+const NAV_ITEMS: { id: ActiveTab; label: string }[] = [
+  { id: "orders", label: "Сделки" },
+  { id: "prices", label: "Каталог" },
+  { id: "templates", label: "Шаблоны" },
+  { id: "parameters", label: "Параметры" },
+];
+
 export function Navigation({ activeTab, onTabChange, hidden }: NavigationProps) {
   const { session, signOut, isDemoMode, exitDemoMode } = useAuth();
   const email = session?.user?.email ?? "";
@@ -18,184 +25,96 @@ export function Navigation({ activeTab, onTabChange, hidden }: NavigationProps) 
   if (hidden) return null;
 
   function handleResetDemo() {
-    if (window.confirm("Сбросить все демо-заказы и материалы к начальным образцам?")) {
+    if (window.confirm("Сбросить демо-проекты и каталог к исходным данным?")) {
       resetDemoState();
       window.location.reload();
     }
   }
 
   return (
-    <>
-      {/* Верхняя ультра-минималистичная панель */}
-      <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#09090b]/80 backdrop-blur-2xl transition-all">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          {/* Бренд */}
-          <div
-            className="flex items-center gap-2.5 cursor-pointer"
-            onClick={() => onTabChange("orders")}
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/30 text-xs font-black text-emerald-400">
-              ⚡
-            </div>
-            <span className="text-sm font-bold tracking-tight text-white">
-              Cockpit
-            </span>
-          </div>
-
-          {/* Вкладки для ПК (Segmented Pill) */}
-          <nav className="hidden md:flex items-center gap-1 rounded-full bg-[#141418] p-1 text-xs font-medium border border-white/[0.06]">
-            <button
-              type="button"
-              onClick={() => onTabChange("orders")}
-              className={`rounded-full px-4 py-1.5 transition-all cursor-pointer ${
-                activeTab === "orders"
-                  ? "bg-zinc-800 text-white shadow-xs font-semibold"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Сделки
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange("prices")}
-              className={`rounded-full px-4 py-1.5 transition-all cursor-pointer ${
-                activeTab === "prices"
-                  ? "bg-zinc-800 text-white shadow-xs font-semibold"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Каталог
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange("templates")}
-              className={`rounded-full px-4 py-1.5 transition-all cursor-pointer ${
-                activeTab === "templates"
-                  ? "bg-zinc-800 text-white shadow-xs font-semibold"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Шаблоны
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange("parameters")}
-              className={`rounded-full px-4 py-1.5 transition-all cursor-pointer ${
-                activeTab === "parameters"
-                  ? "bg-zinc-800 text-white shadow-xs font-semibold"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Настройки
-            </button>
-          </nav>
-
-          {/* Правая часть: Демо-бейдж и Профиль */}
-          <div className="flex items-center gap-2">
-            {isDemoMode ? (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowDemoMenu((v) => !v)}
-                  className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-all cursor-pointer"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Demo</span>
-                </button>
-
-                {showDemoMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl bg-[#18181c] border border-white/[0.1] p-1.5 shadow-2xl z-50 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDemoMenu(false);
-                        handleResetDemo();
-                      }}
-                      className="w-full text-left rounded-xl px-3 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
-                    >
-                      🔄 Сбросить к образцам
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDemoMenu(false);
-                        exitDemoMode();
-                      }}
-                      className="w-full text-left rounded-xl px-3 py-2 text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
-                    >
-                      🚪 Выйти из демо
-                    </button>
-                  </div>
+    <header className="sticky top-0 z-30 border-b border-white/[0.07] bg-[#09090b]/90 backdrop-blur-xl select-none">
+      <div className="mx-auto flex max-w-4xl items-center justify-between px-5 h-13">
+        {/* Навигационные вкладки (чистая типографика с тонким нижним индикатором) */}
+        <nav className="flex items-center gap-5 sm:gap-7 overflow-x-auto no-scrollbar h-full">
+          {NAV_ITEMS.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onTabChange(item.id)}
+                className={`relative h-full flex items-center text-[14px] tracking-[-0.01em] transition-colors cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? "font-medium text-white"
+                    : "font-normal text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                <span>{item.label}</span>
+                {isActive && (
+                  <span className="absolute bottom-0 inset-x-0 h-[1.5px] bg-white rounded-full" />
                 )}
-              </div>
-            ) : email ? (
-              <span className="hidden lg:inline text-xs text-zinc-500 max-w-[140px] truncate">
-                {email}
-              </span>
-            ) : null}
+              </button>
+            );
+          })}
+        </nav>
 
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="text-xs text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer px-2 py-1"
-            >
-              {isDemoMode ? "Выход" : "Выйти"}
-            </button>
-          </div>
+        {/* Правая часть: статус Демо или аккаунт */}
+        <div className="flex items-center gap-3 shrink-0 ml-3">
+          {isDemoMode ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowDemoMenu((v) => !v)}
+                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer py-1"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <span>Демо</span>
+              </button>
+
+              {showDemoMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-[#141417] border border-white/[0.08] py-1 shadow-2xl z-50 text-[13px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDemoMenu(false);
+                      handleResetDemo();
+                    }}
+                    className="w-full text-left px-3.5 py-2 text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-colors cursor-pointer"
+                  >
+                    Сбросить демо-данные
+                  </button>
+                  <div className="my-1 border-t border-white/[0.06]" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDemoMenu(false);
+                      exitDemoMode();
+                    }}
+                    className="w-full text-left px-3.5 py-2 text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                  >
+                    Выйти из демо
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {email && (
+                <span className="hidden md:inline text-[12px] text-zinc-500 max-w-[160px] truncate">
+                  {email}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="text-[12px] text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+              >
+                Выйти
+              </button>
+            </>
+          )}
         </div>
-      </header>
-
-      {/* Нижний парящий стеклянный док (Floating Island Navigation) для мобильных */}
-      <nav className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex md:hidden rounded-full bg-[#121215]/90 border border-white/[0.08] backdrop-blur-2xl shadow-2xl p-1.5 gap-1 select-none">
-        <button
-          type="button"
-          onClick={() => onTabChange("orders")}
-          className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-all ${
-            activeTab === "orders"
-              ? "bg-zinc-800 text-white font-semibold shadow-xs"
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <span>📋</span>
-          <span>Сделки</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onTabChange("prices")}
-          className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-all ${
-            activeTab === "prices"
-              ? "bg-zinc-800 text-white font-semibold shadow-xs"
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <span>🏷️</span>
-          <span>Каталог</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onTabChange("templates")}
-          className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-all ${
-            activeTab === "templates"
-              ? "bg-zinc-800 text-white font-semibold shadow-xs"
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <span>⚡</span>
-          <span>Шаблоны</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onTabChange("parameters")}
-          className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-all ${
-            activeTab === "parameters"
-              ? "bg-zinc-800 text-white font-semibold shadow-xs"
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <span>⚙️</span>
-          <span>Настройки</span>
-        </button>
-      </nav>
-    </>
+      </div>
+    </header>
   );
 }

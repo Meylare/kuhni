@@ -240,136 +240,136 @@ export function ParametersPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col px-4 py-8 pb-32 text-zinc-100">
+    <main className="mx-auto flex w-full max-w-[680px] flex-col px-5 pt-6 pb-24 text-zinc-100 select-none">
       {/* Заголовок */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex items-end justify-between pb-6 border-b border-white/[0.07]">
         <div>
-          <div className="text-[10px] font-semibold tracking-[0.2em] text-zinc-500 uppercase">
-            SETTINGS · FORMULA
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mt-1">Параметры расчёта</h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Глобальные нормативы маржи, сборки, технолога и отходов для калькулятора
-          </p>
+          <span className="text-[11px] font-medium tracking-wider uppercase text-zinc-500 block mb-1">
+            Глобальные нормативы
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+            Параметры расчёта
+          </h1>
         </div>
 
         <button
           type="submit"
           form="parameters-form"
           disabled={saving || loading || denomEval.status === "error"}
-          className="rounded-full bg-white text-black font-semibold px-5 py-2.5 text-xs hover:bg-zinc-200 shadow-md active:scale-95 transition-all cursor-pointer disabled:opacity-50 self-start sm:self-auto"
+          className="h-9 px-4 rounded-lg bg-white text-black font-semibold text-[13px] hover:bg-zinc-200 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-40"
         >
-          {saving ? "Сохранение…" : "Сохранить параметры"}
+          {saving ? "Сохранение…" : "Сохранить"}
         </button>
       </div>
 
       {loading && (
-        <div className="mt-16 flex flex-col items-center justify-center py-12 text-zinc-500">
-          <div className="h-7 w-7 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-          <span className="mt-3 text-xs font-medium">Загрузка параметров…</span>
+        <div className="py-16 text-center text-[13px] text-zinc-500">
+          Загрузка параметров…
         </div>
       )}
 
       {error && (
-        <div className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
+        <div className="my-4 border-l-2 border-rose-500 bg-rose-500/5 pl-4 py-3 text-xs text-rose-300">
           {error}
         </div>
       )}
 
       {saveSuccess && (
-        <div className="mb-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-medium text-emerald-300">
-          ✓ Параметры успешно сохранены и применены к расчётам!
+        <div className="my-4 border-l-2 border-emerald-500 bg-emerald-500/5 pl-4 py-3 text-xs font-medium text-emerald-300">
+          Параметры сохранены и применены к расчётам.
         </div>
       )}
 
       {!loading && (
-        <form id="parameters-form" onSubmit={handleSave} className="flex flex-col gap-6">
-          {/* Индикатор знаменателя формулы расчёта */}
-          <div
-            className={`rounded-3xl border p-5 transition-all shadow-lg ${
-              denomEval.status === "error"
-                ? "border-rose-500/50 bg-rose-950/20 text-rose-200"
-                : denomEval.status === "warning"
-                ? "border-amber-500/50 bg-amber-950/20 text-amber-200"
-                : "border-white/[0.08] bg-[#121215] text-zinc-100"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3">
+        <form
+          id="parameters-form"
+          onSubmit={handleSave}
+          className="divide-y divide-white/[0.07] border-b border-white/[0.07]"
+        >
+          {/* Контроль знаменателя формулы */}
+          <div className="py-6">
+            <div className="flex items-baseline justify-between gap-4">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500 block">
                   Контроль формулы расчёта цены
                 </span>
-                <h3 className="mt-1 text-xl font-bold tracking-tight text-white font-mono">
-                  Знаменатель: {(denomEval.denominator * 100).toFixed(1).replace(".", ",")}%
-                </h3>
+                <div className="mt-1 flex items-baseline gap-2.5">
+                  <span className="text-2xl font-semibold tracking-tight text-white tabular-nums">
+                    {(denomEval.denominator * 100).toFixed(1).replace(".", ",")}%
+                  </span>
+                  <span className="text-xs text-zinc-500">знаменатель</span>
+                </div>
               </div>
 
-              <div
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              <span
+                className={`text-xs font-medium ${
                   denomEval.status === "error"
-                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                    ? "text-rose-400"
                     : denomEval.status === "warning"
-                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                    : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25"
+                    ? "text-amber-400"
+                    : "text-emerald-400"
                 }`}
               >
                 {denomEval.status === "error"
                   ? "Критическая ошибка"
                   : denomEval.status === "warning"
                   ? "Предупреждение (≤ 5%)"
-                  : "Норма"}
-              </div>
+                  : "Формула сбалансирована"}
+              </span>
             </div>
 
             {denomEval.message && (
-              <p className="mt-2 text-xs font-medium leading-relaxed text-zinc-300">
+              <p className="mt-2 text-xs text-zinc-400 leading-relaxed">
                 {denomEval.message}
               </p>
             )}
 
-            {/* Сводка долей */}
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-white/[0.06] text-xs">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-white/[0.05] text-xs">
               <div>
-                <span className="text-zinc-500 block">Маржа:</span>
-                <span className="font-semibold text-white font-mono">{formatPercent(currentMap.target_margin_pct)}</span>
+                <span className="text-zinc-500 block">Целевая маржа</span>
+                <span className="font-medium text-zinc-200 tabular-nums mt-0.5 block">
+                  {formatPercent(currentMap.target_margin_pct)}
+                </span>
               </div>
               <div>
-                <span className="text-zinc-500 block">Сборка:</span>
-                <span className="font-semibold text-white font-mono">
+                <span className="text-zinc-500 block">Сборка</span>
+                <span className="font-medium text-zinc-200 tabular-nums mt-0.5 block">
                   {currentMap.assembly_mode === "percent"
                     ? formatPercent(currentMap.assembly_pct)
                     : "за пог. м"}
                 </span>
               </div>
               <div>
-                <span className="text-zinc-500 block">Технолог:</span>
-                <span className="font-semibold text-white font-mono">
+                <span className="text-zinc-500 block">Технолог</span>
+                <span className="font-medium text-zinc-200 tabular-nums mt-0.5 block">
                   {currentMap.technolog_mode === "percent"
                     ? formatPercent(currentMap.technolog_pct)
                     : "за лист"}
                 </span>
               </div>
               <div>
-                <span className="text-zinc-500 block">Резерв риска:</span>
-                <span className="font-semibold text-white font-mono">{formatPercent(currentMap.risk_reserve_pct)}</span>
+                <span className="text-zinc-500 block">Резерв риска</span>
+                <span className="font-medium text-zinc-200 tabular-nums mt-0.5 block">
+                  {formatPercent(currentMap.risk_reserve_pct)}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Секция 1: Целевая маржа и округление */}
-          <section className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-lg">
-            <header className="border-b border-white/[0.06] pb-3">
-              <h2 className="text-base font-semibold text-white">
+          <section className="py-6">
+            <div className="mb-4">
+              <h2 className="text-[15px] font-medium text-white">
                 {PARAMETER_GROUPS.margin_rounding.title}
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">
+              <p className="text-xs text-zinc-500 mt-0.5">
                 {PARAMETER_GROUPS.margin_rounding.description}
               </p>
-            </header>
+            </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="text-xs font-semibold text-zinc-300 block mb-1">
+                <label className="text-xs text-zinc-400 block mb-1.5">
                   {PARAMETER_DEFINITIONS.target_margin_pct.name}
                 </label>
                 <div className="relative">
@@ -379,19 +379,16 @@ export function ParametersPage() {
                     value={form.target_margin_pct}
                     onChange={(e) => setForm({ ...form, target_margin_pct: e.target.value })}
                     placeholder="18"
-                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 pr-9 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
+                    className="w-full h-10 rounded-lg bg-white/[0.03] border border-white/[0.09] px-3 pr-8 text-[14px] text-white tabular-nums focus:outline-hidden focus:border-white/30"
                   />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-500">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
                     %
                   </span>
                 </div>
-                <p className="mt-1 text-[11px] text-zinc-500">
-                  {PARAMETER_DEFINITIONS.target_margin_pct.description}
-                </p>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-zinc-300 block mb-1">
+                <label className="text-xs text-zinc-400 block mb-1.5">
                   {PARAMETER_DEFINITIONS.price_rounding.name}
                 </label>
                 <div className="relative">
@@ -401,41 +398,40 @@ export function ParametersPage() {
                     value={form.price_rounding}
                     onChange={(e) => setForm({ ...form, price_rounding: e.target.value })}
                     placeholder="1000"
-                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 pr-9 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
+                    className="w-full h-10 rounded-lg bg-white/[0.03] border border-white/[0.09] px-3 pr-8 text-[14px] text-white tabular-nums focus:outline-hidden focus:border-white/30"
                   />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-500">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
                     ₸
                   </span>
                 </div>
-                <p className="mt-1 text-[11px] text-zinc-500">
-                  {PARAMETER_DEFINITIONS.price_rounding.description}
-                </p>
               </div>
             </div>
           </section>
 
           {/* Секция 2: Сборка */}
-          <section className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-lg">
-            <header className="border-b border-white/[0.06] pb-3">
-              <h2 className="text-base font-semibold text-white">
+          <section className="py-6">
+            <div className="mb-4">
+              <h2 className="text-[15px] font-medium text-white">
                 {PARAMETER_GROUPS.assembly.title}
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">{PARAMETER_GROUPS.assembly.description}</p>
-            </header>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {PARAMETER_GROUPS.assembly.description}
+              </p>
+            </div>
 
-            <div className="mt-4 flex flex-col gap-4">
+            <div className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                <label className="block text-xs text-zinc-400 mb-1.5">
                   {PARAMETER_DEFINITIONS.assembly_mode.name}
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 rounded-xl bg-white/[0.04] p-1 border border-white/[0.06]">
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, assembly_mode: "percent" })}
-                    className={`rounded-2xl p-2.5 text-xs font-medium transition-all cursor-pointer text-center ${
+                    className={`py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       form.assembly_mode === "percent"
-                        ? "bg-zinc-800 text-white font-semibold border border-white/20 shadow-xs"
-                        : "bg-zinc-950/60 border border-zinc-800 text-zinc-400 hover:text-white"
+                        ? "bg-white text-black font-semibold shadow-xs"
+                        : "text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
                     Процент от цены (% договора)
@@ -443,20 +439,20 @@ export function ParametersPage() {
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, assembly_mode: "per_meter" })}
-                    className={`rounded-2xl p-2.5 text-xs font-medium transition-all cursor-pointer text-center ${
+                    className={`py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       form.assembly_mode === "per_meter"
-                        ? "bg-zinc-800 text-white font-semibold border border-white/20 shadow-xs"
-                        : "bg-zinc-950/60 border border-zinc-800 text-zinc-400 hover:text-white"
+                        ? "bg-white text-black font-semibold shadow-xs"
+                        : "text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
-                    За погонный метр изделия
+                    За погонный метр
                   </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className={form.assembly_mode === "percent" ? "opacity-100" : "opacity-40"}>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">
+                  <label className="text-xs text-zinc-400 block mb-1.5">
                     {PARAMETER_DEFINITIONS.assembly_pct.name}
                   </label>
                   <div className="relative">
@@ -466,16 +462,16 @@ export function ParametersPage() {
                       value={form.assembly_pct}
                       onChange={(e) => setForm({ ...form, assembly_pct: e.target.value })}
                       placeholder="14,5"
-                      className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 pr-8 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
+                      className="w-full h-10 rounded-lg bg-white/[0.03] border border-white/[0.09] px-3 pr-8 text-[14px] text-white tabular-nums focus:outline-hidden focus:border-white/30"
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-500">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
                       %
                     </span>
                   </div>
                 </div>
 
                 <div className={form.assembly_mode === "per_meter" ? "opacity-100" : "opacity-40"}>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">
+                  <label className="text-xs text-zinc-400 block mb-1.5">
                     {PARAMETER_DEFINITIONS.assembly_per_meter_kitchen.name}
                   </label>
                   <div className="relative">
@@ -487,16 +483,16 @@ export function ParametersPage() {
                         setForm({ ...form, assembly_per_meter_kitchen: e.target.value })
                       }
                       placeholder="35000"
-                      className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 pr-14 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
+                      className="w-full h-10 rounded-lg bg-white/[0.03] border border-white/[0.09] px-3 pr-14 text-[14px] text-white tabular-nums focus:outline-hidden focus:border-white/30"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-zinc-500">
-                      ₸/пог.м
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">
+                      ₸/м
                     </span>
                   </div>
                 </div>
 
                 <div className={form.assembly_mode === "per_meter" ? "opacity-100" : "opacity-40"}>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">
+                  <label className="text-xs text-zinc-400 block mb-1.5">
                     {PARAMETER_DEFINITIONS.assembly_per_meter_wardrobe.name}
                   </label>
                   <div className="relative">
@@ -508,10 +504,10 @@ export function ParametersPage() {
                         setForm({ ...form, assembly_per_meter_wardrobe: e.target.value })
                       }
                       placeholder="25000"
-                      className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 pr-14 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
+                      className="w-full h-10 rounded-lg bg-white/[0.03] border border-white/[0.09] px-3 pr-14 text-[14px] text-white tabular-nums focus:outline-hidden focus:border-white/30"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-zinc-500">
-                      ₸/пог.м
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">
+                      ₸/м
                     </span>
                   </div>
                 </div>
@@ -520,27 +516,29 @@ export function ParametersPage() {
           </section>
 
           {/* Секция 3: Технолог */}
-          <section className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-lg">
-            <header className="border-b border-white/[0.06] pb-3">
-              <h2 className="text-base font-semibold text-white">
+          <section className="py-6">
+            <div className="mb-4">
+              <h2 className="text-[15px] font-medium text-white">
                 {PARAMETER_GROUPS.technolog.title}
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">{PARAMETER_GROUPS.technolog.description}</p>
-            </header>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {PARAMETER_GROUPS.technolog.description}
+              </p>
+            </div>
 
-            <div className="mt-4 flex flex-col gap-4">
+            <div className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                <label className="block text-xs text-zinc-400 mb-1.5">
                   {PARAMETER_DEFINITIONS.technolog_mode.name}
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 rounded-xl bg-white/[0.04] p-1 border border-white/[0.06]">
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, technolog_mode: "percent" })}
-                    className={`rounded-2xl p-2.5 text-xs font-medium transition-all cursor-pointer text-center ${
+                    className={`py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       form.technolog_mode === "percent"
-                        ? "bg-zinc-800 text-white font-semibold border border-white/20 shadow-xs"
-                        : "bg-zinc-950/60 border border-zinc-800 text-zinc-400 hover:text-white"
+                        ? "bg-white text-black font-semibold shadow-xs"
+                        : "text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
                     Процент от цены (% договора)
@@ -548,20 +546,20 @@ export function ParametersPage() {
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, technolog_mode: "per_sheet" })}
-                    className={`rounded-2xl p-2.5 text-xs font-medium transition-all cursor-pointer text-center ${
+                    className={`py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       form.technolog_mode === "per_sheet"
-                        ? "bg-zinc-800 text-white font-semibold border border-white/20 shadow-xs"
-                        : "bg-zinc-950/60 border border-zinc-800 text-zinc-400 hover:text-white"
+                        ? "bg-white text-black font-semibold shadow-xs"
+                        : "text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
-                    За лист ЛДСП в проекте
+                    За лист ЛДСП
                   </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className={form.technolog_mode === "percent" ? "opacity-100" : "opacity-40"}>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">
+                  <label className="text-xs text-zinc-400 block mb-1.5">
                     {PARAMETER_DEFINITIONS.technolog_pct.name}
                   </label>
                   <div className="relative">
@@ -571,16 +569,16 @@ export function ParametersPage() {
                       value={form.technolog_pct}
                       onChange={(e) => setForm({ ...form, technolog_pct: e.target.value })}
                       placeholder="4"
-                      className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 pr-8 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
+                      className="w-full h-10 rounded-lg bg-white/[0.03] border border-white/[0.09] px-3 pr-8 text-[14px] text-white tabular-nums focus:outline-hidden focus:border-white/30"
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-500">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
                       %
                     </span>
                   </div>
                 </div>
 
                 <div className={form.technolog_mode === "per_sheet" ? "opacity-100" : "opacity-40"}>
-                  <label className="text-xs font-semibold text-zinc-300 block mb-1">
+                  <label className="text-xs text-zinc-400 block mb-1.5">
                     {PARAMETER_DEFINITIONS.technolog_per_sheet.name}
                   </label>
                   <div className="relative">
@@ -590,9 +588,9 @@ export function ParametersPage() {
                       value={form.technolog_per_sheet}
                       onChange={(e) => setForm({ ...form, technolog_per_sheet: e.target.value })}
                       placeholder="4000"
-                      className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 pr-14 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
+                      className="w-full h-10 rounded-lg bg-white/[0.03] border border-white/[0.09] px-3 pr-14 text-[14px] text-white tabular-nums focus:outline-hidden focus:border-white/30"
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-zinc-500">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">
                       ₸/лист
                     </span>
                   </div>
@@ -602,17 +600,19 @@ export function ParametersPage() {
           </section>
 
           {/* Секция 4: Отходы и риски */}
-          <section className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-lg">
-            <header className="border-b border-white/[0.06] pb-3">
-              <h2 className="text-base font-semibold text-white">
+          <section className="py-6">
+            <div className="mb-4">
+              <h2 className="text-[15px] font-medium text-white">
                 {PARAMETER_GROUPS.waste_risk.title}
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">{PARAMETER_GROUPS.waste_risk.description}</p>
-            </header>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {PARAMETER_GROUPS.waste_risk.description}
+              </p>
+            </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-zinc-300 block mb-1">
+                <label className="text-xs text-zinc-400 block mb-1.5">
                   {PARAMETER_DEFINITIONS.waste_edge_pct.name}
                 </label>
                 <div className="relative">
@@ -622,16 +622,16 @@ export function ParametersPage() {
                     value={form.waste_edge_pct}
                     onChange={(e) => setForm({ ...form, waste_edge_pct: e.target.value })}
                     placeholder="10"
-                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 pr-8 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
+                    className="w-full h-10 rounded-lg bg-white/[0.03] border border-white/[0.09] px-3 pr-8 text-[14px] text-white tabular-nums focus:outline-hidden focus:border-white/30"
                   />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-500">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
                     %
                   </span>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-zinc-300 block mb-1">
+                <label className="text-xs text-zinc-400 block mb-1.5">
                   {PARAMETER_DEFINITIONS.risk_reserve_pct.name}
                 </label>
                 <div className="relative">
@@ -641,26 +641,15 @@ export function ParametersPage() {
                     value={form.risk_reserve_pct}
                     onChange={(e) => setForm({ ...form, risk_reserve_pct: e.target.value })}
                     placeholder="0"
-                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 pr-8 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20"
+                    className="w-full h-10 rounded-lg bg-white/[0.03] border border-white/[0.09] px-3 pr-8 text-[14px] text-white tabular-nums focus:outline-hidden focus:border-white/30"
                   />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-500">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
                     %
                   </span>
                 </div>
               </div>
             </div>
           </section>
-
-          {/* Сохранение */}
-          <div className="mt-2 flex items-center justify-end">
-            <button
-              type="submit"
-              disabled={saving || loading || denomEval.status === "error"}
-              className="rounded-full bg-white text-black font-semibold px-6 py-3 text-xs hover:bg-zinc-200 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
-            >
-              {saving ? "Сохранение параметров…" : "Сохранить параметры"}
-            </button>
-          </div>
         </form>
       )}
     </main>

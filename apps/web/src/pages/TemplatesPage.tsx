@@ -34,7 +34,7 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
   async function handleDelete(t: ProductTemplateWithLines) {
     const confirmed = await dialog.confirm({
       title: "Удаление шаблона",
-      message: `Удалить шаблон изделия «${t.name}»? Это действие нельзя отменить.`,
+      message: `Удалить шаблон «${t.name}»? Это действие нельзя отменить.`,
       confirmLabel: "Удалить",
       destructive: true,
     });
@@ -51,128 +51,137 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-8 pb-32 text-zinc-100">
-      {/* Шапка страницы */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-8">
+    <div className="mx-auto flex w-full max-w-4xl flex-col px-5 pt-6 pb-24 text-zinc-100 select-none">
+      {/* Шапка */}
+      <div className="flex items-end justify-between pb-6 border-b border-white/[0.08]">
         <div>
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-zinc-900 border border-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
-          >
-            ← К сделкам
-          </button>
-          <div className="text-[10px] font-semibold tracking-[0.2em] text-zinc-500 uppercase">
-            TEMPLATES · ARCHETYPES
+          <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-zinc-500">
+            Библиотека комплектаций
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mt-1">
+          <h1 className="mt-1.5 text-[32px] sm:text-[38px] leading-none font-semibold tracking-[-0.03em] text-white">
             Шаблоны изделий
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Типовые наборы позиций для мгновенного добавления в смету заказа
+          <p className="mt-2 text-[13px] text-zinc-400">
+            Готовые спецификации для быстрого расчёта типовых кухонь и шкафов
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-[13px] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+        >
+          К проектам
+        </button>
       </div>
 
       {error && (
-        <div className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
+        <div className="my-4 border-l-2 border-rose-500 pl-3 py-1 text-[13px] text-rose-300">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="mt-16 flex flex-col items-center justify-center py-12 text-zinc-500">
-          <div className="h-7 w-7 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-          <span className="mt-3 text-xs font-medium">Загрузка шаблонов…</span>
+        <div className="py-20 flex flex-col items-center justify-center text-zinc-500">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
+          <span className="mt-3 text-[13px]">Загрузка…</span>
         </div>
       ) : templates.length === 0 ? (
-        <div className="mt-6 rounded-3xl border border-dashed border-zinc-800 bg-[#121215]/50 p-12 text-center">
-          <span className="text-3xl block mb-2">📋</span>
-          <h3 className="text-base font-semibold text-white">Шаблонов пока нет</h3>
-          <p className="mt-1 text-xs text-zinc-500 max-w-md mx-auto">
-            Вы можете создать шаблон прямо из любого готового заказа: откройте заказ и выберите «Сохранить как шаблон».
+        <div className="py-16 text-center">
+          <h3 className="text-[15px] font-medium text-white">Шаблонов пока нет</h3>
+          <p className="mt-1 text-[13px] text-zinc-500 max-w-md mx-auto">
+            Откройте любой рассчитанный проект и сохраните его комплектацию как шаблон.
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="divide-y divide-white/[0.07]">
           {templates.map((tpl) => {
             const isExpanded = expandedTemplateId === tpl.id;
             const linesCount = tpl.lines?.length ?? 0;
+            const estimatedSum = (tpl.lines ?? []).reduce((acc, l) => {
+              const p = priceItemsById.get(l.price_item_id);
+              return acc + (p ? p.price * l.qty : 0);
+            }, 0);
 
             return (
-              <div
-                key={tpl.id}
-                className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-lg transition-all hover:border-white/[0.18]"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2.5">
-                      <h3 className="text-base font-semibold text-white">{tpl.name}</h3>
-                      <span className="rounded-full bg-white/[0.06] border border-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-zinc-300">
+              <div key={tpl.id}>
+                <div
+                  onClick={() => setExpandedTemplateId(isExpanded ? null : tpl.id)}
+                  className="py-5 flex items-center justify-between gap-4 cursor-pointer group"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2.5">
+                      <h3 className="text-[17px] font-medium tracking-[-0.015em] text-white group-hover:text-emerald-400 transition-colors">
+                        {tpl.name}
+                      </h3>
+                      <span className="text-[13px] text-zinc-500 tabular-nums">
                         {linesCount} поз.
                       </span>
                     </div>
                     {tpl.description && (
-                      <p className="mt-1.5 text-xs text-zinc-400">{tpl.description}</p>
+                      <p className="mt-1 text-[13px] text-zinc-400 truncate">
+                        {tpl.description}
+                      </p>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedTemplateId(isExpanded ? null : tpl.id)}
-                      className="rounded-full bg-zinc-900 border border-zinc-800 px-3.5 py-1.5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                  <div className="flex items-center gap-3 shrink-0">
+                    {estimatedSum > 0 && (
+                      <span className="text-[16px] font-medium text-white tabular-nums">
+                        {formatKzt(estimatedSum)} ₸
+                      </span>
+                    )}
+                    <svg
+                      className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${
+                        isExpanded ? "rotate-90 text-zinc-300" : ""
+                      }`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
                     >
-                      {isExpanded ? "Скрыть состав ▲" : "Состав ▼"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDelete(tpl)}
-                      className="rounded-full bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition-all cursor-pointer"
-                      title="Удалить шаблон"
-                    >
-                      Удалить
-                    </button>
+                      <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </div>
                 </div>
 
-                {/* Раскрывающийся состав строк шаблона */}
                 {isExpanded && (
-                  <div className="mt-4 border-t border-white/[0.06] pt-4 animate-in fade-in duration-200">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                      Позиции в шаблоне:
-                    </span>
-                    <div className="mt-2.5 flex flex-col gap-1.5 text-xs">
+                  <div className="pb-5 pl-4 border-l border-white/[0.08] ml-1">
+                    <div className="divide-y divide-white/[0.04]">
                       {tpl.lines?.map((line, idx) => {
                         const priceItem = priceItemsById.get(line.price_item_id);
                         return (
                           <div
                             key={idx}
-                            className="flex items-center justify-between rounded-xl bg-zinc-950/60 border border-zinc-800/60 p-2.5"
+                            className="py-2.5 flex items-center justify-between text-[13px]"
                           >
-                            <div>
-                              <span className="font-medium text-zinc-200">
-                                {priceItem ? priceItem.name : `Позиция ID: ${line.price_item_id}`}
-                              </span>
-                              {!priceItem?.active && (
-                                <span className="ml-2 text-[10px] text-amber-400 font-semibold">
-                                  (неактивна в каталоге)
-                                </span>
+                            <div className="min-w-0 pr-3">
+                              <div className="text-zinc-200 truncate">
+                                {priceItem ? priceItem.name : `Позиция ${line.price_item_id}`}
+                              </div>
+                              {priceItem && (
+                                <div className="text-[11px] text-zinc-500 tabular-nums">
+                                  {formatKzt(priceItem.price)} ₸ / {priceItem.unit}
+                                  {!priceItem.active && " · архив"}
+                                </div>
                               )}
                             </div>
-                            <div className="text-right">
-                              <span className="font-semibold text-white tabular-nums">
-                                {line.qty} {priceItem?.unit ?? "шт"}
-                              </span>
-                              {priceItem && (
-                                <span className="ml-2 text-zinc-500 font-mono text-[11px]">
-                                  ({formatKzt(priceItem.price)} ₸/{priceItem.unit})
-                                </span>
-                              )}
+                            <div className="text-right shrink-0 font-medium text-white tabular-nums">
+                              {line.qty} {priceItem?.unit ?? "шт"}
                             </div>
                           </div>
                         );
                       })}
+                    </div>
+
+                    <div className="mt-3 pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(tpl)}
+                        className="text-[12px] text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
+                      >
+                        Удалить шаблон
+                      </button>
                     </div>
                   </div>
                 )}

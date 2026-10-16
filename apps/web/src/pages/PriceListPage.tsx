@@ -335,190 +335,205 @@ export function PriceListPage() {
   const filteredItems = filterPriceItems(items, searchQuery, selectedCategory, showArchived);
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col px-4 py-8 pb-32 text-zinc-100">
+    <main className="mx-auto flex w-full max-w-[680px] flex-col px-5 pt-6 pb-24 text-zinc-100 select-none">
       {/* Заголовок страницы и кнопка добавления */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-end justify-between pb-6 border-b border-white/[0.07]">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Каталог цен</h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Материалы, работы цеха, фурнитура и сборка
-          </p>
+          <span className="text-[11px] font-medium tracking-wider uppercase text-zinc-500 block mb-1">
+            Справочник расценок
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+            Прайс-лист
+          </h1>
         </div>
 
         <button
           type="button"
           onClick={() => setIsAddingNew(true)}
-          className="rounded-full bg-white text-black font-semibold px-5 py-2.5 text-xs hover:bg-zinc-200 shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+          className="h-9 px-4 rounded-lg bg-white text-black font-semibold text-[13px] hover:bg-zinc-200 active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5"
         >
-          <span className="text-base leading-none">+</span>
-          <span>Новая позиция</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span>Позиция</span>
         </button>
       </div>
 
-      {/* Поиск и переключатели */}
-      <div className="flex flex-col gap-3 mb-6">
-        <div className="relative">
+      {/* Поиск и фильтры (flush hairline strip) */}
+      <div className="flex flex-col border-b border-white/[0.07]">
+        <div className="relative flex items-center py-2.5 border-b border-white/[0.05]">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-zinc-500 mr-2.5 shrink-0"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
           <input
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск по названию, поставщику, примечанию…"
-            className="w-full rounded-full bg-[#121215] border border-white/[0.08] px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20 transition-all"
+            className="w-full bg-transparent py-1 text-[13px] text-white placeholder-zinc-600 focus:outline-hidden"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white p-1 text-xs cursor-pointer"
+              className="text-zinc-500 hover:text-white p-1 text-xs cursor-pointer"
             >
               ✕
             </button>
           )}
         </div>
 
-        {/* Фильтр по категориям */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 text-xs font-medium no-scrollbar">
-          <button
-            type="button"
-            onClick={() => setSelectedCategory("all")}
-            className={`rounded-full px-3.5 py-1.5 transition-all cursor-pointer whitespace-nowrap ${
-              selectedCategory === "all"
-                ? "bg-zinc-800 text-white font-semibold shadow-xs"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            Все ({items.length})
-          </button>
-          {ALL_CATEGORIES.map((cat) => {
-            const count = items.filter((it) => it.category === cat).length;
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`rounded-full px-3.5 py-1.5 transition-all cursor-pointer whitespace-nowrap ${
-                  selectedCategory === cat
-                    ? "bg-zinc-800 text-white font-semibold shadow-xs"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                {CATEGORY_LABELS[cat]} ({count})
-              </button>
-            );
-          })}
-        </div>
+        {/* Категории и архив */}
+        <div className="flex items-center justify-between gap-4 py-2.5 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-4 text-[12px]">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory("all")}
+              className={`transition-colors cursor-pointer whitespace-nowrap ${
+                selectedCategory === "all"
+                  ? "text-white font-semibold"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Все <span className="text-[11px] text-zinc-600 ml-0.5">{items.length}</span>
+            </button>
+            {ALL_CATEGORIES.map((cat) => {
+              const count = items.filter((it) => it.category === cat).length;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`transition-colors cursor-pointer whitespace-nowrap ${
+                    selectedCategory === cat
+                      ? "text-white font-semibold"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {CATEGORY_LABELS[cat]}{" "}
+                  <span className="text-[11px] text-zinc-600 ml-0.5">{count}</span>
+                </button>
+              );
+            })}
+          </div>
 
-        {/* Переключатель показа архивных позиций */}
-        <div className="flex items-center justify-between text-xs text-zinc-500 pt-1">
-          <span>Найдено позиций: {filteredItems.length}</span>
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+          <label className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 cursor-pointer shrink-0">
             <input
               type="checkbox"
               checked={showArchived}
               onChange={(e) => setShowArchived(e.target.checked)}
               className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-0"
             />
-            <span>Показать архивные</span>
+            <span>Архив</span>
           </label>
         </div>
       </div>
 
       {/* Ошибки или индикатор загрузки */}
       {loading && (
-        <div className="mt-12 flex items-center justify-center text-xs text-zinc-500">
+        <div className="py-16 text-center text-[13px] text-zinc-500">
           Загрузка каталога…
         </div>
       )}
 
       {error && (
-        <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
+        <div className="my-4 border-l-2 border-rose-500 bg-rose-500/5 pl-4 py-3 text-xs text-rose-300">
           Ошибка: {error}
         </div>
       )}
 
       {/* Список позиций */}
       {!loading && !error && filteredItems.length === 0 && (
-        <div className="mt-8 rounded-3xl border border-dashed border-white/10 bg-zinc-900/30 p-8 text-center text-xs text-zinc-500">
+        <div className="py-16 text-center text-[13px] text-zinc-500 border-b border-white/[0.07]">
           Позиции не найдены. Попробуйте изменить поисковый запрос или категорию.
         </div>
       )}
 
       {!loading && !error && filteredItems.length > 0 && (
-        <div className="mt-4 flex flex-col gap-2.5">
+        <div className="divide-y divide-white/[0.07] border-b border-white/[0.07]">
           {filteredItems.map((item) => {
             const isEditing = inlineEditingId === item.id;
 
             return (
               <div
                 key={item.id}
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-3xl border p-4 transition-all shadow-md ${
-                  item.active
-                    ? "border-white/[0.07] bg-[#121215] hover:border-white/[0.18]"
-                    : "border-zinc-800/60 bg-zinc-950/60 opacity-60"
+                className={`py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
+                  item.active ? "" : "opacity-50"
                 }`}
               >
-                {/* Левая часть: название, категория, бейджи */}
+                {/* Левая часть: название, категория, свойства */}
                 <div
-                  className="flex-1 cursor-pointer"
+                  className="flex-1 min-w-0 cursor-pointer pr-2 group"
                   onClick={() => handleOpenDetail(item)}
                 >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-white text-sm md:text-base leading-snug">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14px] font-medium text-zinc-100 group-hover:text-white transition-colors truncate">
                       {item.name}
                     </span>
-                    <span className="rounded-full bg-white/[0.06] border border-white/[0.08] px-2.5 py-0.5 text-[11px] font-medium text-zinc-400">
-                      {CATEGORY_LABELS[item.category]}
-                    </span>
                     {!item.active && (
-                      <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-amber-300">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-amber-400 shrink-0">
                         Архив
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
-                    <span>
-                      Ед.: <strong className="font-medium text-zinc-300">{item.unit}</strong>
-                    </span>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-zinc-500">
+                    <span>{CATEGORY_LABELS[item.category]}</span>
+                    <span>·</span>
+                    <span>ед. {item.unit}</span>
                     {item.supplier && (
-                      <span>
-                        Поставщик:{" "}
-                        <strong className="font-medium text-zinc-300">{item.supplier}</strong>
-                      </span>
+                      <>
+                        <span>·</span>
+                        <span className="text-zinc-400">{item.supplier}</span>
+                      </>
                     )}
                     {item.waste_applicable && (
-                      <span className="text-emerald-400 font-medium">Отход: кромка</span>
+                      <>
+                        <span>·</span>
+                        <span className="text-emerald-400/90">отход кромки</span>
+                      </>
                     )}
                     {item.counts_for_technolog && (
-                      <span className="text-indigo-400 font-medium">Для технолога</span>
-                    )}
-                    {item.billable_qty_rounding === "ceil_to_unit" && (
-                      <span className="text-zinc-400">Окр. вверх</span>
+                      <>
+                        <span>·</span>
+                        <span className="text-sky-400/90">базис технолога</span>
+                      </>
                     )}
                   </div>
                 </div>
 
                 {/* Правая часть: цена и инлайн-редактирование */}
-                <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-800/80">
+                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
                   {isEditing ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <input
                         type="text"
                         inputMode="decimal"
                         value={inlinePriceInput}
                         onChange={(e) => setInlinePriceInput(e.target.value)}
                         placeholder="Цена"
-                        className="w-28 min-h-10 rounded-xl border border-emerald-500 bg-zinc-950 px-3 text-right text-sm font-semibold text-white focus:outline-hidden"
+                        className="w-28 h-8 rounded-lg border border-white/25 bg-zinc-900 px-2.5 text-right text-[13px] font-semibold text-white tabular-nums focus:outline-hidden"
                         autoFocus
                       />
                       <button
                         type="button"
                         onClick={() => void handleSaveInlinePrice(item)}
                         disabled={inlineSaving}
-                        className="min-h-10 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition-all cursor-pointer disabled:opacity-50"
+                        className="h-8 px-2.5 rounded-lg bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition-colors cursor-pointer disabled:opacity-50"
                         title="Сохранить цену"
                       >
-                        ✓
+                        ОК
                       </button>
                       <button
                         type="button"
@@ -526,7 +541,7 @@ export function PriceListPage() {
                           setInlineEditingId(null);
                           setInlineError(null);
                         }}
-                        className="min-h-10 px-3 rounded-xl border border-zinc-800 bg-zinc-900 text-xs font-bold text-zinc-400 hover:text-white cursor-pointer"
+                        className="h-8 px-2 rounded-lg text-xs text-zinc-500 hover:text-white cursor-pointer"
                         title="Отмена"
                       >
                         ✕
@@ -534,15 +549,6 @@ export function PriceListPage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className="text-base md:text-lg font-bold text-white tabular-nums">
-                          {formatKzt(item.price)} ₸
-                        </span>
-                        <span className="block text-[10px] text-zinc-500 font-mono">
-                          за {item.unit}
-                        </span>
-                      </div>
-
                       <button
                         type="button"
                         onClick={() => {
@@ -550,27 +556,34 @@ export function PriceListPage() {
                           setInlinePriceInput(String(item.price));
                           setInlineError(null);
                         }}
-                        className="rounded-full bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
-                        title="Быстро изменить цену"
+                        className="text-right group/price cursor-pointer"
+                        title="Нажмите, чтобы быстро изменить цену"
                       >
-                        Изменить
+                        <span className="text-[15px] font-semibold text-white tabular-nums group-hover/price:text-emerald-400 transition-colors">
+                          {formatKzt(item.price)}{" "}
+                          <span className="text-xs font-normal text-zinc-500">₸</span>
+                        </span>
+                        <span className="block text-[11px] text-zinc-600">
+                          за {item.unit}
+                        </span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handleOpenDetail(item)}
-                        className="h-8 w-8 rounded-full border border-zinc-800 bg-zinc-900 flex items-center justify-center text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
-                        title="Подробнее"
+                        className="h-7 w-7 rounded-full flex items-center justify-center text-zinc-600 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                        title="Параметры и история"
                       >
-                        ⋯
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m9 18 6-6-6-6" />
+                        </svg>
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Ошибка инлайн-сохранения, если возникла */}
                 {isEditing && inlineError && (
-                  <div className="w-full text-xs text-red-600 font-medium">
+                  <div className="w-full text-xs text-rose-400 mt-1">
                     {inlineError}
                   </div>
                 )}
@@ -580,7 +593,7 @@ export function PriceListPage() {
         </div>
       )}
 
-      {/* Модальное окно карточки позиции (детали, история, редактирование, архив) */}
+      {/* Модальное окно карточки позиции */}
       {selectedItem && (
         <PriceItemDetailModal
           item={selectedItem}

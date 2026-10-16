@@ -7,7 +7,6 @@ import type {
   OrderLine,
   OrderAdjustment,
   PriceItem,
-  PriceCategory,
 } from "../../types/database";
 import type { ParametersMap } from "../../lib/parameters";
 import type { OrderDisplayCalculation } from "../../lib/orders";
@@ -37,6 +36,10 @@ export interface CockpitViewProps {
   onToggleTableMode?: () => void;
 }
 
+function lineEffectiveCost(line: OrderLine): number {
+  return Math.round(line.qty * line.unit_price * (1 + (line.waste_pct || 0) / 100));
+}
+
 export function CockpitView({
   order,
   lines,
@@ -47,29 +50,23 @@ export function CockpitView({
   displayCalc,
   calcOutcome: _calcOutcome,
   locked,
-  currentStage: _currentStage,
-  onSelectStage: _onSelectStage,
+  currentStage,
+  onSelectStage,
   onUpdateContractPrice,
   onStepLineQty,
   onStepPriceItem,
   onDeleteLine,
   onOpenPricePicker,
-  onSaveCalculation: _onSaveCalculation,
-  onOpenVersionsModal: _onOpenVersionsModal,
+  onSaveCalculation,
+  onOpenVersionsModal,
   onBack,
   onToggleTableMode,
 }: CockpitViewProps) {
-  // Режим экрана: "deal" (для владельца: маржа, прибыль, линейка) | "client" (для заказчика: чистые солидные категории)
   const [viewMode, setViewMode] = useState<"deal" | "client">("deal");
+  const [expandedSection, setExpandedSection] = useState<string | null>("materials");
+  const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
+  const [quickQuery, setQuickQuery] = useState("");
 
-  // Раскрытая капсула для редактирования состава
-  const [expandedCapsule, setExpandedCapsule] = useState<string | null>(null);
-
-  // Быстрый поиск материалов внизу
-  const [isQuickInputOpen, setIsQuickInputOpen] = useState(false);
-  const [quickInput, setQuickInput] = useState("");
-
-  // Рекомендуемая цена без скидки и себестоимость
   const recommendedPrice = useMemo(() => {
     return displayCalc?.priceTotal || 1480000;
   }, [displayCalc]);
@@ -78,7 +75,6 @@ export function CockpitView({
     return displayCalc?.costTotal || 980000;
   }, [displayCalc]);
 
-  // Текущая цена договора
   const [currentPrice, setCurrentPrice] = useState<number>(() => {
     return order.contract_price ?? recommendedPrice;
   });
@@ -91,105 +87,89 @@ export function CockpitView({
     }
   }, [order.contract_price, recommendedPrice]);
 
-  // Расчёт чистой прибыли и маржи
-  const netProfit = Math.max(0, currentPrice - costTotal);
+  const netProfit = currentPrice - costTotal;
   const marginPct = currentPrice > 0 ? netProfit / currentPrice : 0;
+  const discountDiff = currentPrice - recommendedPrice;
   const discountPct =
-    recommendedPrice > 0 && currentPrice < recommendedPrice
-      ? Math.round(((recommendedPrice - currentPrice) / recommendedPrice) * 100)
+    recommendedPrice > 0 && Math.abs(discountDiff) >= 1000
+      ? Math.round((discountDiff / recommendedPrice) * 100)
       : 0;
 
-  // Форматирование процентов строго по референсу (например, "14.2%" без лишних хвостов)
   const marginPctString = `${(marginPct * 100).toFixed(1).replace(/\.0$/, "")}%`;
-
   const marginColor = getMarginColor(marginPct, 0.28);
-  const dotColor =
+  const accentColor =
     marginColor.status === "success"
       ? "#10b981"
       : marginColor.status === "warning"
       ? "#f59e0b"
       : marginColor.status === "danger"
       ? "#ef4444"
-      : "#71717a";
+      : "#a1a1aa";
 
-  // Линейные метры гарнитура
   const totalLinearMeters = useMemo(() => {
     const sum = items.reduce((acc, it) => acc + (it.linear_meters || 0), 0);
-    return sum > 0 ? sum.toFixed(2) : "3.60";
+    return sum > 0 ? sum.toFixed(2).replace(/\.00$/, "") : "3.6";
   }, [items]);
 
-  // Группировка затрат по категориям
-  const categoryGroups = useMemo(() => {
-    const groups: Record<PriceCategory, { total: number; lines: OrderLine[] }> = {
-      materials: { total: 0, lines: [] },
-      facades: { total: 0, lines: [] },
-      hardware: { total: 0, lines: [] },
-      workshop: { total: 0, lines: [] },
-      transport: { total: 0, lines: [] },
-      labor: { total: 0, lines: [] },
-      assembly: { total: 0, lines: [] },
-      technolog: { total: 0, lines: [] },
-      other: { total: 0, lines: [] },
+  // Точная группировка всех строк и расчётных статей без расхождений
+  const breakdown = useMemo(() => {
+    const materialLines = lines.filter(
+      (l) => l.category === "materials" || l.category === "facades"
+    );
+    const hardwareLines = lines.filter(
+      (l) => l.category === "hardware" || l.category === "other"
+    );
+    const workshopLines = lines.filter(
+      (l) =>
+        l.category === "workshop" ||
+        l.category === "transport" ||
+        l.category === "labor" ||
+        l.category === "assembly" ||
+        l.category === "technolog"
+    );
+
+    const materialsSum = materialLines.reduce((acc, l) => acc + lineEffectiveCost(l), 0);
+    const hardwareSum = hardwareLines.reduce((acc, l) => acc + lineEffectiveCost(l), 0);
+    const workshopLinesSum = workshopLines.reduce((acc, l) => acc + lineEffectiveCost(l), 0);
+
+    const assemblyCost = Math.round(displayCalc?.assembly || 0);
+    const technologCost = Math.round(displayCalc?.technolog || 0);
+    const riskReserveCost = Math.round(displayCalc?.riskReserve || 0);
+
+    const operationsTotal =
+      assemblyCost + technologCost + riskReserveCost + workshopLinesSum;
+
+    return {
+      materialLines,
+      hardwareLines,
+      workshopLines,
+      materialsSum,
+      hardwareSum,
+      workshopLinesSum,
+      assemblyCost,
+      technologCost,
+      riskReserveCost,
+      operationsTotal,
     };
+  }, [lines, displayCalc]);
 
-    for (const l of lines) {
-      const cat = l.category in groups ? l.category : "other";
-      const lineCost = l.qty * l.unit_price * (1 + (l.waste_pct || 0) / 100);
-      groups[cat].total += lineCost;
-      groups[cat].lines.push(l);
-    }
+  const hasBlum = useMemo(
+    () =>
+      lines.some(
+        (x) => x.category === "hardware" && x.name.toLowerCase().includes("blum")
+      ),
+    [lines]
+  );
 
-    return groups;
-  }, [lines]);
-
-  // Суммарные блоки для Deal Mode
-  const workshopAndTechTotal =
-    categoryGroups.workshop.total +
-    categoryGroups.technolog.total +
-    (displayCalc?.technolog || 0);
-
-  const materialsAndWasteTotal =
-    categoryGroups.materials.total +
-    categoryGroups.facades.total +
-    categoryGroups.hardware.total;
-
-  const workshopPctString = `${(
-    (currentPrice > 0 ? workshopAndTechTotal / currentPrice : 0) * 100
-  )
-    .toFixed(1)
-    .replace(/\.0$/, "")}%`;
-
-  // Категории для Client Mode
-  const corpusTotal = categoryGroups.materials.total;
-  const facadesTotal = categoryGroups.facades.total;
-  const hardwareTotal = categoryGroups.hardware.total;
-  const countertopTotal = useMemo(() => {
-    return lines
-      .filter((l) => l.name.toLowerCase().includes("столешниц") || l.name.toLowerCase().includes("кварц"))
-      .reduce((sum, l) => sum + l.qty * l.unit_price, 0);
-  }, [lines]);
-
-  const mainCorpusName = useMemo(() => {
-    const l = lines.find((x) => x.category === "materials" && !x.name.includes("Столешница"));
-    return l ? l.name.replace("ЛДСП ", "").slice(0, 16) : "Egger 16mm";
-  }, [lines]);
-
-  const mainFacadeName = useMemo(() => {
-    const l = lines.find((x) => x.category === "facades");
-    return l ? l.name.replace("МДФ ", "").slice(0, 16) : "MDF Soft-Touch";
-  }, [lines]);
-
-  const hasBlum = lines.some((x) => x.category === "hardware" && x.name.toLowerCase().includes("blum"));
-  const mainHardwareName = hasBlum ? "Blum Austria" : "Boyard Pro";
-
-  const mainCountertopName = useMemo(() => {
-    const l = lines.find((x) => x.name.toLowerCase().includes("столешниц") || x.name.toLowerCase().includes("кварц"));
-    return l ? l.name.replace("Столешница ", "").slice(0, 16) : "HPL Compact";
-  }, [lines]);
-
-  // Линейка цен: диапазон от minMargin (10%) до basePrice + 15%
-  const rulerMin = Math.max(100000, Math.floor((costTotal * 1.08) / 50000) * 50000);
-  const rulerMax = Math.max(rulerMin + 200000, Math.ceil((recommendedPrice * 1.15) / 50000) * 50000);
+  // Диапазон тактильной шкалы цены
+  const rulerMin = Math.max(
+    100000,
+    Math.floor((costTotal * 1.05) / 50000) * 50000
+  );
+  const rulerMax = Math.max(
+    rulerMin + 300000,
+    Math.ceil((recommendedPrice * 1.2) / 50000) * 50000
+  );
   const rulerRef = useRef<HTMLDivElement>(null);
   const [isDraggingRuler, setIsDraggingRuler] = useState(false);
 
@@ -202,7 +182,9 @@ export function CockpitView({
     setCurrentPrice(steppedVal);
   };
 
-  const handlePointerDown = (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => {
+  const handlePointerDown = (
+    e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>
+  ) => {
     if (locked) return;
     setIsDraggingRuler(true);
     const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
@@ -221,7 +203,7 @@ export function CockpitView({
     };
     window.addEventListener("mousemove", handleMove);
     window.addEventListener("mouseup", handleUp);
-    window.addEventListener("touchmove", handleMove);
+    window.addEventListener("touchmove", handleMove, { passive: true });
     window.addEventListener("touchend", handleUp);
     return () => {
       window.removeEventListener("mousemove", handleMove);
@@ -229,16 +211,19 @@ export function CockpitView({
       window.removeEventListener("touchmove", handleMove);
       window.removeEventListener("touchend", handleUp);
     };
-  }, [isDraggingRuler, currentPrice]);
+  }, [isDraggingRuler, currentPrice, rulerMin, rulerMax]);
 
-  // Позиция стрелочки на линейке (0..100%)
-  const rulerRatio = Math.max(0, Math.min(100, ((currentPrice - rulerMin) / (rulerMax - rulerMin)) * 100));
+  const rulerRatio = Math.max(
+    0,
+    Math.min(100, ((currentPrice - rulerMin) / (rulerMax - rulerMin)) * 100)
+  );
 
-  // Пресеты сценариев в 1 клик
-  const handleApplyPreset = async (type: "min_margin" | "reset" | "discount_5" | "swap_hardware") => {
+  const handleApplyPreset = async (
+    type: "min_margin" | "reset" | "discount_5" | "swap_hardware"
+  ) => {
     if (locked) return;
     if (type === "min_margin") {
-      const minPrice = Math.round((costTotal / (1 - 0.12)) / 10000) * 10000;
+      const minPrice = Math.round(costTotal / (1 - 0.12) / 10000) * 10000;
       setCurrentPrice(minPrice);
       await onUpdateContractPrice(minPrice);
     } else if (type === "reset") {
@@ -249,16 +234,19 @@ export function CockpitView({
       setCurrentPrice(p);
       await onUpdateContractPrice(p);
     } else if (type === "swap_hardware") {
-      // Быстрая замена Blum ⇄ Boyard
       for (const line of lines.filter((l) => l.category === "hardware")) {
         if (hasBlum && line.name.toLowerCase().includes("blum")) {
-          const boyardItem = priceItems.find((p) => p.name.toLowerCase().includes("boyard"));
+          const boyardItem = priceItems.find((p) =>
+            p.name.toLowerCase().includes("boyard")
+          );
           if (boyardItem) {
             onStepLineQty(line.id, -line.qty);
             onStepPriceItem(boyardItem, line.qty, line.order_item_id);
           }
         } else if (!hasBlum && line.name.toLowerCase().includes("boyard")) {
-          const blumItem = priceItems.find((p) => p.name.toLowerCase().includes("blum"));
+          const blumItem = priceItems.find((p) =>
+            p.name.toLowerCase().includes("blum")
+          );
           if (blumItem) {
             onStepLineQty(line.id, -line.qty);
             onStepPriceItem(blumItem, line.qty, line.order_item_id);
@@ -268,542 +256,748 @@ export function CockpitView({
     }
   };
 
-  // Радиус кругового кольца маржи
-  const ringRadius = 10;
-  const ringCircumference = 2 * Math.PI * ringRadius;
-  const ringProgress = Math.min(1, Math.max(0, marginPct / 0.28));
-  const ringOffset = ringCircumference - ringProgress * ringCircumference;
+  // Доли для единой полосы структуры цены (в стиле iOS Storage)
+  const totalBase = Math.max(
+    1,
+    Math.max(0, netProfit) +
+      breakdown.materialsSum +
+      breakdown.hardwareSum +
+      breakdown.operationsTotal
+  );
+  const profitShare = Math.max(0, (Math.max(0, netProfit) / totalBase) * 100);
+  const materialsShare = (breakdown.materialsSum / totalBase) * 100;
+  const hardwareShare = (breakdown.hardwareSum / totalBase) * 100;
+  const opsShare = (breakdown.operationsTotal / totalBase) * 100;
+
+  const filteredCatalog = useMemo(() => {
+    const q = quickQuery.trim().toLowerCase();
+    if (!q) return priceItems.filter((p) => p.active).slice(0, 6);
+    return priceItems
+      .filter((p) => p.active && p.name.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [priceItems, quickQuery]);
+
+  const renderLineRow = (l: OrderLine) => {
+    const totalLine = lineEffectiveCost(l);
+    return (
+      <div
+        key={l.id}
+        className="group flex items-center justify-between py-3 border-b border-white/[0.04] last:border-b-0"
+      >
+        <div className="flex-1 min-w-0 pr-3">
+          <div className="text-[14px] font-normal text-zinc-100 leading-snug truncate">
+            {l.name}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-zinc-500 tabular-nums">
+            <span>
+              {formatKzt(l.unit_price)} ₸ / {l.unit}
+            </span>
+            {l.waste_pct > 0 && <span>· отходы +{l.waste_pct}%</span>}
+            <span className="text-zinc-400">· {formatKzt(totalLine)} ₸</span>
+          </div>
+        </div>
+
+        {viewMode === "deal" && !locked ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="inline-flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onStepLineQty(l.id, -1)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-zinc-300 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer"
+                aria-label="Уменьшить"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 12h14" strokeLinecap="round" />
+                </svg>
+              </button>
+              <span className="min-w-[32px] text-center text-[13px] font-medium text-white tabular-nums">
+                {l.qty}
+              </span>
+              <button
+                type="button"
+                onClick={() => onStepLineQty(l.id, 1)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-zinc-300 hover:bg-white/[0.12] hover:text-white active:scale-95 transition-all cursor-pointer"
+                aria-label="Увеличить"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onDeleteLine(l.id)}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              title="Удалить позицию"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <div className="text-right shrink-0">
+            <div className="text-[14px] font-medium text-zinc-200 tabular-nums">
+              {l.qty} {l.unit}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="mx-auto w-full max-w-md px-4 py-6 sm:py-8 flex flex-col min-h-screen text-zinc-100 select-none">
-      {/* 1. Верхний минималистичный бар */}
-      <header className="mb-8 flex items-center justify-between text-xs font-medium">
+    <div className="mx-auto w-full max-w-lg px-5 pt-4 pb-28 sm:py-8 flex flex-col min-h-svh text-zinc-100 select-none">
+      {/* 1. Навигационная шапка в стиле iOS */}
+      <header className="flex items-center justify-between py-2 mb-6">
         <button
           type="button"
           onClick={onBack}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer"
-          title="Назад к проектам"
+          className="inline-flex items-center gap-1 -ml-1.5 px-1.5 py-1 text-[15px] font-normal text-zinc-400 hover:text-white transition-colors cursor-pointer"
         >
-          ←
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>Сделки</span>
         </button>
 
-        {/* Индикатор режима: • Deal Mode или • Margin 18% */}
-        <div className="flex items-center gap-2">
-          <span
-            className="h-2 w-2 rounded-full transition-colors"
-            style={{ backgroundColor: dotColor, boxShadow: `0 0 8px ${dotColor}` }}
-          />
-          <span className="tracking-wide text-zinc-300">
-            {viewMode === "deal" ? "Deal Mode" : `Margin ${marginPctString}`}
-          </span>
-        </div>
-
-        {/* Переключатель: 🔒 Hide Margin / Client */}
-        <div className="flex items-center gap-2">
-          {onToggleTableMode && (
-            <button
-              type="button"
-              onClick={onToggleTableMode}
-              className="hidden sm:inline-block text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer mr-1"
-              title="Переключить на классическую таблицу"
-            >
-              Таблица
-            </button>
+        {/* Переключатель режимов и дополнительных экранов */}
+        <div className="flex items-center gap-4">
+          {viewMode === "deal" && (
+            <>
+              <button
+                type="button"
+                onClick={() => onSelectStage(currentStage === "fact" ? "quote" : "fact")}
+                className="text-[13px] font-normal text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                План/Факт
+              </button>
+              <button
+                type="button"
+                onClick={onOpenVersionsModal}
+                className="text-[13px] font-normal text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                Версии
+              </button>
+              {onToggleTableMode && (
+                <button
+                  type="button"
+                  onClick={onToggleTableMode}
+                  className="hidden sm:inline text-[13px] font-normal text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  Таблица
+                </button>
+              )}
+            </>
           )}
+
           <button
             type="button"
             onClick={() => setViewMode((prev) => (prev === "deal" ? "client" : "deal"))}
-            className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-pointer text-xs"
+            className={`inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors cursor-pointer ${
+              viewMode === "client" ? "text-emerald-400" : "text-zinc-300 hover:text-white"
+            }`}
           >
-            <span>🔒</span>
-            <span>{viewMode === "deal" ? "Hide Margin" : "Client"}</span>
+            {viewMode === "deal" ? (
+              <svg className="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0110 0v4" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+            <span>{viewMode === "deal" ? "Скрыть маржу" : "Режим клиента"}</span>
           </button>
         </div>
       </header>
 
-      {/* 2. Подзаголовок и цена (Hero Price) */}
-      <div className="flex flex-col items-center justify-center text-center mb-6">
-        <span className="text-[11px] font-semibold tracking-widest uppercase text-zinc-500">
-          {viewMode === "deal" ? (
-            discountPct > 0 ? (
-              <>
-                CONTRACT PRICE · DISCOUNT <span className="text-amber-400">-{discountPct}%</span>
-              </>
-            ) : (
-              "CONTRACT PRICE"
-            )
-          ) : (
-            `ORDER #${order.name.slice(0, 8)} · ${totalLinearMeters} M`
+      {/* 2. Заголовок заказа и Главная цена (Hero Price) */}
+      <div className="flex flex-col items-center text-center mb-7">
+        <div className="flex items-center gap-2 text-[12px] font-medium tracking-wide text-zinc-500">
+          <span className="truncate max-w-[220px]">{order.name}</span>
+          <span>·</span>
+          <span>{totalLinearMeters} п.м.</span>
+          {discountPct !== 0 && (
+            <>
+              <span>·</span>
+              <span className={discountPct < 0 ? "text-amber-400" : "text-emerald-400"}>
+                {discountPct > 0 ? `+${discountPct}%` : `${discountPct}%`}
+              </span>
+            </>
           )}
-        </span>
+        </div>
 
-        <h1 className="mt-2 text-5xl sm:text-6xl font-bold tracking-tight text-white tabular-nums">
-          {formatKzt(currentPrice)} <span className="font-light text-zinc-400">₸</span>
+        <h1 className="mt-2 text-[50px] sm:text-[56px] leading-[1.04] font-semibold tracking-[-0.035em] text-white tabular-nums">
+          {formatKzt(currentPrice)}
+          <span className="ml-2 text-[34px] font-light text-zinc-500">₸</span>
         </h1>
+
+        {/* Подстрочник статуса */}
+        <div className="mt-2.5 flex items-center gap-2 text-[13px] text-zinc-400 tabular-nums">
+          {viewMode === "deal" ? (
+            <>
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: accentColor }}
+              />
+              <span>
+                Маржа <strong className="font-medium text-white">{marginPctString}</strong>
+              </span>
+              <span className="text-zinc-600">·</span>
+              <span>Себестоимость {formatKzt(costTotal)} ₸</span>
+            </>
+          ) : (
+            <span>Индивидуальная комплектация · Гарантия 24 мес.</span>
+          )}
+        </div>
       </div>
 
-      {/* 3. Тактильная интерактивная линейка (Price Ruler) — только в Deal Mode */}
+      {/* 3. Тактильная шкала цены (Apple Watch / Camera Dial style) — только в режиме сделки */}
       {viewMode === "deal" && (
-        <div className="mb-8 px-2">
-          {/* Метки диапазона: 1.2M слева, 1.6M справа */}
-          <div className="flex justify-between text-[11px] font-mono text-zinc-600 mb-2 px-1">
-            <span>{(rulerMin / 1000000).toFixed(1)}M</span>
-            <span>{(rulerMax / 1000000).toFixed(1)}M</span>
+        <div className="mb-8">
+          <div className="flex items-center justify-between text-[11px] font-normal text-zinc-500 tabular-nums mb-1.5 px-0.5">
+            <span>{(rulerMin / 1000000).toFixed(2)} млн ₸</span>
+            <span className="text-zinc-600 text-[10px] tracking-widest uppercase">
+              Сдвиньте для подбора цены
+            </span>
+            <span>{(rulerMax / 1000000).toFixed(2)} млн ₸</span>
           </div>
 
-          {/* Дорожка с тонкими засечками */}
           <div
             ref={rulerRef}
             onMouseDown={handlePointerDown}
             onTouchStart={handlePointerDown}
-            className="relative h-12 flex flex-col justify-center cursor-pointer py-2"
+            style={{ touchAction: "none" }}
+            className="relative h-12 flex items-center cursor-ew-resize select-none"
           >
-            {/* Тонкие вертикальные засечки */}
-            <div className="flex justify-between items-center w-full px-1 pointer-events-none">
-              {Array.from({ length: 33 }).map((_, i) => {
-                const isMajor = i % 8 === 0;
-                const isMid = i % 4 === 0 && !isMajor;
+            {/* 41 точная засечка с подсветкой вокруг активного положения */}
+            <div className="flex justify-between items-center w-full pointer-events-none">
+              {Array.from({ length: 41 }).map((_, i) => {
+                const tickPos = (i / 40) * 100;
+                const dist = Math.abs(tickPos - rulerRatio);
+                const isMajor = i % 10 === 0;
+                const isMid = i % 5 === 0 && !isMajor;
+                const isNear = dist < 4.5;
+
                 return (
                   <div
                     key={i}
-                    className={`w-[1px] transition-all rounded-full ${
-                      isMajor
-                        ? "h-5 bg-zinc-600"
+                    className={`w-[1.5px] rounded-full transition-all duration-75 ${
+                      isNear
+                        ? "h-6 bg-white"
+                        : isMajor
+                        ? "h-5 bg-white/35"
                         : isMid
-                        ? "h-3.5 bg-zinc-750"
-                        : "h-2 bg-zinc-850"
+                        ? "h-3.5 bg-white/20"
+                        : "h-2 bg-white/[0.09]"
                     }`}
                   />
                 );
               })}
             </div>
 
-            {/* Аккуратная стрелка указателя (Needle) без цветных полос */}
+            {/* Активный курсор-игла */}
             <div
-              className="absolute bottom-0 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-75"
+              className="absolute inset-y-1 -translate-x-1/2 flex flex-col items-center justify-between pointer-events-none transition-all duration-75"
               style={{ left: `${rulerRatio}%` }}
             >
-              <span className="text-[10px] text-zinc-400 font-mono mb-0.5 leading-none">▲</span>
+              <div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: accentColor, boxShadow: `0 0 8px ${accentColor}` }}
+              />
+              <div
+                className="w-[2px] flex-1 my-0.5 rounded-full"
+                style={{ backgroundColor: accentColor }}
+              />
+              <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[5px] border-b-white" />
+            </div>
+          </div>
+
+          {/* Быстрые пресеты цены — минималистичные текстовые действия без тяжелых рамок */}
+          <div className="mt-2 flex items-center justify-between text-[12px] px-0.5">
+            <button
+              type="button"
+              onClick={() => void handleApplyPreset("min_margin")}
+              className="text-zinc-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <span>Мин. порог (маржа 12%)</span>
+            </button>
+
+            <div className="flex items-center gap-4">
+              {currentPrice !== recommendedPrice && (
+                <button
+                  type="button"
+                  onClick={() => void handleApplyPreset("reset")}
+                  className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer font-medium"
+                >
+                  Вернуть {formatKzt(recommendedPrice)} ₸
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onSaveCalculation}
+                className="text-zinc-300 hover:text-white transition-colors cursor-pointer font-medium"
+              >
+                Зафиксировать версию
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 4. Пропорциональные капсулы со световой заливкой (Capsule Bars) */}
-      <div className="flex flex-col gap-3">
-        {viewMode === "deal" ? (
-          <>
-            {/* Net Profit Capsule */}
+      {/* 4. Единая мульти-сегментная полоса структуры цены (как в iOS Хранилище / Apple Wallet) */}
+      <div className="mb-5">
+        <div className="h-1.5 w-full flex gap-[3px] rounded-full overflow-hidden">
+          {viewMode === "deal" && profitShare > 0 && (
             <div
-              onClick={() => setExpandedCapsule((p) => (p === "profit" ? null : "profit"))}
-              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
+              className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${profitShare}%`, backgroundColor: accentColor }}
+            />
+          )}
+          <div
+            className="h-full bg-zinc-100 rounded-full transition-all duration-300"
+            style={{ width: `${ Math.max(8, materialsShare)}%` }}
+          />
+          <div
+            className="h-full bg-zinc-400 rounded-full transition-all duration-300"
+            style={{ width: `${Math.max(6, hardwareShare)}%` }}
+          />
+          <div
+            className="h-full bg-zinc-600 rounded-full transition-all duration-300"
+            style={{ width: `${Math.max(6, opsShare)}%` }}
+          />
+        </div>
+      </div>
+
+      {/* 5. Чистый типографический список категорий с разделителями-волосками (без прямоугольных капсул) */}
+      <div className="border-t border-white/[0.08] divide-y divide-white/[0.08]">
+        {/* СЕКЦИЯ 1: ЧИСТАЯ ПРИБЫЛЬ (Только в режиме сделки) */}
+        {viewMode === "deal" && (
+          <div>
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedSection((p) => (p === "profit" ? null : "profit"))
+              }
+              className="w-full py-4 flex items-center justify-between text-left group cursor-pointer"
             >
-              {/* Полупрозрачная световая заливка доли */}
-              <div
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 border-r border-emerald-500/30 rounded-full transition-all duration-300 pointer-events-none"
-                style={{ width: `${Math.min(100, Math.max(12, marginPct * 100 * 2.2))}%` }}
-              />
+              <div className="flex items-center gap-3 min-w-0">
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: accentColor }}
+                />
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[16px] font-medium text-white tracking-[-0.01em]">
+                      Чистая прибыль
+                    </span>
+                    <span className="text-[13px] text-zinc-500 tabular-nums">
+                      {marginPctString}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-              <div className="relative z-10 flex items-center justify-between w-full text-xs">
-                <span className="font-medium text-zinc-200">
-                  Net Profit · {marginPctString}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span
+                  className="text-[16px] font-medium tabular-nums"
+                  style={{ color: netProfit >= 0 ? "#ffffff" : "#f87171" }}
+                >
+                  {formatKzt(netProfit)} ₸
                 </span>
+                <svg
+                  className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${
+                    expandedSection === "profit" ? "rotate-90 text-zinc-300" : ""
+                  }`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </button>
 
-                <div className="flex items-center gap-3">
-                  {/* SVG круговой индикатор */}
-                  <svg className="w-6 h-6 -rotate-90" viewBox="0 0 28 28">
-                    <circle
-                      cx="14"
-                      cy="14"
-                      r={ringRadius}
-                      stroke="rgba(255,255,255,0.12)"
-                      strokeWidth="2.5"
-                      fill="none"
-                    />
-                    <circle
-                      cx="14"
-                      cy="14"
-                      r={ringRadius}
-                      stroke={dotColor}
-                      strokeWidth="2.5"
-                      strokeDasharray={ringCircumference}
-                      strokeDashoffset={ringOffset}
-                      strokeLinecap="round"
-                      fill="none"
-                      className="transition-all duration-500"
-                    />
-                  </svg>
+            {expandedSection === "profit" && (
+              <div className="pb-4 pl-5 border-l border-white/[0.08] ml-1 space-y-2.5 text-[13px]">
+                <div className="flex items-center justify-between py-1">
+                  <div>
+                    <div className="text-zinc-200">Выручка по заказу</div>
+                    <div className="text-[11px] text-zinc-500">Текущая цена для клиента</div>
+                  </div>
+                  <span className="font-medium text-white tabular-nums">
+                    {formatKzt(currentPrice)} ₸
+                  </span>
+                </div>
 
-                  <span className="font-medium text-white tabular-nums text-sm">
-                    {formatKzt(netProfit)} ₸
+                <div className="flex items-center justify-between py-1">
+                  <div>
+                    <div className="text-zinc-200">Полная себестоимость</div>
+                    <div className="text-[11px] text-zinc-500">Материалы, фурнитура, цех и монтаж</div>
+                  </div>
+                  <span className="font-medium text-zinc-300 tabular-nums">
+                    −{formatKzt(costTotal)} ₸
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/[0.05]">
+                  <span className="text-zinc-400">Чистый остаток ({marginPctString})</span>
+                  <span className="font-semibold text-emerald-400 tabular-nums">
+                    +{formatKzt(netProfit)} ₸
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* СЕКЦИЯ 2: ПЛИТНЫЕ МАТЕРИАЛЫ И ФАСАДЫ */}
+        <div>
+          <button
+            type="button"
+            onClick={() =>
+              setExpandedSection((p) => (p === "materials" ? null : "materials"))
+            }
+            className="w-full py-4 flex items-center justify-between text-left group cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="h-2.5 w-2.5 rounded-full bg-zinc-100 shrink-0" />
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[16px] font-medium text-white tracking-[-0.01em]">
+                    Корпус, фасады и столешница
+                  </span>
+                  <span className="text-[13px] text-zinc-500 tabular-nums">
+                    {breakdown.materialLines.length} поз.
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Раскрывающийся состав по тапу на Net Profit */}
-            {expandedCapsule === "profit" && (
-              <div className="rounded-3xl bg-[#141418]/90 border border-white/[0.07] backdrop-blur-xl p-4 text-xs space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="flex justify-between text-zinc-400">
-                  <span>Себестоимость производства:</span>
-                  <span className="text-zinc-200 font-medium">{formatKzt(costTotal)} ₸</span>
-                </div>
-                <div className="flex justify-between text-zinc-400">
-                  <span>Выручка по договору:</span>
-                  <span className="text-white font-medium">{formatKzt(currentPrice)} ₸</span>
-                </div>
-                <div className="flex justify-between border-t border-zinc-800 pt-2 text-emerald-400 font-bold">
-                  <span>Чистая маржа:</span>
-                  <span>{formatKzt(netProfit)} ₸ ({marginPctString})</span>
-                </div>
-              </div>
-            )}
-
-            {/* Workshop & Tech Capsule */}
-            <div
-              onClick={() => setExpandedCapsule((p) => (p === "workshop" ? null : "workshop"))}
-              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
-            >
-              <div
-                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
-                style={{
-                  width: `${Math.min(
-                    100,
-                    Math.max(12, (workshopAndTechTotal / currentPrice) * 100 * 1.6)
-                  )}%`,
-                }}
-              />
-
-              <div className="relative z-10 flex items-center justify-between w-full text-xs">
-                <span className="font-medium text-zinc-200">
-                  Workshop & Tech · {workshopPctString}
-                </span>
-                <span className="font-medium text-white tabular-nums text-sm">
-                  {formatKzt(workshopAndTechTotal)} ₸
-                </span>
-              </div>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span className="text-[16px] font-medium text-white tabular-nums">
+                {formatKzt(breakdown.materialsSum)} ₸
+              </span>
+              <svg
+                className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${
+                  expandedSection === "materials" ? "rotate-90 text-zinc-300" : ""
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
+          </button>
 
-            {/* Раскрывающийся состав Workshop & Tech */}
-            {expandedCapsule === "workshop" && (
-              <div className="rounded-3xl bg-[#141418]/90 border border-white/[0.07] backdrop-blur-xl p-4 text-xs space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="flex justify-between text-zinc-400">
-                  <span>Сборка и монтаж:</span>
-                  <span className="text-zinc-200">{formatKzt(displayCalc?.assembly || 0)} ₸</span>
+          {expandedSection === "materials" && (
+            <div className="pb-4 pl-5 border-l border-white/[0.08] ml-1">
+              {breakdown.materialLines.length === 0 ? (
+                <div className="py-3 text-[13px] text-zinc-500">
+                  Плитные материалы ещё не добавлены
                 </div>
-                <div className="flex justify-between text-zinc-400">
-                  <span>Услуги технолога (Базис):</span>
-                  <span className="text-zinc-200">{formatKzt(displayCalc?.technolog || 0)} ₸</span>
+              ) : (
+                <div className="divide-y divide-white/[0.04]">
+                  {breakdown.materialLines.map(renderLineRow)}
                 </div>
-                <div className="flex justify-between text-zinc-400">
-                  <span>Цеховые работы:</span>
-                  <span className="text-zinc-200">{formatKzt(categoryGroups.workshop.total)} ₸</span>
-                </div>
-              </div>
-            )}
+              )}
 
-            {/* Materials & Waste Capsule */}
-            <div
-              onClick={() => setExpandedCapsule((p) => (p === "materials" ? null : "materials"))}
-              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
-            >
-              <div
-                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
-                style={{
-                  width: `${Math.min(
-                    100,
-                    Math.max(12, (materialsAndWasteTotal / currentPrice) * 100)
-                  )}%`,
-                }}
-              />
-
-              <div className="relative z-10 flex items-center justify-between w-full text-xs">
-                <span className="font-medium text-zinc-200">Materials & Waste</span>
-                <span className="font-medium text-white tabular-nums text-sm">
-                  {formatKzt(materialsAndWasteTotal)} ₸
-                </span>
-              </div>
-            </div>
-
-            {/* Раскрывающийся состав по тапу на Materials & Waste (счётчики, удаление, добавление) */}
-            {expandedCapsule === "materials" && (
-              <div className="rounded-3xl bg-[#141418]/90 border border-white/[0.07] backdrop-blur-xl p-4 text-xs space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="flex items-center justify-between text-zinc-400 font-semibold mb-1">
-                  <span>Позиции спецификации</span>
-                  <span>{lines.length} шт</span>
-                </div>
-
-                <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
-                  {lines.map((l) => (
-                    <div
-                      key={l.id}
-                      className="flex items-center justify-between rounded-xl bg-zinc-900/80 border border-zinc-800/60 p-2.5 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0 mr-3">
-                        <div className="font-medium text-zinc-200 truncate">{l.name}</div>
-                        <div className="text-[11px] text-zinc-500 font-mono">
-                          {formatKzt(l.unit_price)} ₸ / {l.unit}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Счётчик кол-ва [-] [qty] [+] */}
-                        <div className="flex items-center rounded-lg bg-zinc-950 border border-zinc-800 p-0.5">
-                          <button
-                            type="button"
-                            onClick={() => onStepLineQty(l.id, -1)}
-                            className="h-6 w-6 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer font-bold"
-                          >
-                            −
-                          </button>
-                          <span className="min-w-[28px] text-center font-mono font-semibold text-white text-[11px]">
-                            {l.qty}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onStepLineQty(l.id, 1)}
-                            className="h-6 w-6 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer font-bold"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        {/* Удаление */}
-                        <button
-                          type="button"
-                          onClick={() => onDeleteLine(l.id)}
-                          className="h-7 w-7 rounded-lg flex items-center justify-center text-zinc-600 hover:text-rose-400 hover:bg-rose-950/20 transition-colors cursor-pointer"
-                          title="Удалить позицию"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
+              {viewMode === "deal" && !locked && (
                 <button
                   type="button"
                   onClick={onOpenPricePicker}
-                  className="w-full rounded-2xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 py-2.5 text-center text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer"
+                  className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
                 >
-                  + Добавить позицию из каталога
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                  </svg>
+                  <span>Добавить из каталога</span>
                 </button>
-              </div>
-            )}
-          </>
-        ) : (
-          /* Client Mode (Photo 2) */
-          <>
-            {/* Corpus */}
-            <div
-              onClick={() => setExpandedCapsule((p) => (p === "corpus" ? null : "corpus"))}
-              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
-            >
-              <div
-                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
-                style={{ width: `${Math.min(100, Math.max(12, (corpusTotal / currentPrice) * 100))}%` }}
-              />
-              <div className="relative z-10 flex items-center justify-between w-full text-xs">
-                <span className="font-medium text-zinc-200">
-                  Corpus · {mainCorpusName}
-                </span>
-                <span className="font-medium text-white tabular-nums text-sm">
-                  {formatKzt(corpusTotal)} ₸
-                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* СЕКЦИЯ 3: ФУРНИТУРА И МЕХАНИЗМЫ */}
+        <div>
+          <button
+            type="button"
+            onClick={() =>
+              setExpandedSection((p) => (p === "hardware" ? null : "hardware"))
+            }
+            className="w-full py-4 flex items-center justify-between text-left group cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="h-2.5 w-2.5 rounded-full bg-zinc-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[16px] font-medium text-white tracking-[-0.01em]">
+                    Фурнитура и механизмы
+                  </span>
+                  <span className="text-[13px] text-zinc-500">
+                    {hasBlum ? "Blum" : "Boyard"}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Facades */}
-            <div
-              onClick={() => setExpandedCapsule((p) => (p === "facades" ? null : "facades"))}
-              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
-            >
-              <div
-                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
-                style={{ width: `${Math.min(100, Math.max(12, (facadesTotal / currentPrice) * 100))}%` }}
-              />
-              <div className="relative z-10 flex items-center justify-between w-full text-xs">
-                <span className="font-medium text-zinc-200">
-                  Facades · {mainFacadeName}
-                </span>
-                <span className="font-medium text-white tabular-nums text-sm">
-                  {formatKzt(facadesTotal)} ₸
-                </span>
-              </div>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span className="text-[16px] font-medium text-white tabular-nums">
+                {formatKzt(breakdown.hardwareSum)} ₸
+              </span>
+              <svg
+                className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${
+                  expandedSection === "hardware" ? "rotate-90 text-zinc-300" : ""
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
+          </button>
 
-            {/* Hardware */}
-            <div
-              onClick={() => setExpandedCapsule((p) => (p === "hardware" ? null : "hardware"))}
-              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
-            >
-              <div
-                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
-                style={{ width: `${Math.min(100, Math.max(12, (hardwareTotal / currentPrice) * 100))}%` }}
-              />
-              <div className="relative z-10 flex items-center justify-between w-full text-xs">
-                <span className="font-medium text-zinc-200">
-                  Hardware · {mainHardwareName}
-                </span>
-                <span className="font-medium text-white tabular-nums text-sm">
-                  {formatKzt(hardwareTotal)} ₸
-                </span>
-              </div>
-            </div>
-
-            {/* Раскрывающийся состав Hardware с переключением Blum ⇄ Boyard */}
-            {expandedCapsule === "hardware" && (
-              <div className="rounded-3xl bg-[#141418]/90 border border-white/[0.07] backdrop-blur-xl p-4 text-xs space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="flex items-center justify-between text-zinc-400">
-                  <span>Фурнитурная комплектация</span>
+          {expandedSection === "hardware" && (
+            <div className="pb-4 pl-5 border-l border-white/[0.08] ml-1">
+              {!locked && (
+                <div className="flex items-center justify-between py-2 mb-1 border-b border-white/[0.05]">
+                  <span className="text-[12px] text-zinc-400">
+                    Комплектация: <strong className="text-white font-medium">{hasBlum ? "Blum (Австрия)" : "Boyard"}</strong>
+                  </span>
                   <button
                     type="button"
                     onClick={() => void handleApplyPreset("swap_hardware")}
-                    className="text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer underline"
+                    className="text-[12px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
                   >
-                    {hasBlum ? "⇄ Сменить на Boyard" : "⇄ Сменить на Blum"}
+                    {hasBlum ? "Пересчитать на Boyard →" : "Пересчитать на Blum →"}
                   </button>
                 </div>
-                <div className="space-y-1.5">
-                  {lines
-                    .filter((l) => l.category === "hardware")
-                    .map((l) => (
-                      <div key={l.id} className="flex justify-between text-zinc-300">
-                        <span className="truncate mr-2">{l.name} ({l.qty} шт)</span>
-                        <span className="font-mono tabular-nums">{formatKzt(l.qty * l.unit_price)} ₸</span>
-                      </div>
-                    ))}
+              )}
+
+              {breakdown.hardwareLines.length === 0 ? (
+                <div className="py-3 text-[13px] text-zinc-500">
+                  Позиции фурнитуры не добавлены
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="divide-y divide-white/[0.04]">
+                  {breakdown.hardwareLines.map(renderLineRow)}
+                </div>
+              )}
 
-            {/* Countertop */}
-            <div
-              onClick={() => setExpandedCapsule((p) => (p === "countertop" ? null : "countertop"))}
-              className="relative overflow-hidden rounded-full min-h-[58px] px-6 py-3.5 bg-[#121215] border border-white/[0.08] hover:border-white/[0.18] transition-all cursor-pointer flex items-center justify-between shadow-lg"
-            >
-              <div
-                className="absolute inset-y-0 left-0 bg-white/[0.08] border-r border-white/20 rounded-full transition-all duration-300 pointer-events-none"
-                style={{ width: `${Math.min(100, Math.max(12, (countertopTotal / currentPrice) * 100))}%` }}
-              />
-              <div className="relative z-10 flex items-center justify-between w-full text-xs">
-                <span className="font-medium text-zinc-200">
-                  Countertop · {mainCountertopName}
-                </span>
-                <span className="font-medium text-white tabular-nums text-sm">
-                  {formatKzt(countertopTotal || 238000)} ₸
-                </span>
-              </div>
+              {viewMode === "deal" && !locked && (
+                <button
+                  type="button"
+                  onClick={onOpenPricePicker}
+                  className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                  </svg>
+                  <span>Добавить фурнитуру</span>
+                </button>
+              )}
             </div>
-          </>
-        )}
-      </div>
-
-      {/* 5. Чипы быстрых сценариев (Scenario Chips) */}
-      <div className="mt-8 flex items-center justify-center gap-3">
-        {viewMode === "deal" ? (
-          <>
-            <button
-              type="button"
-              onClick={() => void handleApplyPreset("min_margin")}
-              className="rounded-full bg-[#16161a] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white px-4 py-2 text-xs font-medium transition-all shadow-sm cursor-pointer"
-            >
-              Min Margin 12%
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleApplyPreset("reset")}
-              className="rounded-full bg-[#16161a] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white px-4 py-2 text-xs font-medium transition-all shadow-sm cursor-pointer"
-            >
-              Reset to {(recommendedPrice / 1000000).toFixed(2)}M
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => void handleApplyPreset("swap_hardware")}
-              className="rounded-full bg-[#16161a] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white px-4 py-2 text-xs font-medium transition-all shadow-sm cursor-pointer"
-            >
-              Blum ⇄ Boyard
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleApplyPreset("discount_5")}
-              className="rounded-full bg-[#16161a] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white px-4 py-2 text-xs font-medium transition-all shadow-sm cursor-pointer"
-            >
-              Discount -5%
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* 6. Нижний командный бар (Command Bar) */}
-      <div className="mt-auto pt-8">
-        <div
-          onClick={() => setIsQuickInputOpen(true)}
-          className="rounded-full bg-[#16161a]/95 border border-white/[0.08] backdrop-blur-2xl px-5 py-3.5 text-xs text-zinc-400 flex items-center justify-between shadow-2xl hover:border-white/20 transition-all cursor-pointer"
-        >
-          <span className="truncate mr-3">
-            {viewMode === "deal"
-              ? "Fit into 1.35M without losing margin..."
-              : "Ask or type: 3.6m, Blum, Enamel..."}
-          </span>
-          <span className="text-zinc-500 hover:text-zinc-300">🎙️</span>
+          )}
         </div>
 
-        {/* Выдвижная шторка быстрого добавления материала */}
-        {isQuickInputOpen && (
-          <div className="mt-3 rounded-3xl bg-[#18181c] border border-white/[0.1] p-4 text-xs shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <span className="font-semibold text-zinc-200">Быстрый поиск материала</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsQuickInputOpen(false);
-                  setQuickInput("");
-                }}
-                className="text-zinc-500 hover:text-white cursor-pointer"
-              >
-                ✕
-              </button>
+        {/* СЕКЦИЯ 4: ЦЕХ, СБОРКА И ТЕХНОЛОГ */}
+        <div>
+          <button
+            type="button"
+            onClick={() =>
+              setExpandedSection((p) => (p === "workshop" ? null : "workshop"))
+            }
+            className="w-full py-4 flex items-center justify-between text-left group cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="h-2.5 w-2.5 rounded-full bg-zinc-600 shrink-0" />
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[16px] font-medium text-white tracking-[-0.01em]">
+                    Производство, сборка и монтаж
+                  </span>
+                  <span className="text-[13px] text-zinc-500 tabular-nums">
+                    {currentPrice > 0
+                      ? `${Math.round((breakdown.operationsTotal / currentPrice) * 100)}%`
+                      : ""}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <input
-              type="text"
-              autoFocus
-              value={quickInput}
-              onChange={(e) => setQuickInput(e.target.value)}
-              placeholder="Начните вводить: Egger, петли, профиль Gola..."
-              className="mt-3 w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
-            />
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span className="text-[16px] font-medium text-white tabular-nums">
+                {formatKzt(breakdown.operationsTotal)} ₸
+              </span>
+              <svg
+                className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${
+                  expandedSection === "workshop" ? "rotate-90 text-zinc-300" : ""
+                }`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          </button>
 
-            <div className="flex flex-col gap-1.5 mt-2 max-h-48 overflow-y-auto">
-              {priceItems
-                .filter((p) => p.name.toLowerCase().includes(quickInput.toLowerCase()))
-                .slice(0, 5)
-                .map((p) => (
+          {expandedSection === "workshop" && (
+            <div className="pb-4 pl-5 border-l border-white/[0.08] ml-1 divide-y divide-white/[0.04]">
+              <div className="flex items-center justify-between py-2.5">
+                <div>
+                  <div className="text-[14px] text-zinc-100">Сборка и установка на объекте</div>
+                  <div className="text-[12px] text-zinc-500">
+                    Норматив монтажа · {totalLinearMeters} п.м.
+                  </div>
+                </div>
+                <span className="text-[14px] font-medium text-zinc-200 tabular-nums">
+                  {formatKzt(breakdown.assemblyCost)} ₸
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-2.5">
+                <div>
+                  <div className="text-[14px] text-zinc-100">Проектирование и технолог (Базис)</div>
+                  <div className="text-[12px] text-zinc-500">
+                    Деталировка, карты раскроя и присадки
+                  </div>
+                </div>
+                <span className="text-[14px] font-medium text-zinc-200 tabular-nums">
+                  {formatKzt(breakdown.technologCost)} ₸
+                </span>
+              </div>
+
+              {breakdown.riskReserveCost > 0 && (
+                <div className="flex items-center justify-between py-2.5">
+                  <div>
+                    <div className="text-[14px] text-zinc-100">Технологический резерв</div>
+                    <div className="text-[12px] text-zinc-500">Запас на непредвиденный расход</div>
+                  </div>
+                  <span className="text-[14px] font-medium text-zinc-200 tabular-nums">
+                    {formatKzt(breakdown.riskReserveCost)} ₸
+                  </span>
+                </div>
+              )}
+
+              {breakdown.workshopLines.map(renderLineRow)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 6. Быстрые действия в режиме клиента */}
+      {viewMode === "client" && !locked && (
+        <div className="mt-6 flex items-center justify-between text-[13px] py-2">
+          <button
+            type="button"
+            onClick={() => void handleApplyPreset("swap_hardware")}
+            className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
+          >
+            Фурнитура: <strong className="text-white font-medium">{hasBlum ? "Blum ⇄ Boyard" : "Boyard ⇄ Blum"}</strong>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleApplyPreset("discount_5")}
+            className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer font-medium"
+          >
+            Скидка −5%
+          </button>
+        </div>
+      )}
+
+      {/* 7. Минималистичный поиск и быстрое добавление позиций (в потоке страницы, без перекрытия браузером) */}
+      {viewMode === "deal" && !locked && (
+        <div className="mt-8 pt-4">
+          {!isQuickSearchOpen ? (
+            <div className="flex items-center justify-between border-b border-white/[0.12] pb-2.5">
+              <button
+                type="button"
+                onClick={() => setIsQuickSearchOpen(true)}
+                className="flex-1 flex items-center gap-2.5 text-left text-[14px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+              >
+                <svg className="w-4 h-4 text-zinc-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+                </svg>
+                <span>Быстро добавить материал или фурнитуру…</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenPricePicker}
+                className="text-[13px] font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer ml-3"
+              >
+                Каталог
+              </button>
+            </div>
+          ) : (
+            <div className="pt-1">
+              <div className="flex items-center gap-2 border-b border-white/30 pb-2">
+                <svg className="w-4 h-4 text-zinc-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+                </svg>
+                <input
+                  type="text"
+                  autoFocus
+                  value={quickQuery}
+                  onChange={(e) => setQuickQuery(e.target.value)}
+                  placeholder="Название: Egger, петля Blum, Gola…"
+                  className="w-full bg-transparent text-[15px] text-white placeholder-zinc-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsQuickSearchOpen(false);
+                    setQuickQuery("");
+                  }}
+                  className="text-[13px] text-zinc-400 hover:text-white cursor-pointer shrink-0"
+                >
+                  Готово
+                </button>
+              </div>
+
+              <div className="mt-2 divide-y divide-white/[0.05] max-h-60 overflow-y-auto">
+                {filteredCatalog.map((p) => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => {
                       onStepPriceItem(p, 1, null);
-                      setQuickInput("");
-                      setIsQuickInputOpen(false);
                     }}
-                    className="flex items-center justify-between rounded-xl px-2.5 py-2 text-left hover:bg-zinc-800/80 text-zinc-200 cursor-pointer transition-colors"
+                    className="w-full py-2.5 flex items-center justify-between text-left hover:bg-white/[0.03] transition-colors cursor-pointer"
                   >
-                    <span className="truncate">{p.name}</span>
-                    <span className="text-emerald-400 font-bold shrink-0 ml-2 font-mono">
-                      +{formatKzt(p.price)} ₸
+                    <div className="min-w-0 pr-3">
+                      <div className="text-[14px] text-zinc-200 truncate">{p.name}</div>
+                      <div className="text-[11px] text-zinc-500">
+                        {formatKzt(p.price)} ₸ / {p.unit}
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-[13px] font-medium text-emerald-400 shrink-0 tabular-nums">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                      </svg>
+                      <span>Добавить</span>
                     </span>
                   </button>
                 ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

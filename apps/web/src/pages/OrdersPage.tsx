@@ -184,75 +184,83 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
   }, [orders]);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col px-4 py-8 pb-32 text-zinc-100">
-      {/* 1. Верхний минималистичный заголовок */}
-      <div className="flex items-center justify-between mb-8">
+    <div className="mx-auto flex w-full max-w-4xl flex-col px-5 pt-6 pb-24 text-zinc-100 select-none">
+      {/* 1. Шапка портфеля проектов */}
+      <div className="flex items-end justify-between pb-6 border-b border-white/[0.08]">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Сделки</h1>
-          <div className="flex items-center gap-2 mt-1 text-xs text-zinc-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span>
-              {metrics.total} активных проекта · {formatKzt(metrics.totalGMV)} ₸
-            </span>
+          <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-zinc-500">
+            Портфель · {metrics.total} {metrics.total === 1 ? "проект" : "проекта"}
           </div>
+          <h1 className="mt-1.5 text-[36px] sm:text-[42px] leading-none font-semibold tracking-[-0.03em] text-white tabular-nums">
+            {formatKzt(metrics.totalGMV)}
+            <span className="ml-1.5 text-[24px] font-light text-zinc-500">₸</span>
+          </h1>
         </div>
 
         <button
           type="button"
           onClick={() => handleOpenCreateModal("kitchen")}
-          className="rounded-full bg-white text-black font-semibold px-5 py-2.5 text-xs hover:bg-zinc-200 shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+          className="inline-flex items-center gap-1.5 bg-white text-black font-medium px-4 py-2 rounded-full text-[13px] hover:bg-zinc-200 active:scale-95 transition-all cursor-pointer"
         >
-          <span className="text-base leading-none">+</span>
-          <span>Новый проект</span>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
+            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+          </svg>
+          <span>Новый</span>
         </button>
       </div>
 
       {/* Ошибка загрузки */}
       {error && (
-        <div className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
+        <div className="my-4 border-l-2 border-rose-500 pl-3 py-1 text-[13px] text-rose-300">
           <p>{error}</p>
           <button
             type="button"
             onClick={() => void loadOrders()}
-            className="mt-2 font-bold underline hover:no-underline cursor-pointer"
+            className="mt-1 font-medium text-white underline cursor-pointer"
           >
-            Повторить попытку
+            Повторить
           </button>
         </div>
       )}
 
-      {/* 2. Поиск и переключатель фильтров */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      {/* 2. Тонкая строка поиска и типографические фильтры */}
+      <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.06]">
+        <div className="relative flex-1 flex items-center gap-2.5">
+          <svg className="w-4 h-4 text-zinc-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+          </svg>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск проекта или клиента..."
-            className="w-full rounded-full bg-[#121215] border border-white/[0.08] px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-white/20 transition-all"
+            placeholder="Поиск по названию или клиенту…"
+            className="w-full bg-transparent text-[14px] text-white placeholder-zinc-500 focus:outline-none"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs cursor-pointer"
+              className="text-zinc-500 hover:text-white cursor-pointer"
             >
-              ✕
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+              </svg>
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-4 overflow-x-auto no-scrollbar text-[13px]">
           <button
             type="button"
             onClick={() => setSelectedStatus("all")}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
+            className={`transition-colors cursor-pointer whitespace-nowrap ${
               selectedStatus === "all"
-                ? "bg-zinc-800 text-white shadow-xs font-semibold"
+                ? "text-white font-medium"
                 : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
-            Все ({orders.length})
+            Все <span className="text-zinc-600 tabular-nums">{orders.length}</span>
           </button>
           {ORDER_STATUSES.slice(0, 4).map((st) => {
             const count = orders.filter((o) => o.status === st).length;
@@ -261,48 +269,43 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                 key={st}
                 type="button"
                 onClick={() => setSelectedStatus(st)}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
+                className={`transition-colors cursor-pointer whitespace-nowrap ${
                   selectedStatus === st
-                    ? "bg-zinc-800 text-white shadow-xs font-semibold"
+                    ? "text-white font-medium"
                     : "text-zinc-500 hover:text-zinc-300"
                 }`}
               >
-                {ORDER_STATUS_LABELS[st]} {count > 0 ? `(${count})` : ""}
+                {ORDER_STATUS_LABELS[st]}{" "}
+                {count > 0 && <span className="text-zinc-600 tabular-nums">{count}</span>}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 3. Сетка сделок (Luxury Glass Cards) */}
+      {/* 3. Чистый архитектурный список сделок с разделителями-волосками */}
       {loading ? (
-        <div className="mt-16 flex flex-col items-center justify-center py-12 text-zinc-500">
-          <div className="h-7 w-7 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-          <span className="mt-3 text-xs font-medium">Загрузка сделок…</span>
+        <div className="py-20 flex flex-col items-center justify-center text-zinc-500">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
+          <span className="mt-3 text-[13px]">Загрузка…</span>
         </div>
       ) : displayedOrders.length === 0 ? (
-        <div className="mt-8 rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/30 p-12 text-center">
-          <h3 className="text-sm font-semibold text-white">
-            {searchQuery ? "Ничего не найдено" : "Сделок пока нет"}
-          </h3>
-          <p className="mt-1 text-xs text-zinc-500">
+        <div className="py-16 text-center">
+          <div className="text-[15px] font-medium text-white">
+            {searchQuery ? "Проекты не найдены" : "Список проектов пуст"}
+          </div>
+          <p className="mt-1 text-[13px] text-zinc-500">
             {searchQuery
-              ? "Попробуйте изменить поисковый запрос."
-              : "Создайте свой первый мебельный заказ, чтобы рассчитать смету."}
+              ? "Попробуйте изменить запрос или сбросить фильтр"
+              : "Создайте первый заказ для расчёта стоимости и маржи"}
           </p>
-          <button
-            type="button"
-            onClick={() => handleOpenCreateModal("kitchen")}
-            className="mt-4 rounded-full bg-white text-black px-4 py-2 text-xs font-semibold hover:bg-zinc-200 cursor-pointer"
-          >
-            + Создать тестовую кухню
-          </button>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="divide-y divide-white/[0.07]">
           {displayedOrders.map((ord) => {
             const latestCalc = getLatestCalculation(ord);
-            const displayPrice = ord.contract_price !== null ? ord.contract_price : latestCalc?.price_total;
+            const displayPrice =
+              ord.contract_price !== null ? ord.contract_price : latestCalc?.price_total;
             const margin = latestCalc?.margin_pct ?? 0.18;
             const marginStyle = getMarginColor(margin, 0.28);
             const marginString = `${(margin * 100).toFixed(1).replace(/\.0$/, "")}%`;
@@ -320,19 +323,23 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
               <div
                 key={ord.id}
                 onClick={() => onSelectOrder(ord.id)}
-                className="relative rounded-3xl bg-[#121215] border border-white/[0.07] hover:border-white/[0.18] p-5 transition-all cursor-pointer shadow-lg active:scale-[0.99] group flex flex-col justify-between"
+                className="group py-5 flex items-center justify-between gap-4 cursor-pointer transition-colors hover:bg-white/[0.015] -mx-2 px-2"
               >
-                <div>
-                  {/* Верхняя строка карточки: статус и дата */}
-                  <div className="flex items-center justify-between text-[11px] mb-3">
-                    <span className="flex items-center gap-1.5 text-zinc-400">
-                      <span
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: dotBg }}
-                      />
-                      <span>{ORDER_STATUS_LABELS[ord.status] ?? ord.status}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-[17px] font-medium tracking-[-0.015em] text-white group-hover:text-emerald-400 transition-colors truncate">
+                      {ord.name}
+                    </h2>
+                  </div>
+
+                  <div className="mt-1 flex items-center gap-2 text-[13px] text-zinc-400 truncate">
+                    <span>{ord.client_label || "Частный заказчик"}</span>
+                    <span className="text-zinc-700">·</span>
+                    <span className="text-zinc-500">
+                      {ORDER_STATUS_LABELS[ord.status] ?? ord.status}
                     </span>
-                    <span className="text-zinc-600 font-mono">
+                    <span className="text-zinc-700">·</span>
+                    <span className="text-zinc-500 tabular-nums">
                       {new Date(ord.created_at).toLocaleDateString("ru-RU", {
                         day: "numeric",
                         month: "short",
@@ -340,33 +347,38 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                     </span>
                   </div>
 
-                  {/* Название и клиент */}
-                  <h2 className="text-base font-semibold text-white group-hover:text-emerald-400 transition-colors line-clamp-2 leading-snug">
-                    {ord.name}
-                  </h2>
-
-                  <div className="mt-1 text-xs text-zinc-400 truncate">
-                    {ord.client_label ? ord.client_label : <span className="text-zinc-600 italic">Клиент не указан</span>}
-                  </div>
-
                   {ord.note && (
-                    <p className="mt-2 text-xs text-zinc-500 line-clamp-1 italic">
+                    <p className="mt-1 text-[12px] text-zinc-500 truncate">
                       {ord.note}
                     </p>
                   )}
                 </div>
 
-                {/* Нижняя часть карточки: цена и маржа */}
-                <div className="mt-6 pt-3 border-t border-white/[0.06] flex items-center justify-between">
-                  <div className="text-xl font-bold text-white tabular-nums tracking-tight">
-                    {displayPrice !== undefined && displayPrice !== null
-                      ? `${formatKzt(displayPrice)} ₸`
-                      : "Расчёт не сохранён"}
+                <div className="flex items-center gap-3 shrink-0 text-right">
+                  <div>
+                    <div className="text-[18px] font-semibold tracking-[-0.02em] text-white tabular-nums">
+                      {displayPrice !== undefined && displayPrice !== null
+                        ? `${formatKzt(displayPrice)} ₸`
+                        : "—"}
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-end gap-1.5 text-[12px] text-zinc-400 tabular-nums">
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: dotBg }}
+                      />
+                      <span>Маржа {marginString}</span>
+                    </div>
                   </div>
 
-                  <div className="rounded-full bg-white/[0.06] border border-white/[0.08] px-2.5 py-1 text-xs font-semibold text-emerald-400 font-mono">
-                    {marginString}
-                  </div>
+                  <svg
+                    className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300 transition-colors"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </div>
               </div>
             );
@@ -374,149 +386,144 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
         </div>
       )}
 
-      {/* 4. Модальное окно создания заказа (Clean Bottom-Sheet / Modal) */}
+      {/* 4. Модальное окно нового проекта (в стиле iOS Sheet, без эмодзи) */}
       {isCreating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="w-full max-w-md rounded-3xl border border-white/[0.1] bg-[#141418] p-6 shadow-2xl text-zinc-100">
-            <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-              <h2 className="text-base font-bold text-white">Новый проект</h2>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-md p-0 sm:p-4">
+          <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border-t sm:border border-white/[0.1] bg-[#121215] p-6 shadow-2xl text-zinc-100">
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.07]">
+              <h2 className="text-[17px] font-semibold tracking-[-0.01em] text-white">
+                Новый проект
+              </h2>
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
-                className="text-zinc-500 hover:text-white text-base cursor-pointer"
+                className="text-zinc-500 hover:text-white cursor-pointer p-1"
               >
-                ✕
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                </svg>
               </button>
             </div>
 
-            <form onSubmit={handleCreateOrder} className="mt-4 flex flex-col gap-3.5 text-xs">
-              {/* Пресет шаблона */}
+            <form onSubmit={handleCreateOrder} className="mt-5 flex flex-col gap-4 text-[13px]">
+              {/* Сегментированный переключатель типа проекта (iOS Segmented Control) */}
               <div>
-                <label className="block font-medium text-zinc-400 mb-1.5">
-                  Тип изделия
+                <label className="block text-[11px] uppercase tracking-wider text-zinc-500 mb-2">
+                  Базовый пресет
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 rounded-lg bg-zinc-900 p-0.5 border border-white/[0.06]">
                   <button
                     type="button"
                     onClick={() => {
                       setCreatePreset("kitchen");
-                      if (!createName || createName.includes("Шкаф")) setCreateName("Кухня на заказ");
+                      if (!createName || createName.includes("Шкаф"))
+                        setCreateName("Кухня на заказ");
                     }}
-                    className={`rounded-2xl border p-2.5 transition-all cursor-pointer text-center ${
+                    className={`py-1.5 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
                       createPreset === "kitchen"
-                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-semibold"
-                        : "border-white/[0.06] bg-zinc-900/60 text-zinc-400 hover:text-white"
+                        ? "bg-zinc-800 text-white shadow-xs"
+                        : "text-zinc-400 hover:text-white"
                     }`}
                   >
-                    <span className="text-lg block">🍳</span>
-                    <span className="text-[11px] mt-1 block">Кухня</span>
+                    Кухня
                   </button>
-
                   <button
                     type="button"
                     onClick={() => {
                       setCreatePreset("wardrobe");
-                      if (!createName || createName.includes("Кухня")) setCreateName("Шкаф-купе в спальню");
+                      if (!createName || createName.includes("Кухня"))
+                        setCreateName("Шкаф-купе в спальню");
                     }}
-                    className={`rounded-2xl border p-2.5 transition-all cursor-pointer text-center ${
+                    className={`py-1.5 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
                       createPreset === "wardrobe"
-                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-semibold"
-                        : "border-white/[0.06] bg-zinc-900/60 text-zinc-400 hover:text-white"
+                        ? "bg-zinc-800 text-white shadow-xs"
+                        : "text-zinc-400 hover:text-white"
                     }`}
                   >
-                    <span className="text-lg block">🚪</span>
-                    <span className="text-[11px] mt-1 block">Шкаф</span>
+                    Шкаф
                   </button>
-
                   <button
                     type="button"
                     onClick={() => setCreatePreset("empty")}
-                    className={`rounded-2xl border p-2.5 transition-all cursor-pointer text-center ${
+                    className={`py-1.5 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
                       createPreset === "empty"
-                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-semibold"
-                        : "border-white/[0.06] bg-zinc-900/60 text-zinc-400 hover:text-white"
+                        ? "bg-zinc-800 text-white shadow-xs"
+                        : "text-zinc-400 hover:text-white"
                     }`}
                   >
-                    <span className="text-lg block">📄</span>
-                    <span className="text-[11px] mt-1 block">С нуля</span>
+                    С нуля
                   </button>
                 </div>
               </div>
 
-              <div>
-                <label className="block font-medium text-zinc-400 mb-1">
-                  Название сделки
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
-                  placeholder="Например: Кухня угловая • ЖК Highvill"
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
-                />
-              </div>
+              <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+                <div className="py-3 flex items-center justify-between gap-3">
+                  <label className="text-zinc-400 shrink-0 w-28">Проект</label>
+                  <input
+                    type="text"
+                    required
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    placeholder="Кухня · ЖК Highvill"
+                    className="w-full bg-transparent text-right text-white placeholder-zinc-600 focus:outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-medium text-zinc-400 mb-1">
-                  Клиент / Телефон
-                </label>
-                <input
-                  type="text"
-                  value={createClient}
-                  onChange={(e) => setCreateClient(e.target.value)}
-                  placeholder="Айгерим (+7 701 123 45 67)"
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
-                />
-              </div>
+                <div className="py-3 flex items-center justify-between gap-3">
+                  <label className="text-zinc-400 shrink-0 w-28">Заказчик</label>
+                  <input
+                    type="text"
+                    value={createClient}
+                    onChange={(e) => setCreateClient(e.target.value)}
+                    placeholder="Имя или телефон"
+                    className="w-full bg-transparent text-right text-white placeholder-zinc-600 focus:outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-medium text-zinc-400 mb-1">
-                  Договорная цена (₸)
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={createContractPrice}
-                  onChange={(e) => setCreateContractPrice(formatCurrencyInput(e.target.value))}
-                  placeholder="Оставьте пустым для расчета по смете"
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
-                />
-              </div>
+                <div className="py-3 flex items-center justify-between gap-3">
+                  <label className="text-zinc-400 shrink-0 w-28">Бюджет (₸)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={createContractPrice}
+                    onChange={(e) =>
+                      setCreateContractPrice(formatCurrencyInput(e.target.value))
+                    }
+                    placeholder="Авторасчёт по смете"
+                    className="w-full bg-transparent text-right text-white placeholder-zinc-600 focus:outline-none tabular-nums"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-medium text-zinc-400 mb-1">
-                  Заметки
-                </label>
-                <textarea
-                  rows={2}
-                  value={createNote}
-                  onChange={(e) => setCreateNote(e.target.value)}
-                  placeholder="Высота 2.8м, вентканал справа, подсветка..."
-                  className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-hidden focus:border-emerald-500"
-                />
+                <div className="py-3 flex items-center justify-between gap-3">
+                  <label className="text-zinc-400 shrink-0 w-28">Примечание</label>
+                  <input
+                    type="text"
+                    value={createNote}
+                    onChange={(e) => setCreateNote(e.target.value)}
+                    placeholder="Размеры и детали"
+                    className="w-full bg-transparent text-right text-white placeholder-zinc-600 focus:outline-none"
+                  />
+                </div>
               </div>
 
               {createError && (
-                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-300">
-                  {createError}
-                </div>
+                <div className="text-[12px] text-rose-400">{createError}</div>
               )}
 
-              <div className="mt-3 flex items-center justify-end gap-2 pt-3 border-t border-white/[0.06]">
+              <div className="mt-2 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsCreating(false)}
-                  className="rounded-full px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
+                  className="px-4 py-2 text-[13px] text-zinc-400 hover:text-white cursor-pointer"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={createSaving}
-                  className="rounded-full bg-white text-black px-5 py-2 text-xs font-semibold hover:bg-zinc-200 active:scale-95 disabled:opacity-50 cursor-pointer shadow-md"
+                  className="rounded-full bg-white text-black px-5 py-2 text-[13px] font-medium hover:bg-zinc-200 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  {createSaving ? "Создание…" : "Открыть кокпит →"}
+                  {createSaving ? "Создание…" : "Создать проект"}
                 </button>
               </div>
             </form>
