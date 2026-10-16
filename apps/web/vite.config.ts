@@ -6,6 +6,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   base: process.env.VITE_BASE || "/",
+  server: {
+    allowedHosts: true,
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
