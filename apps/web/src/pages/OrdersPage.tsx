@@ -184,212 +184,206 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
   }, [orders]);
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col px-5 pt-6 pb-24 text-zinc-100 select-none">
-      {/* 1. Шапка портфеля проектов */}
-      <div className="flex items-end justify-between pb-6 border-b border-white/[0.08]">
-        <div>
-          <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-zinc-500">
-            Портфель · {metrics.total} {metrics.total === 1 ? "проект" : "проекта"}
+    <>
+      <div
+        className={`mx-auto flex w-full max-w-[680px] flex-col px-5 pt-6 pb-24 text-zinc-100 select-none ${
+          isCreating ? "apple-stage-recessed" : "apple-stage-normal"
+        }`}
+      >
+        {/* 1. Шапка портфеля проектов */}
+        <div className="flex items-end justify-between pb-6 border-b border-white/[0.08]">
+          <div>
+            <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-zinc-500">
+              Портфель · {metrics.total}
+            </div>
+            <h1 className="mt-1.5 text-[34px] sm:text-[42px] leading-none font-semibold tracking-[-0.03em] text-white tabular-nums">
+              {formatKzt(metrics.totalGMV)}
+              <span className="ml-1.5 text-[24px] font-light text-zinc-500">₸</span>
+            </h1>
           </div>
-          <h1 className="mt-1.5 text-[36px] sm:text-[42px] leading-none font-semibold tracking-[-0.03em] text-white tabular-nums">
-            {formatKzt(metrics.totalGMV)}
-            <span className="ml-1.5 text-[24px] font-light text-zinc-500">₸</span>
-          </h1>
-        </div>
 
-        <button
-          type="button"
-          onClick={() => handleOpenCreateModal("kitchen")}
-          className="inline-flex items-center gap-1.5 bg-white text-black font-medium px-4 py-2 rounded-full text-[13px] hover:bg-zinc-200 active:scale-95 transition-all cursor-pointer"
-        >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
-            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-          </svg>
-          <span>Новый</span>
-        </button>
-      </div>
-
-      {/* Ошибка загрузки */}
-      {error && (
-        <div className="my-4 border-l-2 border-rose-500 pl-3 py-1 text-[13px] text-rose-300">
-          <p>{error}</p>
           <button
             type="button"
-            onClick={() => void loadOrders()}
-            className="mt-1 font-medium text-white underline cursor-pointer"
+            onClick={() => handleOpenCreateModal("kitchen")}
+            className="inline-flex items-center gap-1.5 bg-white text-black font-semibold px-4 h-9 rounded-full text-[13px] hover:bg-zinc-200 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
-            Повторить
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+            <span>Новый</span>
           </button>
         </div>
-      )}
 
-      {/* 2. Тонкая строка поиска и типографические фильтры */}
-      <div className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.06]">
-        <div className="relative flex-1 flex items-center gap-2.5">
-          <svg className="w-4 h-4 text-zinc-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-            <circle cx="11" cy="11" r="8" />
-            <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск по названию или клиенту…"
-            className="w-full bg-transparent text-[14px] text-white placeholder-zinc-500 focus:outline-none"
-          />
-          {searchQuery && (
+        {/* Ошибка загрузки */}
+        {error && (
+          <div className="my-4 border-l-2 border-rose-500 pl-3 py-1 text-[13px] text-rose-300">
+            <p>{error}</p>
             <button
               type="button"
-              onClick={() => setSearchQuery("")}
-              className="text-zinc-500 hover:text-white cursor-pointer"
+              onClick={() => void loadOrders()}
+              className="mt-1 font-medium text-white underline cursor-pointer"
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-              </svg>
+              Повторить
             </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-4 overflow-x-auto no-scrollbar text-[13px]">
-          <button
-            type="button"
-            onClick={() => setSelectedStatus("all")}
-            className={`transition-colors cursor-pointer whitespace-nowrap ${
-              selectedStatus === "all"
-                ? "text-white font-medium"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            Все <span className="text-zinc-600 tabular-nums">{orders.length}</span>
-          </button>
-          {ORDER_STATUSES.slice(0, 4).map((st) => {
-            const count = orders.filter((o) => o.status === st).length;
-            return (
-              <button
-                key={st}
-                type="button"
-                onClick={() => setSelectedStatus(st)}
-                className={`transition-colors cursor-pointer whitespace-nowrap ${
-                  selectedStatus === st
-                    ? "text-white font-medium"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                {ORDER_STATUS_LABELS[st]}{" "}
-                {count > 0 && <span className="text-zinc-600 tabular-nums">{count}</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 3. Чистый архитектурный список сделок с разделителями-волосками */}
-      {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center text-zinc-500">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
-          <span className="mt-3 text-[13px]">Загрузка…</span>
-        </div>
-      ) : displayedOrders.length === 0 ? (
-        <div className="py-16 text-center">
-          <div className="text-[15px] font-medium text-white">
-            {searchQuery ? "Проекты не найдены" : "Список проектов пуст"}
           </div>
-          <p className="mt-1 text-[13px] text-zinc-500">
-            {searchQuery
-              ? "Попробуйте изменить запрос или сбросить фильтр"
-              : "Создайте первый заказ для расчёта стоимости и маржи"}
-          </p>
-        </div>
-      ) : (
-        <div className="divide-y divide-white/[0.07]">
-          {displayedOrders.map((ord) => {
-            const latestCalc = getLatestCalculation(ord);
-            const displayPrice =
-              ord.contract_price !== null ? ord.contract_price : latestCalc?.price_total;
-            const margin = latestCalc?.margin_pct ?? 0.18;
-            const marginStyle = getMarginColor(margin, 0.28);
-            const marginString = `${(margin * 100).toFixed(1).replace(/\.0$/, "")}%`;
+        )}
 
-            const dotBg =
-              marginStyle.status === "success"
-                ? "#10b981"
-                : marginStyle.status === "warning"
-                ? "#f59e0b"
-                : marginStyle.status === "danger"
-                ? "#ef4444"
-                : "#71717a";
-
-            return (
-              <div
-                key={ord.id}
-                onClick={() => onSelectOrder(ord.id)}
-                className="group py-5 flex items-center justify-between gap-4 cursor-pointer transition-colors hover:bg-white/[0.015] -mx-2 px-2"
+        {/* 2. Тонкая строка поиска и типографические фильтры */}
+        <div className="py-3.5 flex flex-col gap-3 border-b border-white/[0.06]">
+          <div className="relative flex items-center gap-2.5">
+            <svg className="w-4 h-4 text-zinc-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Поиск по названию или клиенту…"
+              className="w-full bg-transparent text-[14px] text-white placeholder-zinc-600 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="text-zinc-500 hover:text-white cursor-pointer"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-[17px] font-medium tracking-[-0.015em] text-white group-hover:text-emerald-400 transition-colors truncate">
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-4 overflow-x-auto no-scrollbar text-[12px]">
+            <button
+              type="button"
+              onClick={() => setSelectedStatus("all")}
+              className={`transition-colors cursor-pointer whitespace-nowrap ${
+                selectedStatus === "all"
+                  ? "text-white font-semibold"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Все <span className="text-zinc-600 tabular-nums">{orders.length}</span>
+            </button>
+            {ORDER_STATUSES.slice(0, 4).map((st) => {
+              const count = orders.filter((o) => o.status === st).length;
+              return (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setSelectedStatus(st)}
+                  className={`transition-colors cursor-pointer whitespace-nowrap ${
+                    selectedStatus === st
+                      ? "text-white font-semibold"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {ORDER_STATUS_LABELS[st]}{" "}
+                  {count > 0 && <span className="text-zinc-600 tabular-nums">{count}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 3. Чистый архитектурный список сделок (строго 2 линии на строку, без мусора) */}
+        {loading ? (
+          <div className="py-20 text-center text-[13px] text-zinc-500">
+            Загрузка…
+          </div>
+        ) : displayedOrders.length === 0 ? (
+          <div className="py-16 text-center">
+            <div className="text-[15px] font-medium text-white">
+              {searchQuery ? "Проекты не найдены" : "Список проектов пуст"}
+            </div>
+            <p className="mt-1 text-[13px] text-zinc-500">
+              {searchQuery
+                ? "Попробуйте изменить запрос или сбросить фильтр"
+                : "Создайте первый заказ для расчёта стоимости и маржи"}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.07] border-b border-white/[0.07]">
+            {displayedOrders.map((ord) => {
+              const latestCalc = getLatestCalculation(ord);
+              const displayPrice =
+                ord.contract_price !== null ? ord.contract_price : latestCalc?.price_total;
+              const margin = latestCalc?.margin_pct ?? 0.18;
+              const marginStyle = getMarginColor(margin, 0.28);
+              const marginString = `${(margin * 100).toFixed(1).replace(/\.0$/, "")}%`;
+
+              const dotBg =
+                marginStyle.status === "success"
+                  ? "#10b981"
+                  : marginStyle.status === "warning"
+                  ? "#f59e0b"
+                  : marginStyle.status === "danger"
+                  ? "#ef4444"
+                  : "#71717a";
+
+              return (
+                <div
+                  key={ord.id}
+                  onClick={() => onSelectOrder(ord.id)}
+                  className="group py-4.5 flex items-center justify-between gap-4 cursor-pointer transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-[16px] font-medium tracking-[-0.015em] text-white group-hover:text-emerald-400 transition-colors truncate">
                       {ord.name}
                     </h2>
-                  </div>
 
-                  <div className="mt-1 flex items-center gap-2 text-[13px] text-zinc-400 truncate">
-                    <span>{ord.client_label || "Частный заказчик"}</span>
-                    <span className="text-zinc-700">·</span>
-                    <span className="text-zinc-500">
-                      {ORDER_STATUS_LABELS[ord.status] ?? ord.status}
-                    </span>
-                    <span className="text-zinc-700">·</span>
-                    <span className="text-zinc-500 tabular-nums">
-                      {new Date(ord.created_at).toLocaleDateString("ru-RU", {
-                        day: "numeric",
-                        month: "short",
-                      })}
-                    </span>
-                  </div>
-
-                  {ord.note && (
-                    <p className="mt-1 text-[12px] text-zinc-500 truncate">
-                      {ord.note}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3 shrink-0 text-right">
-                  <div>
-                    <div className="text-[18px] font-semibold tracking-[-0.02em] text-white tabular-nums">
-                      {displayPrice !== undefined && displayPrice !== null
-                        ? `${formatKzt(displayPrice)} ₸`
-                        : "—"}
-                    </div>
-                    <div className="mt-0.5 flex items-center justify-end gap-1.5 text-[12px] text-zinc-400 tabular-nums">
-                      <span
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: dotBg }}
-                      />
-                      <span>Маржа {marginString}</span>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-zinc-500 whitespace-nowrap truncate">
+                      <span className="truncate max-w-[140px]">
+                        {ord.client_label || "Частный заказчик"}
+                      </span>
+                      <span>·</span>
+                      <span>{ORDER_STATUS_LABELS[ord.status] ?? ord.status}</span>
                     </div>
                   </div>
 
-                  <svg
-                    className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300 transition-colors"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  <div className="flex items-center gap-2.5 shrink-0 text-right whitespace-nowrap">
+                    <div>
+                      <div className="text-[16px] font-semibold tracking-[-0.02em] text-white tabular-nums">
+                        {displayPrice !== undefined && displayPrice !== null
+                          ? `${formatKzt(displayPrice)} ₸`
+                          : "—"}
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-end gap-1.5 text-[11px] text-zinc-500 tabular-nums">
+                        <span
+                          className="h-1.5 w-1.5 rounded-full shrink-0"
+                          style={{ backgroundColor: dotBg }}
+                        />
+                        <span>Маржа {marginString}</span>
+                      </div>
+                    </div>
 
-      {/* 4. Модальное окно нового проекта (в стиле iOS Sheet, без эмодзи) */}
+                    <svg
+                      className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300 transition-colors shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 4. Шторка нового проекта (VisionOS Spatial Sheet) */}
       {isCreating && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-md p-0 sm:p-4">
-          <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border-t sm:border border-white/[0.1] bg-[#121215] p-6 shadow-2xl text-zinc-100">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/65 backdrop-blur-md p-0 sm:p-4"
+          onClick={() => setIsCreating(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="apple-spatial-sheet apple-glass-glint w-full max-w-md rounded-t-[24px] sm:rounded-[24px] border-t sm:border border-white/[0.12] bg-[#141418] p-6 pb-8 shadow-2xl text-zinc-100"
+          >
             <div className="flex items-center justify-between pb-4 border-b border-white/[0.07]">
               <h2 className="text-[17px] font-semibold tracking-[-0.01em] text-white">
                 Новый проект
@@ -397,21 +391,18 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
-                className="text-zinc-500 hover:text-white cursor-pointer p-1"
+                className="h-8 w-8 rounded-full bg-white/[0.06] flex items-center justify-center text-zinc-400 hover:text-white cursor-pointer"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-                </svg>
+                ✕
               </button>
             </div>
 
             <form onSubmit={handleCreateOrder} className="mt-5 flex flex-col gap-4 text-[13px]">
-              {/* Сегментированный переключатель типа проекта (iOS Segmented Control) */}
-              <div>
+              <div style={{ animationDelay: "30ms" }} className="apple-menu-item">
                 <label className="block text-[11px] uppercase tracking-wider text-zinc-500 mb-2">
                   Базовый пресет
                 </label>
-                <div className="grid grid-cols-3 rounded-lg bg-zinc-900 p-0.5 border border-white/[0.06]">
+                <div className="grid grid-cols-3 rounded-xl bg-white/[0.04] p-1 border border-white/[0.06]">
                   <button
                     type="button"
                     onClick={() => {
@@ -419,9 +410,9 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                       if (!createName || createName.includes("Шкаф"))
                         setCreateName("Кухня на заказ");
                     }}
-                    className={`py-1.5 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
+                    className={`py-1.5 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
                       createPreset === "kitchen"
-                        ? "bg-zinc-800 text-white shadow-xs"
+                        ? "bg-white text-black font-semibold shadow-xs"
                         : "text-zinc-400 hover:text-white"
                     }`}
                   >
@@ -434,9 +425,9 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                       if (!createName || createName.includes("Кухня"))
                         setCreateName("Шкаф-купе в спальню");
                     }}
-                    className={`py-1.5 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
+                    className={`py-1.5 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
                       createPreset === "wardrobe"
-                        ? "bg-zinc-800 text-white shadow-xs"
+                        ? "bg-white text-black font-semibold shadow-xs"
                         : "text-zinc-400 hover:text-white"
                     }`}
                   >
@@ -445,9 +436,9 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                   <button
                     type="button"
                     onClick={() => setCreatePreset("empty")}
-                    className={`py-1.5 rounded-md text-[12px] font-medium transition-all cursor-pointer ${
+                    className={`py-1.5 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
                       createPreset === "empty"
-                        ? "bg-zinc-800 text-white shadow-xs"
+                        ? "bg-white text-black font-semibold shadow-xs"
                         : "text-zinc-400 hover:text-white"
                     }`}
                   >
@@ -456,7 +447,10 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                 </div>
               </div>
 
-              <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+              <div
+                style={{ animationDelay: "70ms" }}
+                className="apple-menu-item divide-y divide-white/[0.07] border-y border-white/[0.07]"
+              >
                 <div className="py-3 flex items-center justify-between gap-3">
                   <label className="text-zinc-400 shrink-0 w-28">Проект</label>
                   <input
@@ -510,26 +504,18 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                 <div className="text-[12px] text-rose-400">{createError}</div>
               )}
 
-              <div className="mt-2 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsCreating(false)}
-                  className="px-4 py-2 text-[13px] text-zinc-400 hover:text-white cursor-pointer"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={createSaving}
-                  className="rounded-full bg-white text-black px-5 py-2 text-[13px] font-medium hover:bg-zinc-200 active:scale-95 disabled:opacity-50 cursor-pointer"
-                >
-                  {createSaving ? "Создание…" : "Создать проект"}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={createSaving}
+                style={{ animationDelay: "110ms" }}
+                className="apple-menu-item mt-2 w-full h-11 rounded-xl bg-white text-black text-[14px] font-semibold hover:bg-zinc-200 active:scale-[0.99] disabled:opacity-50 transition-all cursor-pointer"
+              >
+                {createSaving ? "Создание…" : "Создать проект"}
+              </button>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -468,11 +468,11 @@ export function PriceListPage() {
             return (
               <div
                 key={item.id}
-                className={`py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
+                className={`py-3.5 flex items-center justify-between gap-3 transition-colors ${
                   item.active ? "" : "opacity-50"
                 }`}
               >
-                {/* Левая часть: название, категория, свойства */}
+                {/* Левая часть: только название и категория (все детали — в шторке по клику) */}
                 <div
                   className="flex-1 min-w-0 cursor-pointer pr-2 group"
                   onClick={() => handleOpenDetail(item)}
@@ -488,33 +488,19 @@ export function PriceListPage() {
                     )}
                   </div>
 
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-zinc-500">
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-zinc-500 whitespace-nowrap truncate">
                     <span>{CATEGORY_LABELS[item.category]}</span>
-                    <span>·</span>
-                    <span>ед. {item.unit}</span>
                     {item.supplier && (
                       <>
                         <span>·</span>
-                        <span className="text-zinc-400">{item.supplier}</span>
-                      </>
-                    )}
-                    {item.waste_applicable && (
-                      <>
-                        <span>·</span>
-                        <span className="text-emerald-400/90">отход кромки</span>
-                      </>
-                    )}
-                    {item.counts_for_technolog && (
-                      <>
-                        <span>·</span>
-                        <span className="text-sky-400/90">базис технолога</span>
+                        <span className="text-zinc-400 truncate">{item.supplier}</span>
                       </>
                     )}
                   </div>
                 </div>
 
                 {/* Правая часть: цена и инлайн-редактирование */}
-                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                <div className="flex items-center justify-end gap-2.5 shrink-0 whitespace-nowrap">
                   {isEditing ? (
                     <div className="flex items-center gap-1.5">
                       <input
@@ -523,7 +509,7 @@ export function PriceListPage() {
                         value={inlinePriceInput}
                         onChange={(e) => setInlinePriceInput(e.target.value)}
                         placeholder="Цена"
-                        className="w-28 h-8 rounded-lg border border-white/25 bg-zinc-900 px-2.5 text-right text-[13px] font-semibold text-white tabular-nums focus:outline-hidden"
+                        className="w-24 h-8 rounded-lg border border-white/25 bg-zinc-900 px-2.5 text-right text-[13px] font-semibold text-white tabular-nums focus:outline-hidden"
                         autoFocus
                       />
                       <button
@@ -548,7 +534,7 @@ export function PriceListPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                       <button
                         type="button"
                         onClick={() => {
@@ -673,8 +659,8 @@ function PriceItemDetailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-3xl bg-[#141418] border border-white/10 shadow-2xl overflow-hidden text-zinc-100 animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/65 p-0 sm:p-4 backdrop-blur-md">
+      <div className="apple-spatial-sheet apple-glass-glint flex max-h-[90vh] w-full max-w-xl flex-col rounded-t-[24px] sm:rounded-[24px] bg-[#141418] border-t sm:border border-white/12 shadow-2xl overflow-hidden text-zinc-100">
         {/* Шапка модалки */}
         <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
           <div>
@@ -1013,8 +999,8 @@ function NewPriceItemModal({ onClose, onCreate }: NewItemModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-3xl bg-[#141418] border border-white/10 shadow-2xl overflow-hidden text-zinc-100 animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/65 p-0 sm:p-4 backdrop-blur-md">
+      <div className="apple-spatial-sheet apple-glass-glint flex max-h-[90vh] w-full max-w-xl flex-col rounded-t-[24px] sm:rounded-[24px] bg-[#141418] border-t sm:border border-white/12 shadow-2xl overflow-hidden text-zinc-100">
         <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
           <h2 className="text-base font-bold text-white leading-snug">
             Новая позиция каталога

@@ -12,6 +12,7 @@ body {
   color: #f4f4f5;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 button,
@@ -21,7 +22,7 @@ input {
 
 /* Безопасная область для мобильных экранов с вырезом / домашней полоской */
 .safe-bottom {
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
 /* Скрытие скроллбара для горизонтальных списков табов/фильтров */
@@ -33,11 +34,195 @@ input {
   scrollbar-width: none;
 }
 
-/* Предотвращение автозума на iOS Safari при фокусе на ячейку ввода (B3) */
+/* Предотвращение автозума на iOS Safari при фокусе на ячейку ввода */
 @media (max-width: 768px) {
   input,
   select,
   textarea {
     font-size: 16px !important;
   }
+}
+
+/* ==========================================================================
+   APPLE / VISIONOS SPATIAL ANIMATION SYSTEM
+   Только для открывающихся меню, шторок и раскрытия списков
+   ========================================================================== */
+
+/* 1. Плавное физическое раскрытие аккордеона через CSS Grid (0fr -> 1fr) */
+.apple-accordion-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 440ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.apple-accordion-grid[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.apple-accordion-inner {
+  overflow: hidden;
+}
+
+/* 2. Пространственное 3D-разворачивание строк внутри открытой категории */
+@keyframes spatialRowUnfold {
+  0% {
+    opacity: 0;
+    transform: perspective(650px) rotateX(-16deg) translateY(-8px) scale(0.97);
+    filter: blur(5px);
+  }
+  65% {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(650px) rotateX(0deg) translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.apple-unfold-row {
+  transform-origin: 50% 0%;
+  animation: spatialRowUnfold 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Вертикальная направляющая линия, прорисовывающаяся сверху вниз */
+@keyframes guideLineDraw {
+  0% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.apple-guide-line {
+  transform-origin: top center;
+  animation: guideLineDraw 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 3. Dynamic Island — морфинг верхнего контекстного меню из кнопки */
+@keyframes dynamicIslandPopover {
+  0% {
+    opacity: 0;
+    transform: scale(0.38, 0.22) translateY(-14px);
+    filter: blur(10px);
+    border-radius: 28px;
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1, 1) translateY(0);
+    filter: blur(0px);
+    border-radius: 20px;
+  }
+}
+
+.apple-island-popover {
+  transform-origin: 92% 0%;
+  animation: dynamicIslandPopover 420ms cubic-bezier(0.175, 0.885, 0.32, 1.06) both;
+}
+
+/* 4. VisionOS Sheet — подъём нижней/центральной панели с оптической фокусировкой */
+@keyframes spatialSheetRise {
+  0% {
+    opacity: 0;
+    transform: perspective(900px) translateY(36px) scale(0.94) rotateX(6deg);
+    filter: blur(8px);
+  }
+  65% {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(900px) translateY(0) scale(1) rotateX(0deg);
+    filter: blur(0px);
+  }
+}
+
+.apple-spatial-sheet {
+  transform-origin: 50% 100%;
+  animation: spatialSheetRise 440ms cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+/* 5. Каскадная фокусировка элементов внутри открывшегося меню */
+@keyframes menuItemCascade {
+  0% {
+    opacity: 0;
+    transform: translateY(7px) scale(0.985);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.apple-menu-item {
+  animation: menuItemCascade 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 6. Световой блик (Specular Glint) по верхней грани стекла при открытии меню */
+@keyframes specularGlint {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.apple-glass-glint {
+  position: relative;
+  overflow: hidden;
+}
+
+.apple-glass-glint::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 100%
+  );
+  animation: specularGlint 750ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
+  pointer-events: none;
+}
+
+/* Плавное отступление заднего фона вглубь при открытии меню (iOS Depth Recession) */
+.apple-stage-recessed {
+  transform: scale(0.968) translateY(2px);
+  filter: brightness(0.7) blur(1px);
+  transition:
+    transform 440ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 440ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.apple-stage-normal {
+  transform: scale(1) translateY(0);
+  filter: brightness(1) blur(0px);
+  transition:
+    transform 400ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 400ms cubic-bezier(0.22, 1, 0.36, 1);
 }

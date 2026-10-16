@@ -51,27 +51,24 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col px-5 pt-6 pb-24 text-zinc-100 select-none">
+    <div className="mx-auto flex w-full max-w-[680px] flex-col px-5 pt-6 pb-24 text-zinc-100 select-none">
       {/* Шапка */}
       <div className="flex items-end justify-between pb-6 border-b border-white/[0.08]">
         <div>
-          <div className="text-[11px] font-medium tracking-[0.14em] uppercase text-zinc-500">
+          <div className="text-[11px] font-medium tracking-wider uppercase text-zinc-500">
             Библиотека комплектаций
           </div>
-          <h1 className="mt-1.5 text-[32px] sm:text-[38px] leading-none font-semibold tracking-[-0.03em] text-white">
-            Шаблоны изделий
+          <h1 className="mt-1 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+            Шаблоны
           </h1>
-          <p className="mt-2 text-[13px] text-zinc-400">
-            Готовые спецификации для быстрого расчёта типовых кухонь и шкафов
-          </p>
         </div>
 
         <button
           type="button"
           onClick={onBack}
-          className="text-[13px] text-zinc-400 hover:text-white transition-colors cursor-pointer"
+          className="text-[13px] text-zinc-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
         >
-          К проектам
+          К сделкам
         </button>
       </div>
 
@@ -82,9 +79,8 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
       )}
 
       {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center text-zinc-500">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
-          <span className="mt-3 text-[13px]">Загрузка…</span>
+        <div className="py-20 text-center text-[13px] text-zinc-500">
+          Загрузка…
         </div>
       ) : templates.length === 0 ? (
         <div className="py-16 text-center">
@@ -94,7 +90,7 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-white/[0.07]">
+        <div className="divide-y divide-white/[0.07] border-b border-white/[0.07]">
           {templates.map((tpl) => {
             const isExpanded = expandedTemplateId === tpl.id;
             const linesCount = tpl.lines?.length ?? 0;
@@ -105,35 +101,31 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
 
             return (
               <div key={tpl.id}>
-                <div
+                <button
+                  type="button"
                   onClick={() => setExpandedTemplateId(isExpanded ? null : tpl.id)}
-                  className="py-5 flex items-center justify-between gap-4 cursor-pointer group"
+                  className="w-full py-4.5 flex items-center justify-between gap-4 text-left cursor-pointer group"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2.5">
-                      <h3 className="text-[17px] font-medium tracking-[-0.015em] text-white group-hover:text-emerald-400 transition-colors">
+                      <h3 className="text-[16px] font-medium text-white group-hover:text-emerald-400 transition-colors truncate">
                         {tpl.name}
                       </h3>
-                      <span className="text-[13px] text-zinc-500 tabular-nums">
-                        {linesCount} поз.
+                      <span className="text-[12px] text-zinc-500 tabular-nums shrink-0">
+                        {linesCount}
                       </span>
                     </div>
-                    {tpl.description && (
-                      <p className="mt-1 text-[13px] text-zinc-400 truncate">
-                        {tpl.description}
-                      </p>
-                    )}
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-3 shrink-0 whitespace-nowrap">
                     {estimatedSum > 0 && (
-                      <span className="text-[16px] font-medium text-white tabular-nums">
+                      <span className="text-[15px] font-medium text-white tabular-nums">
                         {formatKzt(estimatedSum)} ₸
                       </span>
                     )}
                     <svg
-                      className={`w-4 h-4 text-zinc-500 transition-transform duration-200 ${
-                        isExpanded ? "rotate-90 text-zinc-300" : ""
+                      className={`w-4 h-4 text-zinc-500 transition-transform duration-300 ${
+                        isExpanded ? "rotate-90 text-zinc-200" : ""
                       }`}
                       viewBox="0 0 24 24"
                       fill="none"
@@ -143,48 +135,56 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
                       <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
-                </div>
+                </button>
 
-                {isExpanded && (
-                  <div className="pb-5 pl-4 border-l border-white/[0.08] ml-1">
-                    <div className="divide-y divide-white/[0.04]">
-                      {tpl.lines?.map((line, idx) => {
-                        const priceItem = priceItemsById.get(line.price_item_id);
-                        return (
-                          <div
-                            key={idx}
-                            className="py-2.5 flex items-center justify-between text-[13px]"
-                          >
-                            <div className="min-w-0 pr-3">
-                              <div className="text-zinc-200 truncate">
-                                {priceItem ? priceItem.name : `Позиция ${line.price_item_id}`}
-                              </div>
-                              {priceItem && (
-                                <div className="text-[11px] text-zinc-500 tabular-nums">
-                                  {formatKzt(priceItem.price)} ₸ / {priceItem.unit}
-                                  {!priceItem.active && " · архив"}
+                <div
+                  className="apple-accordion-grid"
+                  data-open={isExpanded}
+                >
+                  <div className="apple-accordion-inner">
+                    {isExpanded && (
+                      <div className="pb-5 pl-5 ml-1 relative">
+                        <div className="apple-guide-line absolute left-0 top-1 bottom-4 w-[1px] bg-gradient-to-b from-white/30 via-white/10 to-transparent" />
+                        <div className="divide-y divide-white/[0.04]">
+                          {tpl.lines?.map((line, idx) => {
+                            const priceItem = priceItemsById.get(line.price_item_id);
+                            return (
+                              <div
+                                key={idx}
+                                style={{ animationDelay: `${idx * 35}ms` }}
+                                className="apple-unfold-row py-2.5 flex items-center justify-between gap-3 text-[13px]"
+                              >
+                                <div className="min-w-0">
+                                  <div className="text-zinc-200 truncate">
+                                    {priceItem ? priceItem.name : `Позиция ${line.price_item_id}`}
+                                  </div>
+                                  {priceItem && (
+                                    <div className="text-[11px] text-zinc-500 tabular-nums whitespace-nowrap">
+                                      {formatKzt(priceItem.price * line.qty)} ₸
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                            <div className="text-right shrink-0 font-medium text-white tabular-nums">
-                              {line.qty} {priceItem?.unit ?? "шт"}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                                <div className="text-right shrink-0 font-medium text-zinc-300 tabular-nums whitespace-nowrap">
+                                  {line.qty} {priceItem?.unit ?? "шт"}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
 
-                    <div className="mt-3 pt-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(tpl)}
-                        className="text-[12px] text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
-                      >
-                        Удалить шаблон
-                      </button>
-                    </div>
+                        <div className="mt-3 pt-2 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(tpl)}
+                            className="text-[12px] text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer"
+                          >
+                            Удалить шаблон
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             );
           })}

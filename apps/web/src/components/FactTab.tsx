@@ -38,6 +38,7 @@ interface FactTabProps {
   calculations: OrderCalculation[];
   onExpensesChange: (expenses: ActualExpense[]) => void;
   onPaymentsChange: (payments: Payment[]) => void;
+  onBackToQuote?: () => void;
 }
 
 export function FactTab({
@@ -47,10 +48,13 @@ export function FactTab({
   calculations,
   onExpensesChange,
   onPaymentsChange,
+  onBackToQuote,
 }: FactTabProps) {
   const dialog = useDialog();
 
-  // --- Добавление расхода ---
+  const [expandedSection, setExpandedSection] = useState<string | null>("plan_fact");
+
+  // --- Добавление расхода (в пространственной шторке) ---
   const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false);
   const [expDate, setExpDate] = useState(() => getLocalTodayDateString());
   const [expCategory, setExpCategory] = useState<PriceCategory>("materials");
@@ -62,7 +66,7 @@ export function FactTab({
   const [expSaving, setExpSaving] = useState(false);
   const [expError, setExpError] = useState<string | null>(null);
 
-  // --- Добавление поступления ---
+  // --- Добавление поступления (в пространственной шторке) ---
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [payDate, setPayDate] = useState(() => getLocalTodayDateString());
   const [payAmount, setPayAmount] = useState("");
@@ -70,7 +74,6 @@ export function FactTab({
   const [paySaving, setPaySaving] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
 
-  // --- План: опорная договорная версия или последняя сохранённая (Step A5, Q3) ---
   const planCalc = useMemo(() => {
     return getPlanCalculation(calculations);
   }, [calculations]);
@@ -80,14 +83,8 @@ export function FactTab({
     return buildPlanFactRows(toCalculationResultLike(planCalc.result), expenses);
   }, [planCalc, expenses]);
 
-  const riskReservePlan = useMemo(() => {
-    const row = planFactRows.find((r) => r.key === "risk_reserve");
-    return row ? row.plan : 0;
-  }, [planFactRows]);
-
   const planCostTotal = planCalc ? Number(planCalc.cost_total) : 0;
 
-  // --- Факт: финансовые итоги и кассовый баланс (Step A4, Q4) ---
   const financialSummary = useMemo(() => {
     return computeOrderFinancialSummary({
       contractPrice: order.contract_price,
@@ -96,7 +93,6 @@ export function FactTab({
     });
   }, [order.contract_price, expenses, payments]);
 
-  // --- Обработчики ---
   function resetExpenseForm() {
     setExpDate(getLocalTodayDateString());
     setExpCategory("materials");
@@ -150,6 +146,7 @@ export function FactTab({
         onExpensesChange([newExp, ...expenses]);
         resetExpenseForm();
         setIsExpenseFormOpen(false);
+        setExpandedSection("expenses");
         return;
       }
 
@@ -175,6 +172,7 @@ export function FactTab({
         onExpensesChange([...expenses, data as ActualExpense]);
         resetExpenseForm();
         setIsExpenseFormOpen(false);
+        setExpandedSection("expenses");
       }
     } catch (err: unknown) {
       setExpError(formatErrorMessage(err, "Ошибка сохранения расхода."));
@@ -240,6 +238,7 @@ export function FactTab({
         onPaymentsChange([newPay, ...payments]);
         resetPaymentForm();
         setIsPaymentFormOpen(false);
+        setExpandedSection("payments");
         return;
       }
 
@@ -261,6 +260,7 @@ export function FactTab({
         onPaymentsChange([...payments, data as Payment]);
         resetPaymentForm();
         setIsPaymentFormOpen(false);
+        setExpandedSection("payments");
       }
     } catch (err: unknown) {
       setPayError(formatErrorMessage(err, "Ошибка сохранения поступления."));
@@ -301,601 +301,566 @@ export function FactTab({
     }
   }
 
+  const anyModalOpen = isExpenseFormOpen || isPaymentFormOpen;
+
   return (
-    <div className="mt-4 flex flex-col gap-4 text-zinc-100">
-      {/* Подсказка */}
-      <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3.5 text-xs text-sky-300 font-medium">
-        💡 Сюда вносятся только расходы по этому заказу. Личные траты не вносить.
-      </div>
+    <>
+      <div
+        className={`mx-auto w-full max-w-lg px-5 pt-4 pb-28 sm:py-8 flex flex-col min-h-svh text-zinc-100 select-none ${
+          anyModalOpen ? "apple-stage-recessed" : "apple-stage-normal"
+        }`}
+      >
+        {/* 1. Навигационная шапка */}
+        <header className="flex items-center justify-between py-2 mb-6">
+          {onBackToQuote ? (
+            <button
+              type="button"
+              onClick={onBackToQuote}
+              className="inline-flex items-center gap-1 -ml-1.5 px-1.5 py-1 text-[15px] font-normal text-zinc-400 hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>К смете</span>
+            </button>
+          ) : (
+            <span className="text-[13px] text-zinc-500">План / Факт</span>
+          )}
 
-      {/* ========== СВОДКА ПЛАН / ФАКТ ========== */}
-      <div className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-2xl backdrop-blur-xl md:p-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/[0.06] pb-3">
-          <h2 className="text-base font-medium tracking-tight text-white">
-            📊 {planCalc
-              ? planCalc.is_contract_baseline
-                ? `План: версия №${planCalc.version} (договорная)`
-                : `План: версия №${planCalc.version}`
-              : "План / Факт"}
-          </h2>
-        </div>
-        {!planCalc ? (
-          <p className="mt-3 text-xs text-zinc-500">
-            Нет сохранённых версий расчёта. Сохраните расчёт на вкладке «Расчёт», чтобы увидеть сравнение план/факт.
-          </p>
-        ) : (
-          <div className="mt-4 flex flex-col gap-0">
-            {/* Таблица по категориям */}
-            <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-zinc-900/30">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-zinc-950/60 text-left text-[11px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-white/[0.06]">
-                    <th className="px-3.5 py-2.5">Категория</th>
-                    <th className="px-3.5 py-2.5 text-right">План</th>
-                    <th className="px-3.5 py-2.5 text-right">Факт</th>
-                    <th className="px-3.5 py-2.5 text-right">Разница</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04]">
-                  {planFactRows.map((row) => (
-                    <tr key={row.key} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-3.5 py-2.5 font-medium text-zinc-200">
-                        {row.label}
-                      </td>
-                      <td className="px-3.5 py-2.5 text-right text-zinc-400 tabular-nums">
-                        {row.plan > 0 ? `${formatKzt(row.plan)} ₸` : "—"}
-                      </td>
-                      <td className="px-3.5 py-2.5 text-right font-medium text-white tabular-nums">
-                        {row.fact !== null && row.fact > 0 ? `${formatKzt(row.fact)} ₸` : "—"}
-                      </td>
-                      <td className={`px-3.5 py-2.5 text-right font-semibold tabular-nums ${
-                        row.diff !== null
-                          ? row.diff > 0
-                            ? "text-rose-400"
-                            : row.diff < 0
-                            ? "text-emerald-400"
-                            : "text-zinc-500"
-                          : "text-zinc-500"
-                      }`}>
-                        {row.diff !== null && (row.fact! > 0 || row.plan > 0)
-                          ? `${row.diff > 0 ? "+" : ""}${formatKzt(row.diff)} ₸`
-                          : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="border-t border-white/[0.08] bg-zinc-950/80 text-xs font-semibold text-white">
-                  <tr>
-                    <td className="px-3.5 py-2.5 text-white">
-                      Итого расходы
-                      {riskReservePlan > 0 && (
-                        <span className="block text-[10px] font-normal text-zinc-400">
-                          в плане учтён резерв {formatKzt(riskReservePlan)} ₸
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3.5 py-2.5 text-right text-zinc-300 tabular-nums">
-                      {formatKzt(planCostTotal)} ₸
-                    </td>
-                    <td className="px-3.5 py-2.5 text-right text-white tabular-nums">
-                      {financialSummary.totalExpenses > 0
-                        ? `${formatKzt(financialSummary.totalExpenses)} ₸`
-                        : "—"}
-                    </td>
-                    <td className={`px-3.5 py-2.5 text-right tabular-nums ${
-                      financialSummary.totalExpenses - planCostTotal > 0
-                        ? "text-rose-400 font-semibold"
-                        : financialSummary.totalExpenses - planCostTotal < 0
-                        ? "text-emerald-400 font-semibold"
-                        : "text-zinc-500"
-                    }`}>
-                      {financialSummary.totalExpenses > 0
-                        ? `${financialSummary.totalExpenses - planCostTotal > 0 ? "+" : ""}${formatKzt(financialSummary.totalExpenses - planCostTotal)} ₸`
-                        : "—"}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-            {/* Переделки отдельной информационной строкой (Q4) */}
-            {financialSummary.reworkTotal > 0 && (
-              <div className="mt-2.5 flex items-center justify-between rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3.5 py-2 text-xs text-zinc-300">
-                <span>из них переделки:</span>
-                <span className="font-semibold text-rose-400 tabular-nums">
-                  {formatKzt(financialSummary.reworkTotal)} ₸
-                </span>
-              </div>
-            )}
-
-            {/* Финансовые карточки (Q4): Договор, Оплачено клиентом, Остаток долга, Фактическая прибыль, Кассовый баланс */}
-            <div className="mt-3.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
-              {/* 1. Договор */}
-              <div className="rounded-2xl bg-zinc-900/60 border border-white/[0.05] px-3.5 py-3 text-center">
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                  Договор
-                </span>
-                <span className="mt-1 block text-sm font-semibold tracking-tight text-white tabular-nums">
-                  {financialSummary.contractPrice > 0
-                    ? `${formatKzt(financialSummary.contractPrice)} ₸`
-                    : "—"}
-                </span>
-              </div>
-
-              {/* 2. Оплачено клиентом */}
-              <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-3 text-center">
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
-                  Оплачено клиентом
-                </span>
-                <span className="mt-1 block text-sm font-semibold tracking-tight text-emerald-300 tabular-nums">
-                  {financialSummary.paymentsTotal > 0
-                    ? `${formatKzt(financialSummary.paymentsTotal)} ₸`
-                    : "—"}
-                </span>
-              </div>
-
-              {/* 3. Остаток долга */}
-              <div className={`rounded-2xl px-3.5 py-3 text-center border ${
-                financialSummary.contractPrice > 0 && financialSummary.paymentRemaining > 0
-                  ? "bg-amber-500/10 border-amber-500/20"
-                  : financialSummary.contractPrice > 0 && financialSummary.paymentRemaining <= 0
-                  ? "bg-emerald-500/10 border-emerald-500/20"
-                  : "bg-zinc-900/60 border-white/[0.05]"
-              }`}>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                  Остаток долга
-                </span>
-                <span className={`mt-1 block text-sm font-semibold tracking-tight tabular-nums ${
-                  financialSummary.contractPrice > 0 && financialSummary.paymentRemaining > 0
-                    ? "text-amber-300"
-                    : financialSummary.contractPrice > 0 && financialSummary.paymentRemaining <= 0
-                    ? "text-emerald-300"
-                    : "text-white"
-                }`}>
-                  {financialSummary.contractPrice > 0
-                    ? `${formatKzt(financialSummary.paymentRemaining)} ₸`
-                    : "—"}
-                </span>
-              </div>
-
-              {/* 4. Фактическая прибыль */}
-              <div className={`rounded-2xl px-3.5 py-3 text-center border ${
-                financialSummary.contractPrice > 0 && financialSummary.actualProfit >= 0
-                  ? "bg-emerald-500/10 border-emerald-500/20"
-                  : financialSummary.contractPrice > 0 && financialSummary.actualProfit < 0
-                  ? "bg-rose-500/10 border-rose-500/20"
-                  : "bg-zinc-900/60 border-white/[0.05]"
-              }`}>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                  Фактическая прибыль
-                </span>
-                <span className={`mt-1 block text-sm font-semibold tracking-tight tabular-nums ${
-                  financialSummary.contractPrice > 0 && financialSummary.actualProfit >= 0
-                    ? "text-emerald-300"
-                    : financialSummary.contractPrice > 0 && financialSummary.actualProfit < 0
-                    ? "text-rose-300"
-                    : "text-white"
-                }`}>
-                  {financialSummary.contractPrice > 0 ? (
-                    <>
-                      {financialSummary.actualProfit > 0 ? "+" : ""}
-                      {formatKzt(financialSummary.actualProfit)} ₸
-                      {financialSummary.profitMarginPct !== null && (
-                        <span className="text-xs font-normal ml-1 opacity-80">
-                          ({formatPercent(financialSummary.profitMarginPct)})
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    "—"
-                  )}
-                </span>
-              </div>
-
-              {/* 5. Кассовый баланс */}
-              <div className={`rounded-2xl px-3.5 py-3 text-center border ${
-                financialSummary.cashBalance >= 0
-                  ? "bg-emerald-500/10 border-emerald-500/20"
-                  : "bg-rose-500/10 border-rose-500/20"
-              }`}>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                  Кассовый баланс
-                </span>
-                <span className={`mt-1 block text-sm font-semibold tracking-tight tabular-nums ${
-                  financialSummary.cashBalance >= 0
-                    ? "text-emerald-300"
-                    : "text-rose-300"
-                }`}>
-                  {financialSummary.cashBalance > 0 ? "+" : ""}
-                  {formatKzt(financialSummary.cashBalance)} ₸
-                </span>
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                resetPaymentForm();
+                setIsPaymentFormOpen(true);
+              }}
+              className="h-8 px-3 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[12px] font-medium text-emerald-400 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              + Оплата
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetExpenseForm();
+                setIsExpenseFormOpen(true);
+              }}
+              className="h-8 px-3 rounded-full bg-white text-black hover:bg-zinc-200 text-[12px] font-semibold transition-colors cursor-pointer whitespace-nowrap"
+            >
+              + Расход
+            </button>
           </div>
-        )}
-      </div>
+        </header>
 
-      {/* ========== РАСХОДЫ ========== */}
-      <div className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-2xl backdrop-blur-xl md:p-6">
-        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+        {/* 2. Главная цифра: Фактическая прибыль */}
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="text-[12px] font-medium text-zinc-500 truncate max-w-full">
+            {order.name} · План / Факт
+          </div>
+
+          <div className="mt-2 inline-flex items-baseline justify-center">
+            <span
+              className={`text-[46px] sm:text-[52px] leading-[1.04] font-semibold tracking-[-0.035em] tabular-nums ${
+                financialSummary.actualProfit >= 0 ? "text-white" : "text-rose-400"
+              }`}
+            >
+              {financialSummary.actualProfit > 0 ? "+" : ""}
+              {formatKzt(financialSummary.actualProfit)}
+            </span>
+            <span className="ml-2 text-[30px] font-light text-zinc-500">₸</span>
+          </div>
+
+          <div className="mt-2.5 flex items-center gap-2 text-[13px] text-zinc-400 tabular-nums whitespace-nowrap">
+            <span>
+              Факт. прибыль{" "}
+              {financialSummary.profitMarginPct !== null && (
+                <strong className="font-medium text-white">
+                  {formatPercent(financialSummary.profitMarginPct)}
+                </strong>
+              )}
+            </span>
+            <span className="text-zinc-600">·</span>
+            <span>Касса {formatKzt(financialSummary.cashBalance)} ₸</span>
+          </div>
+        </div>
+
+        {/* 3. Краткая сводка по договору и долгу */}
+        <div className="grid grid-cols-3 gap-2 py-3.5 mb-4 border-y border-white/[0.07] text-center">
           <div>
-            <h2 className="text-base font-medium tracking-tight text-white">💸 Расходы</h2>
-            <p className="text-xs text-zinc-400">
-              Фактические расходы по заказу
-            </p>
+            <span className="block text-[11px] text-zinc-500">Договор</span>
+            <span className="mt-0.5 block text-[13px] font-medium text-white tabular-nums whitespace-nowrap">
+              {financialSummary.contractPrice > 0
+                ? `${formatKzt(financialSummary.contractPrice)} ₸`
+                : "—"}
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              resetExpenseForm();
-              setIsExpenseFormOpen(true);
-            }}
-            className="flex min-h-10 items-center gap-1.5 rounded-xl bg-white px-3.5 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-98 transition-all cursor-pointer shadow-md"
-          >
-            <span>+</span>
-            <span>Добавить расход</span>
-          </button>
+          <div className="border-x border-white/[0.06]">
+            <span className="block text-[11px] text-zinc-500">Оплачено</span>
+            <span className="mt-0.5 block text-[13px] font-medium text-emerald-400 tabular-nums whitespace-nowrap">
+              {formatKzt(financialSummary.paymentsTotal)} ₸
+            </span>
+          </div>
+          <div>
+            <span className="block text-[11px] text-zinc-500">Долг клиента</span>
+            <span className="mt-0.5 block text-[13px] font-medium text-amber-300 tabular-nums whitespace-nowrap">
+              {financialSummary.contractPrice > 0
+                ? `${formatKzt(financialSummary.paymentRemaining)} ₸`
+                : "—"}
+            </span>
+          </div>
         </div>
 
-        {/* Форма добавления расхода */}
-        {isExpenseFormOpen && (
-          <form
-            onSubmit={(e) => void handleSaveExpense(e)}
-            className="mt-4 rounded-2xl border border-white/[0.08] bg-zinc-900/60 p-4 flex flex-col gap-3 text-zinc-100"
-          >
-            {expError && (
-              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-300">
-                {expError}
+        {/* 4. Раскрывающиеся разделы (Сверка, Расходы, Оплаты) */}
+        <div className="divide-y divide-white/[0.08] border-b border-white/[0.08]">
+          {/* РАЗДЕЛ 1: СВЕРКА СО СМЕТОЙ */}
+          <div>
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedSection((p) => (p === "plan_fact" ? null : "plan_fact"))
+              }
+              className="w-full py-4 flex items-center justify-between gap-3 text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0 whitespace-nowrap">
+                <span className="h-2.5 w-2.5 rounded-full bg-zinc-200 shrink-0" />
+                <span className="text-[16px] font-medium text-white">
+                  Сверка со сметой
+                </span>
               </div>
-            )}
 
-            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex items-center gap-2.5 shrink-0 whitespace-nowrap">
+                <span className="text-[14px] text-zinc-400 tabular-nums">
+                  План {formatKzt(planCostTotal)} ₸
+                </span>
+                <svg
+                  className={`w-4 h-4 text-zinc-500 transition-transform duration-300 ${
+                    expandedSection === "plan_fact" ? "rotate-90 text-zinc-200" : ""
+                  }`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </button>
+
+            <div
+              className="apple-accordion-grid"
+              data-open={expandedSection === "plan_fact"}
+            >
+              <div className="apple-accordion-inner">
+                {expandedSection === "plan_fact" && (
+                  <div className="pb-4 pl-5 ml-1 relative divide-y divide-white/[0.05]">
+                    <div className="apple-guide-line absolute left-0 top-1 bottom-4 w-[1px] bg-gradient-to-b from-white/30 via-white/10 to-transparent" />
+                    {!planCalc ? (
+                      <div className="py-2 text-[13px] text-zinc-500">
+                        Зафиксируйте версию в смете, чтобы сравнить план и факт.
+                      </div>
+                    ) : (
+                      planFactRows.map((row, idx) => {
+                        const factVal = row.fact ?? 0;
+                        const diffVal = row.diff ?? 0;
+                        return (
+                          <div
+                            key={row.key}
+                            style={{ animationDelay: `${idx * 35}ms` }}
+                            className="apple-unfold-row py-2.5 flex items-center justify-between gap-3"
+                          >
+                            <div className="min-w-0">
+                              <div className="text-[14px] text-zinc-200 truncate">
+                                {row.label}
+                              </div>
+                              <div className="text-[11px] text-zinc-500 tabular-nums whitespace-nowrap">
+                                План: {formatKzt(row.plan)} ₸ · Факт: {formatKzt(factVal)} ₸
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[13px] font-medium tabular-nums whitespace-nowrap shrink-0 ${
+                                diffVal > 0
+                                  ? "text-rose-400"
+                                  : diffVal < 0
+                                  ? "text-emerald-400"
+                                  : "text-zinc-500"
+                              }`}
+                            >
+                              {diffVal > 0 ? `+${formatKzt(diffVal)} ₸` : diffVal < 0 ? `${formatKzt(diffVal)} ₸` : "0 ₸"}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* РАЗДЕЛ 2: ФАКТИЧЕСКИЕ РАСХОДЫ */}
+          <div>
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedSection((p) => (p === "expenses" ? null : "expenses"))
+              }
+              className="w-full py-4 flex items-center justify-between gap-3 text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0 whitespace-nowrap">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-[16px] font-medium text-white">
+                  Расходы
+                </span>
+                <span className="text-[13px] text-zinc-500 tabular-nums">
+                  {expenses.length}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0 whitespace-nowrap">
+                <span className="text-[16px] font-medium text-white tabular-nums">
+                  {formatKzt(financialSummary.totalExpenses)} ₸
+                </span>
+                <svg
+                  className={`w-4 h-4 text-zinc-500 transition-transform duration-300 ${
+                    expandedSection === "expenses" ? "rotate-90 text-zinc-200" : ""
+                  }`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </button>
+
+            <div
+              className="apple-accordion-grid"
+              data-open={expandedSection === "expenses"}
+            >
+              <div className="apple-accordion-inner">
+                {expandedSection === "expenses" && (
+                  <div className="pb-4 pl-5 ml-1 relative divide-y divide-white/[0.05]">
+                    <div className="apple-guide-line absolute left-0 top-1 bottom-4 w-[1px] bg-gradient-to-b from-amber-400/40 via-white/10 to-transparent" />
+                    {expenses.length === 0 ? (
+                      <div className="py-2 text-[13px] text-zinc-500">
+                        Расходы ещё не внесены
+                      </div>
+                    ) : (
+                      expenses.map((exp, idx) => (
+                        <div
+                          key={exp.id}
+                          style={{ animationDelay: `${idx * 35}ms` }}
+                          className="apple-unfold-row py-2.5 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-[14px] text-zinc-100 truncate">
+                              {exp.name}
+                            </div>
+                            <div className="text-[11px] text-zinc-500 whitespace-nowrap">
+                              {CATEGORY_LABELS[exp.category]}
+                              {exp.is_rework ? " · Переделка" : ""}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <span
+                              className={`text-[14px] font-medium tabular-nums whitespace-nowrap ${
+                                exp.is_rework ? "text-rose-400" : "text-white"
+                              }`}
+                            >
+                              {formatKzt(exp.amount)} ₸
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteExpense(exp.id)}
+                              className="text-zinc-600 hover:text-rose-400 p-1 text-xs cursor-pointer"
+                              title="Удалить"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* РАЗДЕЛ 3: ОПЛАТЫ КЛИЕНТА */}
+          <div>
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedSection((p) => (p === "payments" ? null : "payments"))
+              }
+              className="w-full py-4 flex items-center justify-between gap-3 text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0 whitespace-nowrap">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shrink-0" />
+                <span className="text-[16px] font-medium text-white">
+                  Оплаты
+                </span>
+                <span className="text-[13px] text-zinc-500 tabular-nums">
+                  {payments.length}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0 whitespace-nowrap">
+                <span className="text-[16px] font-medium text-emerald-400 tabular-nums">
+                  +{formatKzt(financialSummary.paymentsTotal)} ₸
+                </span>
+                <svg
+                  className={`w-4 h-4 text-zinc-500 transition-transform duration-300 ${
+                    expandedSection === "payments" ? "rotate-90 text-zinc-200" : ""
+                  }`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </button>
+
+            <div
+              className="apple-accordion-grid"
+              data-open={expandedSection === "payments"}
+            >
+              <div className="apple-accordion-inner">
+                {expandedSection === "payments" && (
+                  <div className="pb-4 pl-5 ml-1 relative divide-y divide-white/[0.05]">
+                    <div className="apple-guide-line absolute left-0 top-1 bottom-4 w-[1px] bg-gradient-to-b from-emerald-400/40 via-white/10 to-transparent" />
+                    {payments.length === 0 ? (
+                      <div className="py-2 text-[13px] text-zinc-500">
+                        Поступлений пока нет
+                      </div>
+                    ) : (
+                      payments.map((pay, idx) => (
+                        <div
+                          key={pay.id}
+                          style={{ animationDelay: `${idx * 35}ms` }}
+                          className="apple-unfold-row py-2.5 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-[14px] text-zinc-100 truncate">
+                              {pay.note || "Оплата по договору"}
+                            </div>
+                            <div className="text-[11px] text-zinc-500">
+                              {new Date(pay.paid_at).toLocaleDateString("ru-RU", {
+                                day: "2-digit",
+                                month: "short",
+                              })}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <span className="text-[14px] font-medium text-emerald-400 tabular-nums whitespace-nowrap">
+                              +{formatKzt(pay.amount)} ₸
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeletePayment(pay.id)}
+                              className="text-zinc-600 hover:text-rose-400 p-1 text-xs cursor-pointer"
+                              title="Удалить"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ШТОРКА ДОБАВЛЕНИЯ РАСХОДА */}
+      {isExpenseFormOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/65 backdrop-blur-md p-0 sm:p-4"
+          onClick={() => setIsExpenseFormOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="apple-spatial-sheet apple-glass-glint w-full max-w-md rounded-t-[24px] sm:rounded-[24px] bg-[#141418] border-t sm:border border-white/[0.12] p-6 pb-8 text-zinc-100 shadow-2xl"
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.07]">
+              <h3 className="text-[17px] font-semibold text-white">Новый расход</h3>
+              <button
+                type="button"
+                onClick={() => setIsExpenseFormOpen(false)}
+                className="h-8 w-8 rounded-full bg-white/[0.06] flex items-center justify-center text-zinc-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={(e) => void handleSaveExpense(e)} className="mt-4 space-y-4">
+              {expError && (
+                <div className="border-l-2 border-rose-500 bg-rose-500/5 pl-3 py-2 text-xs text-rose-300">
+                  {expError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] text-zinc-400 mb-1">Категория</label>
+                  <select
+                    value={expCategory}
+                    onChange={(e) => setExpCategory(e.target.value as PriceCategory)}
+                    className="w-full h-10 rounded-lg bg-white/[0.04] border border-white/[0.1] px-3 text-[13px] text-white focus:outline-hidden"
+                  >
+                    {ALL_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat} className="bg-zinc-900">
+                        {CATEGORY_LABELS[cat]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[12px] text-zinc-400 mb-1">Дата</label>
+                  <input
+                    type="date"
+                    value={expDate}
+                    onChange={(e) => setExpDate(e.target.value)}
+                    className="w-full h-10 rounded-lg bg-white/[0.04] border border-white/[0.1] px-3 text-[13px] text-white focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Дата расхода
-                </label>
+                <label className="block text-[12px] text-zinc-400 mb-1">Наименование</label>
                 <input
-                  type="date"
-                  value={expDate}
-                  onChange={(e) => setExpDate(e.target.value)}
-                  className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none transition-colors"
+                  type="text"
+                  value={expName}
+                  onChange={(e) => setExpName(e.target.value)}
+                  placeholder="Например: Докупка петель Blum"
+                  className="w-full h-10 rounded-lg bg-white/[0.04] border border-white/[0.1] px-3 text-[14px] text-white placeholder-zinc-600 focus:outline-hidden"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Категория
-                </label>
-                <select
-                  value={expCategory}
-                  onChange={(e) => setExpCategory(e.target.value as PriceCategory)}
-                  className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none transition-colors"
-                >
-                  {ALL_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat} className="bg-zinc-900 text-white">
-                      {CATEGORY_LABELS[cat]}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-[12px] text-zinc-400 mb-1">Сумма (₸)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={expAmount}
+                  onChange={(e) => setExpAmount(e.target.value)}
+                  placeholder="15000"
+                  className="w-full h-11 rounded-lg bg-white/[0.04] border border-white/[0.1] px-3 text-[18px] font-semibold text-white tabular-nums placeholder-zinc-600 focus:outline-hidden"
+                />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1">
-                Название
-              </label>
-              <input
-                type="text"
-                value={expName}
-                onChange={(e) => setExpName(e.target.value)}
-                placeholder="Например: ЛДСП Egger 18мм"
-                className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1">
-                Сумма (₸)
-              </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={expAmount}
-                onChange={(e) => setExpAmount(e.target.value)}
-                placeholder="15 000"
-                className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
-              />
-            </div>
-
-            {/* Переключатель переделки */}
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex items-center gap-2 cursor-pointer pt-1">
                 <input
                   type="checkbox"
                   checked={expIsRework}
                   onChange={(e) => setExpIsRework(e.target.checked)}
-                  className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-rose-500 focus:ring-rose-500"
+                  className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-rose-500"
                 />
-                <span className="text-xs font-medium text-zinc-300">
-                  🔧 Переделка
-                </span>
+                <span className="text-[13px] text-zinc-300">Это переделка (брак / ошибка)</span>
               </label>
+
               {expIsRework && (
-                <div>
-                  <label className="block text-xs font-medium text-rose-300 mb-1">
-                    Причина переделки *
-                  </label>
-                  <input
-                    type="text"
-                    value={expReworkReason}
-                    onChange={(e) => setExpReworkReason(e.target.value)}
-                    placeholder="Обязательно укажите причину"
-                    className="min-h-11 w-full rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-white placeholder-rose-400 focus:border-rose-500 outline-none"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={expReworkReason}
+                  onChange={(e) => setExpReworkReason(e.target.value)}
+                  placeholder="Укажите причину переделки *"
+                  className="w-full h-10 rounded-lg bg-rose-500/10 border border-rose-500/30 px-3 text-[13px] text-white placeholder-rose-300/60 focus:outline-hidden"
+                />
               )}
-            </div>
 
-            <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1">
-                Примечание
-              </label>
-              <input
-                type="text"
-                value={expNote}
-                onChange={(e) => setExpNote(e.target.value)}
-                placeholder="Дополнительная информация"
-                className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsExpenseFormOpen(false)}
-                disabled={expSaving}
-                className="min-h-10 rounded-xl border border-white/10 px-4 text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.05] transition-colors"
-              >
-                Отмена
-              </button>
               <button
                 type="submit"
                 disabled={expSaving}
-                className="min-h-10 rounded-xl bg-white px-5 text-xs font-semibold text-black hover:bg-zinc-200 disabled:opacity-40 transition-all cursor-pointer shadow-md"
+                className="w-full h-11 rounded-xl bg-white text-black font-semibold text-[14px] hover:bg-zinc-200 transition-colors cursor-pointer disabled:opacity-50"
               >
-                {expSaving ? "Сохранение…" : "Добавить расход"}
+                {expSaving ? "Сохранение…" : "Сохранить расход"}
               </button>
-            </div>
-          </form>
-        )}
-
-        {/* Список расходов */}
-        {expenses.length === 0 ? (
-          <div className="mt-4 rounded-2xl border border-dashed border-white/[0.08] bg-zinc-900/20 p-6 text-center text-xs text-zinc-500">
-            Пока нет фактических расходов по этому заказу.
+            </form>
           </div>
-        ) : (
-          <div className="mt-4 divide-y divide-white/[0.04] rounded-2xl border border-white/[0.06] bg-zinc-900/30 overflow-hidden">
-            {expenses.map((exp) => {
-              const dateStr = new Date(exp.expense_date).toLocaleDateString("ru-RU", {
-                day: "2-digit",
-                month: "short",
-              });
-              return (
-                <div
-                  key={exp.id}
-                  className={`flex items-center justify-between p-3.5 text-xs ${
-                    exp.is_rework ? "bg-rose-500/5" : ""
-                  }`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-white truncate">
-                        {exp.name}
-                      </span>
-                      <span className="rounded-md bg-white/[0.06] border border-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
-                        {CATEGORY_LABELS[exp.category]}
-                      </span>
-                      {exp.is_rework && (
-                        <span className="rounded-md bg-rose-500/20 border border-rose-500/30 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
-                          🔧 Переделка
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 text-zinc-500 flex items-center gap-2 flex-wrap">
-                      <span>{dateStr}</span>
-                      {exp.is_rework && exp.rework_reason && (
-                        <span className="text-rose-400 italic">
-                          Причина: {exp.rework_reason}
-                        </span>
-                      )}
-                      {exp.note && (
-                        <span className="text-zinc-500 italic">{exp.note}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 ml-3">
-                    <span className={`font-semibold tabular-nums whitespace-nowrap ${
-                      exp.is_rework ? "text-rose-300" : "text-white"
-                    }`}>
-                      {formatKzt(exp.amount)} ₸
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteExpense(exp.id)}
-                      className="rounded-lg p-1 text-zinc-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors cursor-pointer"
-                      title="Удалить"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {/* Итого расходов */}
-            <div className="flex items-center justify-between bg-zinc-950/60 px-3.5 py-2.5 text-xs font-semibold border-t border-white/[0.06]">
-              <span className="text-zinc-400">
-                Итого расходов: {expenses.length}
-              </span>
-              <span className="text-white tabular-nums">
-                {formatKzt(financialSummary.totalExpenses)} ₸
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ========== ПОСТУПЛЕНИЯ ========== */}
-      <div className="rounded-3xl border border-white/[0.07] bg-[#121215] p-5 shadow-2xl backdrop-blur-xl md:p-6">
-        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-          <div>
-            <h2 className="text-base font-medium tracking-tight text-white">💰 Поступления</h2>
-            <p className="text-xs text-zinc-400">
-              Оплаты от клиента
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              resetPaymentForm();
-              setIsPaymentFormOpen(true);
-            }}
-            className="flex min-h-10 items-center gap-1.5 rounded-xl bg-white px-3.5 text-xs font-semibold text-black hover:bg-zinc-200 active:scale-98 transition-all cursor-pointer shadow-md"
-          >
-            <span>+</span>
-            <span>Добавить поступление</span>
-          </button>
         </div>
+      )}
 
-        {/* Форма добавления поступления */}
-        {isPaymentFormOpen && (
-          <form
-            onSubmit={(e) => void handleSavePayment(e)}
-            className="mt-4 rounded-2xl border border-white/[0.08] bg-zinc-900/60 p-4 flex flex-col gap-3 text-zinc-100"
+      {/* ШТОРКА ДОБАВЛЕНИЯ ОПЛАТЫ */}
+      {isPaymentFormOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/65 backdrop-blur-md p-0 sm:p-4"
+          onClick={() => setIsPaymentFormOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="apple-spatial-sheet apple-glass-glint w-full max-w-md rounded-t-[24px] sm:rounded-[24px] bg-[#141418] border-t sm:border border-white/[0.12] p-6 pb-8 text-zinc-100 shadow-2xl"
           >
-            {payError && (
-              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-300">
-                {payError}
-              </div>
-            )}
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Дата поступления
-                </label>
-                <input
-                  type="date"
-                  value={payDate}
-                  onChange={(e) => setPayDate(e.target.value)}
-                  className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white focus:border-emerald-500/50 outline-none transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Сумма (₸)
-                </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
-                  placeholder="300 000"
-                  className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1">
-                Примечание
-              </label>
-              <input
-                type="text"
-                value={payNote}
-                onChange={(e) => setPayNote(e.target.value)}
-                placeholder="Например: Предоплата 50%"
-                className="min-h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500/50 outline-none transition-colors"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.07]">
+              <h3 className="text-[17px] font-semibold text-white">Новая оплата клиента</h3>
               <button
                 type="button"
                 onClick={() => setIsPaymentFormOpen(false)}
-                disabled={paySaving}
-                className="min-h-10 rounded-xl border border-white/10 px-4 text-xs font-medium text-zinc-400 hover:text-white hover:bg-white/[0.05] transition-colors"
+                className="h-8 w-8 rounded-full bg-white/[0.06] flex items-center justify-center text-zinc-400 hover:text-white cursor-pointer"
               >
-                Отмена
+                ✕
               </button>
+            </div>
+
+            <form onSubmit={(e) => void handleSavePayment(e)} className="mt-4 space-y-4">
+              {payError && (
+                <div className="border-l-2 border-rose-500 bg-rose-500/5 pl-3 py-2 text-xs text-rose-300">
+                  {payError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[12px] text-zinc-400 mb-1">Сумма оплаты (₸)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoFocus
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  placeholder="500000"
+                  className="w-full h-11 rounded-lg bg-white/[0.04] border border-white/[0.1] px-3 text-[18px] font-semibold text-white tabular-nums placeholder-zinc-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] text-zinc-400 mb-1">Дата</label>
+                  <input
+                    type="date"
+                    value={payDate}
+                    onChange={(e) => setPayDate(e.target.value)}
+                    className="w-full h-10 rounded-lg bg-white/[0.04] border border-white/[0.1] px-3 text-[13px] text-white focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] text-zinc-400 mb-1">Комментарий</label>
+                  <input
+                    type="text"
+                    value={payNote}
+                    onChange={(e) => setPayNote(e.target.value)}
+                    placeholder="Предоплата 50%"
+                    className="w-full h-10 rounded-lg bg-white/[0.04] border border-white/[0.1] px-3 text-[13px] text-white placeholder-zinc-600 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={paySaving}
-                className="min-h-10 rounded-xl bg-white px-5 text-xs font-semibold text-black hover:bg-zinc-200 disabled:opacity-40 transition-all cursor-pointer shadow-md"
+                className="w-full h-11 rounded-xl bg-white text-black font-semibold text-[14px] hover:bg-zinc-200 transition-colors cursor-pointer disabled:opacity-50"
               >
-                {paySaving ? "Сохранение…" : "Добавить поступление"}
+                {paySaving ? "Сохранение…" : "Сохранить оплату"}
               </button>
-            </div>
-          </form>
-        )}
-
-        {/* Список поступлений */}
-        {payments.length === 0 ? (
-          <div className="mt-4 rounded-2xl border border-dashed border-white/[0.08] bg-zinc-900/20 p-6 text-center text-xs text-zinc-500">
-            Пока нет оплат от клиента.
+            </form>
           </div>
-        ) : (
-          <div className="mt-4 divide-y divide-white/[0.04] rounded-2xl border border-white/[0.06] bg-zinc-900/30 overflow-hidden">
-            {payments.map((pay) => {
-              const dateStr = new Date(pay.paid_at).toLocaleDateString("ru-RU", {
-                day: "2-digit",
-                month: "short",
-              });
-              return (
-                <div
-                  key={pay.id}
-                  className="flex items-center justify-between p-3.5 text-xs"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-emerald-400">
-                        Оплата
-                      </span>
-                      <span className="text-zinc-500">{dateStr}</span>
-                    </div>
-                    {pay.note && (
-                      <div className="mt-0.5 text-zinc-500 italic truncate">
-                        {pay.note}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 ml-3">
-                    <span className="font-semibold text-emerald-400 tabular-nums whitespace-nowrap">
-                      +{formatKzt(pay.amount)} ₸
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeletePayment(pay.id)}
-                      className="rounded-lg p-1 text-zinc-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors cursor-pointer"
-                      title="Удалить"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {/* Итого поступлений */}
-            <div className="flex items-center justify-between bg-zinc-950/60 px-3.5 py-2.5 text-xs font-semibold border-t border-white/[0.06]">
-              <span className="text-zinc-400">
-                Итого поступлений: {payments.length}
-              </span>
-              <span className="text-emerald-400 tabular-nums">
-                {formatKzt(financialSummary.paymentsTotal)} ₸
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }
