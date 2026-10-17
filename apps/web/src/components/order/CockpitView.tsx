@@ -11,7 +11,7 @@ import {
   type PriceItem,
 } from "../../types/database";
 import type { ParametersMap } from "../../lib/parameters";
-import type { OrderDisplayCalculation } from "../../lib/orders";
+import { getOrderLineCalculation, type OrderDisplayCalculation } from "../../lib/orders";
 import type { CalculationOutcome } from "@kuhni/calc";
 import type { OrderStage } from "./OrderHeader";
 
@@ -94,7 +94,7 @@ const CATALOG_GROUPS: CatalogGroupDef[] = [
 ];
 
 function lineEffectiveCost(line: OrderLine): number {
-  return Math.round(line.qty * line.unit_price * (1 + (line.waste_pct || 0) / 100));
+  return getOrderLineCalculation(line).total;
 }
 
 export function CockpitView({
@@ -1342,7 +1342,7 @@ export function CockpitView({
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-500">Плановый отход</span>
                     <span className="text-emerald-400 tabular-nums">
-                      +{inspectingLine.waste_pct}%
+                      +{Math.round(inspectingLine.waste_pct <= 1 ? inspectingLine.waste_pct * 100 : inspectingLine.waste_pct)}%
                     </span>
                   </div>
                 )}

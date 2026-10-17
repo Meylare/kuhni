@@ -17,8 +17,8 @@ describe("demo-data", () => {
 
     expect(items.length).toBeGreaterThanOrEqual(1);
     expect(lines.length).toBeGreaterThanOrEqual(5);
-    expect(lines.some((l) => l.name.includes("Egger"))).toBe(true);
-    expect(lines.some((l) => l.name.includes("Blum"))).toBe(true);
+    expect(lines.some((l) => l.name.toLowerCase().includes("egger"))).toBe(true);
+    expect(lines.some((l) => l.name.toLowerCase().includes("blum"))).toBe(true);
   });
 
   it("catalog includes materials, facades, hardware and services", () => {

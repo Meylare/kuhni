@@ -36,52 +36,23 @@ export function LoginPage() {
             Вход в систему
           </h1>
           <p className="text-[13px] text-zinc-500 mt-1">
-            Калькуляция себестоимости, маржи и спецификаций
+            Рабочая база заказов, прайс-листа и калькуляций
           </p>
         </div>
 
-        {/* Быстрый запуск интерактивного демо */}
-        <div className="py-6 border-b border-white/[0.08]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[13px] font-medium text-white">
-              Интерактивный демо-режим
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-400">
-              Без пароля
-            </span>
-          </div>
-          <p className="text-xs text-zinc-500 leading-relaxed mb-4">
-            Готовые заказы кухонь и шкафов, тактильная шкала цены, голосовой ввод и живой пересчёт маржи.
-          </p>
-          <button
-            type="button"
-            onClick={enterDemoMode}
-            className="flex w-full h-11 items-center justify-center gap-2 rounded-xl bg-white text-black text-[13px] font-semibold hover:bg-zinc-200 active:scale-[0.99] transition-all cursor-pointer"
-          >
-            <span>Открыть демо-стенд</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14" />
-              <path d="m12 5 7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Форма входа владельца */}
-        <form className="pt-6 flex flex-col gap-4" onSubmit={onSubmit}>
-          <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-            Рабочий аккаунт
-          </span>
-
+        {/* Основная форма входа владельца (реальная БД Supabase) */}
+        <form className="py-6 flex flex-col gap-4 border-b border-white/[0.08]" onSubmit={onSubmit}>
           <label className="flex flex-col gap-1.5 text-xs text-zinc-400">
             Электронная почта
             <input
-              className="h-10 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 text-[14px] text-white placeholder-zinc-600 outline-none focus:border-white/30 transition-colors"
+              className="h-11 rounded-xl border border-white/[0.1] bg-white/[0.03] px-3.5 text-[14px] text-white placeholder-zinc-600 outline-none focus:border-white/30 transition-colors"
               type="email"
               name="email"
               autoComplete="email"
               inputMode="email"
               placeholder="owner@example.com"
               required
+              autoFocus
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
@@ -90,7 +61,7 @@ export function LoginPage() {
           <label className="flex flex-col gap-1.5 text-xs text-zinc-400">
             Пароль
             <input
-              className="h-10 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 text-[14px] text-white placeholder-zinc-600 outline-none focus:border-white/30 transition-colors"
+              className="h-11 rounded-xl border border-white/[0.1] bg-white/[0.03] px-3.5 text-[14px] text-white placeholder-zinc-600 outline-none focus:border-white/30 transition-colors"
               type="password"
               name="password"
               autoComplete="current-password"
@@ -108,13 +79,25 @@ export function LoginPage() {
           )}
 
           <button
-            className="mt-1 flex h-10 items-center justify-center rounded-lg border border-white/[0.12] bg-white/[0.05] px-4 text-[13px] font-medium text-white hover:bg-white/[0.1] active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer"
+            className="mt-1 flex h-11 items-center justify-center rounded-xl bg-white text-black px-4 text-[14px] font-semibold hover:bg-zinc-200 active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer"
             type="submit"
             disabled={submitting || Boolean(configError)}
           >
-            {submitting ? "Проверка…" : "Войти"}
+            {submitting ? "Вход…" : "Войти"}
           </button>
         </form>
+
+        {/* Второстепенная кнопка демо-режима */}
+        <div className="pt-5 flex items-center justify-between text-[12px] text-zinc-500">
+          <span>Нет доступа к аккаунту?</span>
+          <button
+            type="button"
+            onClick={enterDemoMode}
+            className="text-zinc-300 hover:text-white underline underline-offset-4 transition-colors cursor-pointer"
+          >
+            Открыть демо-режим →
+          </button>
+        </div>
       </div>
     </main>
   );

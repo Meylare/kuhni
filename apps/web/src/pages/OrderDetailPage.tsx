@@ -30,6 +30,7 @@ import {
 import { formatErrorMessage } from "../lib/errors";
 import { mergeOrderParameters } from "../lib/orders";
 import { getSupabase } from "../lib/supabase";
+import { demoSaveOrder, isDemoModeActive } from "../lib/demo-data";
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -203,6 +204,13 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
   // Обновление цены договора из этапа «Договор» (U5.3)
   async function handleUpdateContractPrice(newPrice: number | null) {
     if (!order || locked) return;
+    if (isDemoModeActive()) {
+      const updated = { ...order, contract_price: newPrice };
+      demoSaveOrder(updated);
+      orderData.setOrder(updated);
+      triggerAutoSaveToast("Цена договора сохранена");
+      return;
+    }
     const { error: updErr } = await getSupabase()
       .from("orders")
       .update({ contract_price: newPrice })
