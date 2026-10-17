@@ -326,6 +326,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           onOpenPricePicker={orderLines.handleOpenPricePicker}
           onSaveCalculation={orderCalcs.handleSaveCalculation}
           onOpenVersionsModal={() => setIsVersionsModalOpen(true)}
+          onOpenApplyTemplate={() => handleOpenApplyTemplate()}
+          onOpenSaveAsTemplate={() => setIsSaveTemplateOpen(true)}
           onBack={onBack}
           onToggleTableMode={() => setDisplayMode("table")}
         />

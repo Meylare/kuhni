@@ -8,7 +8,6 @@ import {
 import { formatErrorMessage } from "../lib/errors";
 import { getMarginColor } from "../lib/margin-colors";
 import { formatKzt } from "../lib/money";
-import { formatCurrencyInput } from "../lib/number-inputs";
 import {
   filterOrders,
   getLatestCalculation,
@@ -36,9 +35,9 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Модалка создания заказа
+  // Модалка создания заказа (по умолчанию всегда чистый пустой заказ)
   const [isCreating, setIsCreating] = useState(false);
-  const [createPreset, setCreatePreset] = useState<"kitchen" | "wardrobe" | "empty">("kitchen");
+  const [createPreset, setCreatePreset] = useState<"kitchen" | "wardrobe" | "empty">("empty");
   const [createName, setCreateName] = useState("");
   const [createClient, setCreateClient] = useState("");
   const [createContractPrice, setCreateContractPrice] = useState("");
@@ -80,24 +79,12 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
     void loadOrders();
   }, []);
 
-  function handleOpenCreateModal(preset: "kitchen" | "wardrobe" | "empty" = "kitchen") {
+  function handleOpenCreateModal(preset: "kitchen" | "wardrobe" | "empty" = "empty") {
     setCreatePreset(preset);
-    setCreateName(
-      preset === "kitchen"
-        ? "Кухня на заказ"
-        : preset === "wardrobe"
-        ? "Шкаф-купе в спальню"
-        : ""
-    );
+    setCreateName("");
     setCreateClient("");
     setCreateContractPrice("");
-    setCreateNote(
-      preset === "kitchen"
-        ? "Комплектация: Egger 18мм, фасады MDF Soft-Touch, фурнитура Blum"
-        : preset === "wardrobe"
-        ? "Комплектация: Egger 18мм, профиль Modus, ящики Boyard"
-        : ""
-    );
+    setCreateNote("");
     setCreateError(null);
     setIsCreating(true);
   }
@@ -204,7 +191,7 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
 
           <button
             type="button"
-            onClick={() => handleOpenCreateModal("kitchen")}
+            onClick={() => handleOpenCreateModal("empty")}
             className="inline-flex items-center gap-1.5 bg-white text-black font-semibold px-4 h-9 rounded-full text-[13px] hover:bg-zinc-200 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
@@ -397,68 +384,20 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
               </button>
             </div>
 
-            <form onSubmit={handleCreateOrder} className="mt-5 flex flex-col gap-4 text-[13px]">
-              <div style={{ animationDelay: "30ms" }} className="apple-menu-item">
-                <label className="block text-[11px] uppercase tracking-wider text-zinc-500 mb-2">
-                  Базовый пресет
-                </label>
-                <div className="grid grid-cols-3 rounded-xl bg-white/[0.04] p-1 border border-white/[0.06]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreatePreset("kitchen");
-                      if (!createName || createName.includes("Шкаф"))
-                        setCreateName("Кухня на заказ");
-                    }}
-                    className={`py-1.5 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
-                      createPreset === "kitchen"
-                        ? "bg-white text-black font-semibold shadow-xs"
-                        : "text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    Кухня
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreatePreset("wardrobe");
-                      if (!createName || createName.includes("Кухня"))
-                        setCreateName("Шкаф-купе в спальню");
-                    }}
-                    className={`py-1.5 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
-                      createPreset === "wardrobe"
-                        ? "bg-white text-black font-semibold shadow-xs"
-                        : "text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    Шкаф
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCreatePreset("empty")}
-                    className={`py-1.5 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
-                      createPreset === "empty"
-                        ? "bg-white text-black font-semibold shadow-xs"
-                        : "text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    С нуля
-                  </button>
-                </div>
-              </div>
-
+            <form onSubmit={handleCreateOrder} className="mt-4 flex flex-col gap-4 text-[13px]">
               <div
-                style={{ animationDelay: "70ms" }}
-                className="apple-menu-item divide-y divide-white/[0.07] border-y border-white/[0.07]"
+                style={{ animationDelay: "30ms" }}
+                className="apple-menu-item divide-y divide-white/[0.07] border-b border-white/[0.07]"
               >
                 <div className="py-3 flex items-center justify-between gap-3">
-                  <label className="text-zinc-400 shrink-0 w-28">Проект</label>
+                  <label className="text-zinc-400 shrink-0 w-28">Название *</label>
                   <input
                     type="text"
                     required
+                    autoFocus
                     value={createName}
                     onChange={(e) => setCreateName(e.target.value)}
-                    placeholder="Кухня · ЖК Highvill"
+                    placeholder="Например: Кухня · ЖК Highvill"
                     className="w-full bg-transparent text-right text-white placeholder-zinc-600 focus:outline-none"
                   />
                 </div>
@@ -475,26 +414,12 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
                 </div>
 
                 <div className="py-3 flex items-center justify-between gap-3">
-                  <label className="text-zinc-400 shrink-0 w-28">Бюджет (₸)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={createContractPrice}
-                    onChange={(e) =>
-                      setCreateContractPrice(formatCurrencyInput(e.target.value))
-                    }
-                    placeholder="Авторасчёт по смете"
-                    className="w-full bg-transparent text-right text-white placeholder-zinc-600 focus:outline-none tabular-nums"
-                  />
-                </div>
-
-                <div className="py-3 flex items-center justify-between gap-3">
                   <label className="text-zinc-400 shrink-0 w-28">Примечание</label>
                   <input
                     type="text"
                     value={createNote}
                     onChange={(e) => setCreateNote(e.target.value)}
-                    placeholder="Размеры и детали"
+                    placeholder="Размеры и детали (опционально)"
                     className="w-full bg-transparent text-right text-white placeholder-zinc-600 focus:outline-none"
                   />
                 </div>
@@ -507,10 +432,10 @@ export function OrdersPage({ onSelectOrder }: OrdersPageProps) {
               <button
                 type="submit"
                 disabled={createSaving}
-                style={{ animationDelay: "110ms" }}
+                style={{ animationDelay: "70ms" }}
                 className="apple-menu-item mt-2 w-full h-11 rounded-xl bg-white text-black text-[14px] font-semibold hover:bg-zinc-200 active:scale-[0.99] disabled:opacity-50 transition-all cursor-pointer"
               >
-                {createSaving ? "Создание…" : "Создать проект"}
+                {createSaving ? "Создание…" : "Создать пустой заказ"}
               </button>
             </form>
           </div>

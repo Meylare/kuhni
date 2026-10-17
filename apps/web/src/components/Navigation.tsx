@@ -13,7 +13,6 @@ interface NavigationProps {
 const NAV_ITEMS: { id: ActiveTab; label: string }[] = [
   { id: "orders", label: "Сделки" },
   { id: "prices", label: "Каталог" },
-  { id: "templates", label: "Шаблоны" },
   { id: "parameters", label: "Параметры" },
 ];
 
