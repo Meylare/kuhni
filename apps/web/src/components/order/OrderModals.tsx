@@ -3,6 +3,7 @@ import {
   ApplyTemplateModal,
   ItemModal,
   ManualLineModal,
+  MeasurementChecklistModal,
   OrderHeaderModal,
   PriceDiffModal,
   PricePickerModal,
@@ -13,6 +14,7 @@ import {
 import {
   useOrderAdjustments,
   useOrderCalculations,
+  useOrderChecklist,
   useOrderData,
   useOrderItems,
   useOrderLines,
@@ -24,6 +26,7 @@ interface OrderModalsProps {
   orderLines: ReturnType<typeof useOrderLines>;
   orderAdjustments: ReturnType<typeof useOrderAdjustments>;
   orderCalcs: ReturnType<typeof useOrderCalculations>;
+  orderChecklist: ReturnType<typeof useOrderChecklist>;
   isSaveTemplateOpen: boolean;
   setIsSaveTemplateOpen: (open: boolean) => void;
   isApplyTemplateOpen: boolean;
@@ -40,6 +43,7 @@ export function OrderModals({
   orderLines,
   orderAdjustments,
   orderCalcs,
+  orderChecklist,
   isSaveTemplateOpen,
   setIsSaveTemplateOpen,
   isApplyTemplateOpen,
@@ -207,6 +211,18 @@ export function OrderModals({
         onSaveCalculation={orderCalcs.handleSaveCalculation}
         calcSaving={orderCalcs.calcSaving}
       />
+
+      {orderData.order && (
+        <MeasurementChecklistModal
+          isOpen={orderChecklist.isChecklistOpen}
+          onClose={() => orderChecklist.setIsChecklistOpen(false)}
+          order={orderData.order}
+          checklist={orderChecklist.checklist}
+          onToggleItem={orderChecklist.handleToggleChecklistItem}
+          onUpdateItemNote={orderChecklist.handleUpdateChecklistItemNote}
+        />
+      )}
     </>
   );
 }
+

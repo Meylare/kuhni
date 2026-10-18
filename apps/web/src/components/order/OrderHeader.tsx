@@ -15,11 +15,13 @@ export interface OrderHeaderProps {
   linesCount: number;
   calculationsCount: number;
   factCount: number;
+  checklistProgress?: { checked: number; total: number; isAllChecked: boolean };
   onBack: () => void;
   onOpenEditHeader: () => void;
   onRetryLoad: () => void;
   onOpenUnlockModal: () => void;
   onOpenVersionsModal: () => void;
+  onOpenChecklist?: () => void;
   onCopySummary: () => void;
   onSelectStage: (stage: OrderStage) => void;
 }
@@ -36,11 +38,13 @@ export function OrderHeader({
   linesCount,
   calculationsCount,
   factCount,
+  checklistProgress,
   onBack,
   onOpenEditHeader,
   onRetryLoad,
   onOpenUnlockModal,
   onOpenVersionsModal,
+  onOpenChecklist,
   onCopySummary,
   onSelectStage,
 }: OrderHeaderProps) {
@@ -68,6 +72,20 @@ export function OrderHeader({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {onOpenChecklist && checklistProgress && (
+            <button
+              type="button"
+              onClick={onOpenChecklist}
+              className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-all cursor-pointer"
+              title="Единый чек-лист замера мебельного объекта"
+            >
+              <span>📏</span>
+              <span>
+                Замер ({checklistProgress.checked}/{checklistProgress.total})
+              </span>
+            </button>
+          )}
+
           {/* Кнопка версий расчёта */}
           <button
             type="button"

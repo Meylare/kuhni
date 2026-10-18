@@ -17,6 +17,7 @@ import {
 import {
   useOrderAdjustments,
   useOrderCalculations,
+  useOrderChecklist,
   useOrderData,
   useOrderDeletions,
   useOrderItems,
@@ -72,6 +73,9 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
     setApplyTemplateDefaultItemId(itemId);
     setIsApplyTemplateOpen(true);
   }
+
+  // Чек-лист замера мебельного объекта
+  const orderChecklist = useOrderChecklist(orderId);
 
   // 1. Загрузка и состояние заказа, шапки и настроек
   const orderData = useOrderData(orderId);
@@ -336,6 +340,8 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
           onOpenVersionsModal={() => setIsVersionsModalOpen(true)}
           onOpenApplyTemplate={() => handleOpenApplyTemplate()}
           onOpenSaveAsTemplate={() => setIsSaveTemplateOpen(true)}
+          checklistProgress={orderChecklist.checklistProgress}
+          onOpenChecklist={() => orderChecklist.setIsChecklistOpen(true)}
           onBack={onBack}
           onToggleTableMode={() => setDisplayMode("table")}
         />
@@ -364,11 +370,13 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
             linesCount={lines.length}
             calculationsCount={calculations.length}
             factCount={expenses.length + payments.length}
+            checklistProgress={orderChecklist.checklistProgress}
             onBack={onBack}
             onOpenEditHeader={handleOpenEditHeader}
             onRetryLoad={() => void loadOrderData()}
             onOpenUnlockModal={() => orderCalcs.setIsUnlockModalOpen(true)}
             onOpenVersionsModal={() => setIsVersionsModalOpen(true)}
+            onOpenChecklist={() => orderChecklist.setIsChecklistOpen(true)}
             onCopySummary={orderCalcs.handleCopySummary}
             onSelectStage={handleSelectStage}
           />
@@ -501,6 +509,7 @@ export function OrderDetailPage({ orderId, onBack }: OrderDetailPageProps) {
         orderLines={orderLines}
         orderAdjustments={orderAdjustments}
         orderCalcs={orderCalcs}
+        orderChecklist={orderChecklist}
         isSaveTemplateOpen={isSaveTemplateOpen}
         setIsSaveTemplateOpen={setIsSaveTemplateOpen}
         isApplyTemplateOpen={isApplyTemplateOpen}

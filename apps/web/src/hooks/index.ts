@@ -7,3 +7,5 @@ export { useManualLine } from "./useManualLine";
 export { useProductTemplates } from "./useProductTemplates";
 export { useUndoDelete } from "./useUndoDelete";
 export { useOrderDeletions } from "./useOrderDeletions";
+export { useOrderChecklist } from "./useOrderChecklist";
+

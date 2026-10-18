@@ -285,3 +285,45 @@ export interface ProductTemplateWithLines extends ProductTemplate {
   lines?: (ProductTemplateLine & { price_item?: PriceItem })[];
 }
 
+export type OrderChecklistStatus = "in_progress" | "completed";
+
+export interface ChecklistTemplateItem {
+  id: string;
+  template_id: string;
+  block_number: number;
+  block_title: string;
+  block_subtitle: string | null;
+  item_code: string;
+  title: string;
+  description: string;
+  sort_order: number;
+}
+
+export interface OrderChecklistItem {
+  id: string;
+  checklist_id: string;
+  block_number: number;
+  block_title: string;
+  block_subtitle: string | null;
+  item_code: string;
+  title: string;
+  description: string;
+  sort_order: number;
+  is_checked: boolean;
+  note: string | null;
+  updated_at: string;
+}
+
+export interface OrderChecklist {
+  id: string;
+  order_id: string;
+  template_code: string;
+  title: string;
+  status: OrderChecklistStatus;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  items: OrderChecklistItem[];
+}
+
+

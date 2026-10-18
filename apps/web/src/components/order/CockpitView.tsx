@@ -36,6 +36,8 @@ export interface CockpitViewProps {
   onOpenVersionsModal: () => void;
   onOpenApplyTemplate?: () => void;
   onOpenSaveAsTemplate?: () => void;
+  checklistProgress?: { checked: number; total: number; isAllChecked: boolean };
+  onOpenChecklist?: () => void;
   onBack: () => void;
   onToggleTableMode?: () => void;
 }
@@ -118,6 +120,8 @@ export function CockpitView({
   onOpenVersionsModal,
   onOpenApplyTemplate,
   onOpenSaveAsTemplate,
+  checklistProgress,
+  onOpenChecklist,
   onBack,
 }: CockpitViewProps) {
   const [viewMode, setViewMode] = useState<"deal" | "client">("deal");
@@ -462,6 +466,27 @@ export function CockpitView({
           </button>
 
           <div className="flex items-center gap-2">
+            {onOpenChecklist && checklistProgress && (
+              <button
+                type="button"
+                onClick={onOpenChecklist}
+                className={`h-8 px-3 rounded-full flex items-center gap-1.5 text-[12px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+                  checklistProgress.isAllChecked
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : checklistProgress.checked > 0
+                    ? "bg-amber-500/15 text-amber-300 border border-amber-500/25"
+                    : "bg-white/[0.05] text-zinc-300 hover:text-white hover:bg-white/[0.09]"
+                }`}
+                title="Открыть чек-лист замера мебельного объекта"
+              >
+                <span>📏</span>
+                <span>Замер</span>
+                <span className="font-mono text-[11px] opacity-90">
+                  {checklistProgress.checked}/{checklistProgress.total}
+                </span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setViewMode((prev) => (prev === "deal" ? "client" : "deal"))}
@@ -551,7 +576,7 @@ export function CockpitView({
           {/* Подстрочник статуса */}
           <div className="mt-2.5 flex items-center gap-2 text-[13px] text-zinc-400 tabular-nums whitespace-nowrap">
             {lines.length === 0 ? (
-              <span className="text-zinc-500">Пустой проект · добавьте позиции или шаблон</span>
+              <span className="text-zinc-500">Пустой проект · начните с замера или сметы</span>
             ) : viewMode === "deal" ? (
               <>
                 <span
@@ -579,14 +604,30 @@ export function CockpitView({
               </svg>
             </div>
             <h2 className="text-[16px] font-medium text-white">
-              Смета заказа пуста
+              Новый заказ готов к работе
             </h2>
             <p className="mt-1 text-[13px] text-zinc-500 max-w-xs leading-relaxed">
-              Выберите материалы по категориям из прайс-листа или загрузите готовый шаблон комплектации.
+              Пройдитесь по чек-листу замера на объекте, выберите материалы из прайс-листа или загрузите шаблон.
             </p>
 
             {!locked && (
               <div className="mt-6 w-full flex flex-col gap-2.5">
+                {onOpenChecklist && checklistProgress && (
+                  <button
+                    type="button"
+                    onClick={onOpenChecklist}
+                    className="w-full h-12 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-200 font-semibold text-[14px] transition-all cursor-pointer flex items-center justify-between px-4"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>📏</span>
+                      <span>Чек-лист замера объекта</span>
+                    </span>
+                    <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[12px] font-mono text-emerald-300">
+                      {checklistProgress.checked} / {checklistProgress.total}
+                    </span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => openAddSheet(null)}
@@ -1052,6 +1093,23 @@ export function CockpitView({
 
             <div className="divide-y divide-white/[0.06]">
               <div className="py-1">
+                {onOpenChecklist && checklistProgress && (
+                  <button
+                    type="button"
+                    style={{ animationDelay: "15ms" }}
+                    onClick={() => {
+                      setIsOrderMenuOpen(false);
+                      onOpenChecklist();
+                    }}
+                    className="apple-menu-item w-full px-3 py-2.5 rounded-xl flex items-center justify-between text-[14px] text-emerald-300 hover:bg-white/[0.07] transition-colors cursor-pointer"
+                  >
+                    <span>Чек-лист замера объекта</span>
+                    <span className="text-[12px] font-mono text-emerald-400">
+                      {checklistProgress.checked}/{checklistProgress.total}
+                    </span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   style={{ animationDelay: "25ms" }}

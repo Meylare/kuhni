@@ -8,3 +8,5 @@ export { OrderHeaderModal } from "./OrderHeaderModal";
 export { SaveAsTemplateModal } from "./SaveAsTemplateModal";
 export { ApplyTemplateModal } from "./ApplyTemplateModal";
 export { VersionsModal } from "./VersionsModal";
+export { MeasurementChecklistModal } from "./MeasurementChecklistModal";
+
