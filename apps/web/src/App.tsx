@@ -1,26 +1,47 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState, type ComponentType } from "react";
 
 import { AccessDeniedPage } from "./auth/AccessDeniedPage";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { LoginPage } from "./auth/LoginPage";
 import { DialogProvider } from "./components/DialogProvider";
-import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ErrorBoundary, isStaleChunkError, reloadClearingSwCaches } from "./components/ErrorBoundary";
 import { Navigation, type ActiveTab } from "./components/Navigation";
 import { UpdateBanner } from "./components/UpdateBanner";
 
-const OrdersPage = lazy(() =>
+const CHUNK_RELOAD_KEY = "kuhni_chunk_reload_ts";
+
+function lazyWithRetry<T extends ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+) {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (error) {
+      if (typeof window !== "undefined" && isStaleChunkError(error)) {
+        const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || "0");
+        if (Date.now() - lastReload > 15_000) {
+          sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+          await reloadClearingSwCaches();
+        }
+      }
+      throw error;
+    }
+  });
+}
+
+const OrdersPage = lazyWithRetry(() =>
   import("./pages/OrdersPage").then((m) => ({ default: m.OrdersPage })),
 );
-const OrderDetailPage = lazy(() =>
+const OrderDetailPage = lazyWithRetry(() =>
   import("./pages/OrderDetailPage").then((m) => ({ default: m.OrderDetailPage })),
 );
-const PriceListPage = lazy(() =>
+const PriceListPage = lazyWithRetry(() =>
   import("./pages/PriceListPage").then((m) => ({ default: m.PriceListPage })),
 );
-const ParametersPage = lazy(() =>
+const ParametersPage = lazyWithRetry(() =>
   import("./pages/ParametersPage").then((m) => ({ default: m.ParametersPage })),
 );
-const TemplatesPage = lazy(() =>
+const TemplatesPage = lazyWithRetry(() =>
   import("./pages/TemplatesPage").then((m) => ({ default: m.TemplatesPage })),
 );
 

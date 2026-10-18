@@ -1,5 +1,39 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
+export function isStaleChunkError(error: unknown): boolean {
+  const msg =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes("not a valid javascript mime type") ||
+    lower.includes("failed to fetch dynamically imported module") ||
+    lower.includes("importing a module script failed") ||
+    lower.includes("error loading dynamically imported module") ||
+    lower.includes("unable to preload css")
+  );
+}
+
+export async function reloadClearingSwCaches(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    if ("caches" in window) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.map((k) => window.caches.delete(k)));
+    }
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.update().catch(() => {})));
+    }
+  } catch {
+    // ignore cache cleanup errors
+  }
+  window.location.reload();
+}
+
 interface Props {
   children: ReactNode;
 }
@@ -21,13 +55,25 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
+    if (typeof window !== "undefined" && isStaleChunkError(error)) {
+      const key = "kuhni_eb_chunk_reload_ts";
+      const last = Number(sessionStorage.getItem(key) || "0");
+      if (Date.now() - last > 15_000) {
+        sessionStorage.setItem(key, String(Date.now()));
+        void reloadClearingSwCaches();
+      }
+    }
   }
 
   handleReload = () => {
-    window.location.reload();
+    void reloadClearingSwCaches();
   };
 
   handleReset = () => {
+    if (this.state.error && isStaleChunkError(this.state.error)) {
+      void reloadClearingSwCaches();
+      return;
+    }
     this.setState({ hasError: false, error: null });
   };
 

@@ -1,7 +1,7 @@
-const CACHE = "kuhni-shell-v2";
+const CACHE = "kuhni-shell-v3";
 
 const STATIC_ASSET_REGEX =
-  /\.(?:html|js|css|svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot|webmanifest|json)$/i;
+  /\.(?:js|css|svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot|webmanifest|json)$/i;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -38,6 +38,15 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+function isHtmlFallthroughForScriptOrStyle(pathname, response) {
+  if (!response) return false;
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (/\.(?:js|css)$/i.test(pathname) && contentType.includes("text/html")) {
+    return true;
+  }
+  return false;
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
     return;
@@ -55,15 +64,34 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Никогда не кэшировать запросы к API
-  if (url.pathname.startsWith("/api") || url.pathname.startsWith("/rest")) {
+  // 2. Никогда не кэшировать запросы к API и самому sw.js
+  if (
+    url.pathname.startsWith("/api") ||
+    url.pathname.startsWith("/rest") ||
+    url.pathname.endsWith("/sw.js")
+  ) {
     return;
   }
 
-  // 3. Для SPA-навигации отдавать index.html из кэша только при сбое сети
-  if (event.request.mode === "navigate") {
+  // 3. Для SPA-навигации и HTML: сначала сеть (с обновлением кэша), при офлайне — кэш
+  if (
+    event.request.mode === "navigate" ||
+    url.pathname === "/" ||
+    url.pathname.endsWith(".html")
+  ) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("./index.html"))
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.ok) {
+            const copy = networkResponse.clone();
+            caches
+              .open(CACHE)
+              .then((cache) => cache.put("./index.html", copy))
+              .catch(() => {});
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match("./index.html"))
     );
     return;
   }
@@ -75,13 +103,19 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
+      const validCached =
+        cachedResponse &&
+        !isHtmlFallthroughForScriptOrStyle(url.pathname, cachedResponse)
+          ? cachedResponse
+          : undefined;
+
       const fetchPromise = fetch(event.request)
         .then((networkResponse) => {
-          // Проверяем response.ok и type === 'basic' перед записью в кэш
           if (
             networkResponse &&
             networkResponse.ok &&
-            networkResponse.type === "basic"
+            networkResponse.type === "basic" &&
+            !isHtmlFallthroughForScriptOrStyle(url.pathname, networkResponse)
           ) {
             const copy = networkResponse.clone();
             caches
@@ -91,9 +125,9 @@ self.addEventListener("fetch", (event) => {
           }
           return networkResponse;
         })
-        .catch(() => cachedResponse);
+        .catch(() => validCached);
 
-      return cachedResponse || fetchPromise;
+      return validCached || fetchPromise;
     })
   );
 });
